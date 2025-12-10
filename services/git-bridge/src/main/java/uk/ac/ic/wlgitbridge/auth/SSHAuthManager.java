@@ -29,9 +29,15 @@ public class SSHAuthManager {
             for (SSHKey k : keys) {
                 if (k == null || k.getPublicKey() == null) continue;
                 String stored = normalizePublicKey(k.getPublicKey());
-                if (Objects.equals(stored, normalizedPresented)) return true;
+                if (Objects.equals(stored, normalizedPresented)) {
+                    System.out.println("Exact match for key: " + stored);
+                    return true;
+                }
                 String storedFp = fingerprint(stored);
-                if (Objects.equals(storedFp, presentedFingerprint)) return true;
+                if (!storedFp.isEmpty() && !presentedFingerprint.isEmpty() && Objects.equals(storedFp, presentedFingerprint)) {
+                    System.out.println("Fingerprint match for user " + userId + ": storedFp=" + storedFp + " presentedFp=" + presentedFingerprint);
+                    return true;
+                }
             }
         } catch (Exception e) {
             Log.warn("Error validating SSH key for user {}: {}", userId, e.getMessage());
@@ -41,7 +47,12 @@ public class SSHAuthManager {
     }
 
     private static String normalizePublicKey(String pubkey) {
-        return pubkey.trim().replaceAll("\\s+", " ");
+        String s = pubkey.trim().replaceAll("\\s+", " ");
+        String[] parts = s.split(" ", 3);
+        if (parts.length >= 2) {
+            return parts[0] + " " + parts[1];
+        }
+        return s;
     }
 
     private static String fingerprint(String pubkey) {
