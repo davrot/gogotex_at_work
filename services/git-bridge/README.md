@@ -77,9 +77,11 @@ The configuration file is in `.json` format.
         "serviceName" (string): current name of writeLaTeX
                                 in case it ever changes,
         "oauth2Server" (string): oauth2 server,
-                                 with protocol and
-                                 without trailing slash,
-                                 null or missing if oauth2 shouldn't be used
+               with protocol and
+               without trailing slash,
+               null or missing if oauth2 shouldn't be used
+        "webProfileApiUrl" (string, optional): internal web-profile API base URL for SSH key retrieval (recommended),
+        "webProfileApiToken" (string, optional): bearer token for internal web-profile API calls,
         },
         "repoStore" (object, optional): { configure the repo store
             "maxFileSize" (long, optional): maximum size of a file, inclusive
