@@ -1,26 +1,5 @@
 package uk.ac.ic.wlgitbridge.auth;
 
-/**
- * Lightweight scaffold for SSH authentication management.
- * This is a placeholder to be extended with key storage, validation
- * and integration with the git-bridge SSH server logic.
- */
-public class SSHAuthManager {
-
-    public SSHAuthManager() {
-    }
-
-    /**
-     * Returns whether SSH-only authentication mode is enabled.
-     * Implementation: read config / feature flag.
-     */
-    public boolean isSSHOnlyEnabled() {
-        return false; // TODO: implement
-    }
-
-}
-package uk.ac.ic.wlgitbridge.auth;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
