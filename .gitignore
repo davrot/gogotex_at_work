@@ -7,5 +7,4 @@ docker-compose.override.yml
 
 node_modules
 services/web/node_modules
-services/web_llm
 develop_llm
