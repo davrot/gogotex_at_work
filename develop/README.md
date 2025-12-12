@@ -87,3 +87,33 @@ services you want to attach a debugger to.
 
 After adding an entry, the service will show up as a _Remote Target_ that you
 can inspect and debug.
+
+## Mongo development notes
+
+- The development compose now includes a healthcheck that verifies the MongoDB
+  replica set has been initialized and a `PRIMARY` is elected. Services will
+  wait (via a small wrapper) until Mongo is PRIMARY before starting, avoiding
+  repeated startup crashes when the replica set is not yet configured.
+- There is an idempotent init script at `bin/shared/mongodb-init-replica-set.js`;
+  it will only call `rs.initiate()` when the replica set is not already
+  configured. This allows running `bin/up` repeatedly without errors.
+- If you need to reinitialize the replica set manually, run:
+
+```shell
+docker exec -it develop-mongo-1 bash -lc "mongosh --quiet --eval \"rs.initiate({_id:'overleaf', members:[{_id:0, host:'mongo:27017'}]})\""
+```
+
+If you encounter issues with the replica set not being PRIMARY, this command
+will initialize it idempotently.
+
+## Webpack dev server (ports)
+
+- The webpack dev server runs inside the `develop-webpack-1` container and is
+  exposed on host port `3808` (http://localhost:3808) in the `develop` compose
+  setup. Some developer environments (for example nested dev containers or
+  restricted Docker setups) may not allow binding directly to privileged host
+  ports like `80` or may isolate host loopback from this container. If you
+  previously relied on port `80`, use `http://localhost:3808` instead.
+- If you really need `http://localhost/` (port 80), consider adding a local
+  reverse-proxy on the host that forwards `:80` → `:3808`, or run a small
+  proxy container with `network_mode: host` that can bind port 80 on the host.

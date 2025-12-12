@@ -17,6 +17,9 @@ services:
       dockerfile: services/chat/Dockerfile
     env_file:
       - dev.env
+    volumes:
+      - ../bin/shared:/overleaf/bin/shared:ro
+    entrypoint: ["/bin/bash", "-lc", "bash /overleaf/bin/shared/wait-for-mongo.sh && exec \"$@\""]
 
   clsi:
     build:
@@ -42,6 +45,9 @@ services:
       dockerfile: services/contacts/Dockerfile
     env_file:
       - dev.env
+    volumes:
+      - ../bin/shared:/overleaf/bin/shared:ro
+    entrypoint: ["/bin/bash", "-lc", "bash /overleaf/bin/shared/wait-for-mongo.sh && exec \"$@\""]
 
   docstore:
     build:
@@ -49,6 +55,9 @@ services:
       dockerfile: services/docstore/Dockerfile
     env_file:
       - dev.env
+    volumes:
+      - ../bin/shared:/overleaf/bin/shared:ro
+    entrypoint: ["/bin/bash", "-lc", "bash /overleaf/bin/shared/wait-for-mongo.sh && exec \"$@\""]
 
   document-updater:
     build:
@@ -56,6 +65,9 @@ services:
       dockerfile: services/document-updater/Dockerfile
     env_file:
       - dev.env
+    volumes:
+      - ../bin/shared:/overleaf/bin/shared:ro
+    entrypoint: ["/bin/bash", "-lc", "bash /overleaf/bin/shared/wait-for-mongo.sh && exec \"$@\""]
 
   filestore:
     build:
@@ -84,7 +96,9 @@ services:
       OVERLEAF_EDITOR_ZIPS_BUCKET: "/buckets/zips"
       PERSISTOR_BACKEND: fs
     volumes:
-        - history-v1-buckets:/buckets
+      - history-v1-buckets:/buckets
+      - ../bin/shared:/overleaf/bin/shared:ro
+    entrypoint: ["/bin/bash", "-lc", "bash /overleaf/bin/shared/wait-for-mongo.sh && exec \"$@\""]
 
   mongo:
     image: mongo:6.0
@@ -94,6 +108,12 @@ services:
     volumes:
       - mongo-data:/data/db
       - ../bin/shared/mongodb-init-replica-set.js:/docker-entrypoint-initdb.d/mongodb-init-replica-set.js
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval \"try { if (rs.status().myState == 1) { print('PRIMARY') } else { print('NOT_PRIMARY') } } catch (e) { print('NO_REPLSET') }\" | grep -q PRIMARY" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
     environment:
       MONGO_INITDB_DATABASE: sharelatex
     extra_hosts:
@@ -108,6 +128,9 @@ services:
       dockerfile: services/notifications/Dockerfile
     env_file:
       - dev.env
+    volumes:
+      - ../bin/shared:/overleaf/bin/shared:ro
+    entrypoint: ["/bin/bash", "-lc", "bash /overleaf/bin/shared/wait-for-mongo.sh && exec \"$@\""]
 
   project-history:
     build:
@@ -115,6 +138,9 @@ services:
       dockerfile: services/project-history/Dockerfile
     env_file:
         - dev.env
+    volumes:
+      - ../bin/shared:/overleaf/bin/shared:ro
+    entrypoint: ["/bin/bash", "-lc", "bash /overleaf/bin/shared/wait-for-mongo.sh && exec \"$@\""]
 
   real-time:
     build:
@@ -143,10 +169,15 @@ services:
       - EMAIL_CONFIRMATION_DISABLED=true
       - NODE_ENV=development
       - OVERLEAF_ALLOW_PUBLIC_ACCESS=true
+      - AUTH_TOKEN_ALLOW_BCRYPT_FALLBACK=true
     command: ["node", "app.mjs"]
+    ports:
+      - "127.0.0.1:3000:3000"
     volumes:
       - sharelatex-data:/var/lib/overleaf
       - web-data:/overleaf/services/web/data
+      - ../bin/shared:/overleaf/bin/shared:ro
+    entrypoint: ["/bin/bash", "-lc", "bash /overleaf/bin/shared/wait-for-mongo.sh && exec \"$@\""]
     depends_on:
       - mongo
       - redis
@@ -166,8 +197,8 @@ services:
       context: ..
       dockerfile: services/web/Dockerfile
       target: webpack
-    command: ["npx", "webpack", "serve", "--config", "webpack.config.dev-env.js"]
+    command: ["npx", "webpack", "serve", "--config", "webpack.config.dev.js", "--host", "0.0.0.0"]
     ports:
-      - "127.0.0.1:80:3808"
-    volumes:
-      - ./webpack.config.dev-env.js:/overleaf/services/web/webpack.config.dev-env.js
+      - "0.0.0.0:3808:3808"
+    # Use the built-in webpack.dev config in the image; avoid bind-mounting the
+    # local dev-config which can cause mount conflicts on some hosts.
