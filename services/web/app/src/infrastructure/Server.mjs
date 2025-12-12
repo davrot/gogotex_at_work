@@ -1,6 +1,5 @@
 import express from 'express'
 import Settings from '@overleaf/settings'
-import assertHashAvailability from '../config/hashAvailability.mjs'
 import logger from '@overleaf/logger'
 import metrics from '@overleaf/metrics'
 import csp, { removeCSPHeaders } from './CSP.mjs'
@@ -120,18 +119,6 @@ if (Settings.exposeHostname) {
     res.setHeader('X-Served-By', HOSTNAME)
     next()
   })
-}
-
-// Validate hashing implementation availability based on runtime settings.
-try {
-  // Prefer ENV during development; some dev setups may not populate the
-  // full `Settings` object the same way as production, so fallback to
-  // process.env to allow local overrides such as `AUTH_TOKEN_ALLOW_BCRYPT_FALLBACK`.
-  const configToCheck = process.env.NODE_ENV === 'development' ? process.env : Settings
-  assertHashAvailability(configToCheck)
-} catch (e) {
-  logger.err({ err: e }, 'hash algorithm availability check failed; aborting startup')
-  throw e
 }
 
 webRouter.use(

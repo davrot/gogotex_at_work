@@ -7,14 +7,12 @@ import {
 import getMeta from '../../../utils/meta'
 import useAsync from '../../../shared/hooks/use-async'
 import { useUserContext } from '../../../shared/context/user-context'
-import OLButton from '../../../shared/components/ol/ol-button'
-import OLNotification from '../../../shared/components/ol/ol-notification'
-import OLFormGroup from '../../../shared/components/ol/ol-form-group'
-import OLFormLabel from '../../../shared/components/ol/ol-form-label'
-import OLFormControl from '../../../shared/components/ol/ol-form-control'
-import OLFormText from '../../../shared/components/ol/ol-form-text'
-import SSHKeysPanel from './SSHKeysPanel'
-import GitTokensPanel from './GitTokensPanel'
+import OLButton from '@/shared/components/ol/ol-button'
+import OLNotification from '@/shared/components/ol/ol-notification'
+import OLFormGroup from '@/shared/components/ol/ol-form-group'
+import OLFormLabel from '@/shared/components/ol/ol-form-label'
+import OLFormControl from '@/shared/components/ol/ol-form-control'
+import OLFormText from '@/shared/components/ol/ol-form-text'
 
 function AccountInfoSection() {
   const { t } = useTranslation()
@@ -24,7 +22,6 @@ function AccountInfoSection() {
   )
   const shouldAllowEditingDetails = getMeta('ol-shouldAllowEditingDetails')
   const {
-    id: userId,
     first_name: initialFirstName,
     last_name: initialLastName,
     email: initialEmail,
@@ -138,8 +135,6 @@ function AccountInfoSection() {
           </OLFormGroup>
         ) : null}
       </form>
-      <SSHKeysPanel userId={userId} />
-      <GitTokensPanel userId={userId} />
     </>
   )
 }

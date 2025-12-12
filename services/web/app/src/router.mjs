@@ -20,9 +20,6 @@ import NotificationsController from './Features/Notifications/NotificationsContr
 import CollaboratorsRouter from './Features/Collaborators/CollaboratorsRouter.mjs'
 import UserInfoController from './Features/User/UserInfoController.mjs'
 import UserController from './Features/User/UserController.mjs'
-import UserSSHKeysController from './Features/User/UserSSHKeysController.mjs'
-import TokenController from './Features/Token/TokenController.mjs'
-import cacheInvalidate from './routes/cacheInvalidate.mjs'
 import UserEmailsController from './Features/User/UserEmailsController.mjs'
 import UserPagesController from './Features/User/UserPagesController.mjs'
 import TutorialController from './Features/Tutorial/TutorialController.mjs'
@@ -164,8 +161,6 @@ const rateLimiters = {
     points: 15,
     duration: 60,
   }),
-  tokenCreate: new RateLimiter('token-create', { points: 5, duration: 60 }),
-  sshKeyCreate: new RateLimiter('sshkey-create', { points: 5, duration: 60 }),
   removeProjectFromTag: new RateLimiter('remove-project-from-tag', {
     points: 30,
     duration: 60,
@@ -463,60 +458,6 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
     '/user/:user_id/personal_info',
     AuthenticationController.requirePrivateApiAuth(),
     UserInfoController.getPersonalInfo
-  )
-  // Internal API: list user SSH keys
-  privateApiRouter.get(
-    '/internal/api/users/:userId/ssh-keys',
-    AuthenticationController.requirePrivateApiAuth(),
-    UserSSHKeysController.list
-  )
-
-  // Internal API: create SSH key for user
-  privateApiRouter.post(
-    '/internal/api/users/:userId/ssh-keys',
-    AuthenticationController.requirePrivateApiAuth(),
-    RateLimiterMiddleware.rateLimit(rateLimiters.sshKeyCreate),
-    UserSSHKeysController.create
-  )
-
-  // Internal API: delete SSH key
-  privateApiRouter.delete(
-    '/internal/api/users/:userId/ssh-keys/:keyId',
-    AuthenticationController.requirePrivateApiAuth(),
-    UserSSHKeysController.remove
-  )
-
-  // Internal API: create/list/revoke personal access tokens
-  privateApiRouter.post(
-    '/internal/api/users/:userId/git-tokens',
-    AuthenticationController.requirePrivateApiAuth(),
-    RateLimiterMiddleware.rateLimit(rateLimiters.tokenCreate),
-    TokenController.create
-  )
-
-  privateApiRouter.get(
-    '/internal/api/users/:userId/git-tokens',
-    AuthenticationController.requirePrivateApiAuth(),
-    TokenController.list
-  )
-
-  privateApiRouter.delete(
-    '/internal/api/users/:userId/git-tokens/:tokenId',
-    AuthenticationController.requirePrivateApiAuth(),
-    TokenController.remove
-  )
-
-  // Internal API: token introspection (used by git-bridge)
-  privateApiRouter.post(
-    '/internal/api/tokens/introspect',
-    AuthenticationController.requirePrivateApiAuth(),
-    TokenController.introspect
-  )
-
-  privateApiRouter.post(
-    '/internal/api/cache/invalidate',
-    AuthenticationController.requirePrivateApiAuth(),
-    cacheInvalidate
   )
   webRouter.get(
     '/user/features',

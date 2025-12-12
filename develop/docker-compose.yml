@@ -18,8 +18,8 @@ services:
     env_file:
       - dev.env
     volumes:
-      - ../bin/shared:/overleaf/bin/shared:ro
-    entrypoint: ["/bin/bash", "-lc", "bash /overleaf/bin/shared/wait-for-mongo.sh && exec \"$@\""]
+      - ../bin/shared:/tmp/wait:ro
+    entrypoint: ["/bin/bash", "-lc", "bash /tmp/wait/wait-for-mongo.sh && exec \"$@\""]
 
   clsi:
     build:
@@ -46,8 +46,8 @@ services:
     env_file:
       - dev.env
     volumes:
-      - ../bin/shared:/overleaf/bin/shared:ro
-    entrypoint: ["/bin/bash", "-lc", "bash /overleaf/bin/shared/wait-for-mongo.sh && exec \"$@\""]
+      - ../bin/shared:/tmp/wait:ro
+    entrypoint: ["/bin/bash", "-lc", "bash /tmp/wait/wait-for-mongo.sh && exec \"$@\""]
 
   docstore:
     build:
@@ -56,8 +56,8 @@ services:
     env_file:
       - dev.env
     volumes:
-      - ../bin/shared:/overleaf/bin/shared:ro
-    entrypoint: ["/bin/bash", "-lc", "bash /overleaf/bin/shared/wait-for-mongo.sh && exec \"$@\""]
+      - ../bin/shared:/tmp/wait:ro
+    entrypoint: ["/bin/bash", "-lc", "bash /tmp/wait/wait-for-mongo.sh && exec \"$@\""]
 
   document-updater:
     build:
@@ -66,8 +66,8 @@ services:
     env_file:
       - dev.env
     volumes:
-      - ../bin/shared:/overleaf/bin/shared:ro
-    entrypoint: ["/bin/bash", "-lc", "bash /overleaf/bin/shared/wait-for-mongo.sh && exec \"$@\""]
+      - ../bin/shared:/tmp/wait:ro
+    entrypoint: ["/bin/bash", "-lc", "bash /tmp/wait/wait-for-mongo.sh && exec \"$@\""]
 
   filestore:
     build:
@@ -97,8 +97,8 @@ services:
       PERSISTOR_BACKEND: fs
     volumes:
       - history-v1-buckets:/buckets
-      - ../bin/shared:/overleaf/bin/shared:ro
-    entrypoint: ["/bin/bash", "-lc", "bash /overleaf/bin/shared/wait-for-mongo.sh && exec \"$@\""]
+      - ../bin/shared:/tmp/wait:ro
+    entrypoint: ["/bin/bash", "-lc", "bash /tmp/wait/wait-for-mongo.sh && exec \"$@\""]
 
   mongo:
     image: mongo:6.0
@@ -129,8 +129,8 @@ services:
     env_file:
       - dev.env
     volumes:
-      - ../bin/shared:/overleaf/bin/shared:ro
-    entrypoint: ["/bin/bash", "-lc", "bash /overleaf/bin/shared/wait-for-mongo.sh && exec \"$@\""]
+      - ../bin/shared:/tmp/wait:ro
+    entrypoint: ["/bin/bash", "-lc", "bash /tmp/wait/wait-for-mongo.sh && exec \"$@\""]
 
   project-history:
     build:
@@ -139,8 +139,8 @@ services:
     env_file:
         - dev.env
     volumes:
-      - ../bin/shared:/overleaf/bin/shared:ro
-    entrypoint: ["/bin/bash", "-lc", "bash /overleaf/bin/shared/wait-for-mongo.sh && exec \"$@\""]
+      - ../bin/shared:/tmp/wait:ro
+    entrypoint: ["/bin/bash", "-lc", "bash /tmp/wait/wait-for-mongo.sh && exec \"$@\""]
 
   real-time:
     build:
@@ -176,8 +176,8 @@ services:
     volumes:
       - sharelatex-data:/var/lib/overleaf
       - web-data:/overleaf/services/web/data
-      - ../bin/shared:/overleaf/bin/shared:ro
-    entrypoint: ["/bin/bash", "-lc", "bash /overleaf/bin/shared/wait-for-mongo.sh && exec \"$@\""]
+      - ../bin/shared:/tmp/wait:ro
+    entrypoint: ["/bin/bash", "-lc", "exec \"$@\""]
     depends_on:
       - mongo
       - redis

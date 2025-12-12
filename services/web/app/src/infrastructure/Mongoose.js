@@ -54,16 +54,4 @@ mongoose.Promise = global.Promise
 
 mongoose.connectionPromise = connectionPromise
 
-// Allow idempotent model registration across multiple require/import paths
-// (useful for development images where the same file may be available under
-// both app/src and app/, or when modules are reloaded). If a model is already
-// registered with mongoose, return it instead of throwing OverwriteModelError.
-const _origModel = mongoose.model.bind(mongoose)
-mongoose.model = function modelWrapper(name, schema, collection, skipInit) {
-  if (this.models && this.models[name]) {
-    return this.models[name]
-  }
-  return _origModel(name, schema, collection, skipInit)
-}
-
 module.exports = mongoose

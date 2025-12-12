@@ -80,11 +80,6 @@ COPY tools/migrations/ /overleaf/tools/migrations/
 # Build the latex parser
 RUN cd /overleaf/services/web && npm run 'lezer-latex:generate'
 
-# For the dev image, ensure the legacy runtime path `app/models` is available
-# by copying the source `app/src/*` into `app/`, so imports that target
-# `app/models/*` resolve correctly during development (dev image only).
-RUN cp -R /overleaf/services/web/app/src/* /overleaf/services/web/app/ || true
-
 USER node
 
 
