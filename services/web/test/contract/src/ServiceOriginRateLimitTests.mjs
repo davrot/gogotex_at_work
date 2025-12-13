@@ -32,6 +32,25 @@ describe('Service-Origin Rate Limits (contract test scaffold)', function () {
 
     // Enforce 429 to make this a concrete contract test; CI should configure the rate limiter accordingly.
     expect(res61.statusCode).to.equal(429)
+
+    // Now test listing rate-limit for the same service-origin
+    const LIST_TARGET = '/internal/api/users/u1/git-tokens'
+    for (let i = 0; i < 60; i++) {
+      const res = await new Promise((resolve, reject) => {
+        CLIENT.get({ url: LIST_TARGET }, (err, response, body) => {
+          if (err) reject(err)
+          else resolve(response)
+        })
+      })
+      expect(res.statusCode).to.be.oneOf([200, 404, 400])
+    }
+    const res61List = await new Promise((resolve, reject) => {
+      CLIENT.get({ url: LIST_TARGET }, (err, response, body) => {
+        if (err) reject(err)
+        else resolve(response)
+      })
+    })
+    expect(res61List.statusCode).to.equal(429)
   })
 
   it('should enforce 60 req/min per service-origin for fingerprint lookup', async function () {

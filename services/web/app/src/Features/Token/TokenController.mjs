@@ -20,6 +20,14 @@ export async function create(req, res) {
 
 export async function list(req, res) {
   const userId = req.params.userId
+  // rate-limit per service-origin
+  try {
+    const originKey = ServiceOrigin.originRateKey(req)
+    await tokenIntrospectRateLimiter.consume(originKey, 1, { method: 'service-origin' })
+  } catch (err) {
+    try { metrics.inc('token.list.rate_limited', 1) } catch (e) {}
+    return res.sendStatus(429)
+  }
   try {
     const tokens = await PersonalAccessTokenManager.listTokens(userId)
     return res.status(200).json(tokens)
