@@ -23,6 +23,8 @@ description: "Tasks for SSH-only Git authentication feature"
 - [ ] T008 Add feature-flag wiring and environment checks to services/git-bridge/conf/envsubst_template.json and services/git-bridge/README.md
 - [ ] T030 Create API contract (OpenAPI) for web-profile SSH keys: specs/001-ssh-git-auth/contracts/web-profile-ssh-keys.openapi.yaml
 - [ ] T031 [P] Add contract tests validating API schema and auth behaviour (use MockServer): tests/contract/web-profile-ssh-keys.contract.test (or service-specific test paths)
+ - [ ] T032 Create API contract (OpenAPI) for membership checks: specs/001-ssh-git-auth/contracts/membership.openapi.yaml
+ - [ ] T033 [P] Add contract tests validating membership behaviour (use MockServer): services/git-bridge/src/test/java/uk/ac/ic/wlgitbridge/contracts/MembershipContractTest.java
 
 ---
 

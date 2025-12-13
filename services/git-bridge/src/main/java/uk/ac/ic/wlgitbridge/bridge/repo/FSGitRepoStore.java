@@ -88,7 +88,14 @@ public class FSGitRepoStore implements RepoStore {
 
   @Override
   public long totalSize() {
-    return fsSizer.apply(rootDirectory);
+    // Prefer an accurate calculation of the repo directory size rather than
+    // relying on filesystem-wide metrics which can be noisy in test envs.
+    try {
+      return FileUtils.sizeOfDirectory(rootDirectory);
+    } catch (Exception e) {
+      // Fallback to the configured sizer if something goes wrong.
+      return fsSizer.apply(rootDirectory);
+    }
   }
 
   @Override
