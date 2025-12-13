@@ -215,6 +215,49 @@ async function main() {
       await page.waitForTimeout(2000)
     }
 
+    // Optionally add SSH keys via the UI for testing (set ADD_SSH_KEYS=true)
+    if (process.env.ADD_SSH_KEYS === 'true') {
+      console.log('ADD_SSH_KEYS=true — adding two SSH keys via settings UI')
+      try {
+        // First key
+        await page.fill('input[aria-label="SSH key label"]', 'playwright-key-1')
+        await page.fill('textarea[aria-label="SSH public key"]', 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexamplekeydata1 key1@local')
+        await Promise.all([
+          page.click('button[aria-label="Add SSH key"]'),
+          page.waitForResponse(r => r.url().includes('/internal/api/users/') && r.url().includes('/ssh-keys') && r.request().method() === 'POST' && r.status() < 400, { timeout: 5000 }).catch(()=>null)
+        ])
+
+        // Wait for the newly-added key to appear in the list
+        await page.waitForFunction(() => {
+          const rows = document.querySelectorAll('.ssh-keys-panel table tbody tr')
+          return rows.length >= 1
+        }, { timeout: 5000 })
+
+        // Second key
+        await page.fill('input[aria-label="SSH key label"]', 'playwright-key-2')
+        await page.fill('textarea[aria-label="SSH public key"]', 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexamplekeydata2 key2@local')
+        await Promise.all([
+          page.click('button[aria-label="Add SSH key"]'),
+          page.waitForResponse(r => r.url().includes('/internal/api/users/') && r.url().includes('/ssh-keys') && r.request().method() === 'POST' && r.status() < 400, { timeout: 5000 }).catch(()=>null)
+        ])
+
+        // Wait until at least two keys are visible in the table
+        await page.waitForFunction(() => {
+          const rows = document.querySelectorAll('.ssh-keys-panel table tbody tr')
+          return rows.length >= 2
+        }, { timeout: 5000 })
+
+        // Save a screenshot of the settings page with keys visible
+        await page.screenshot({ path: path.join(outDir, 'user_settings_with_ssh_keys.png'), fullPage: true })
+        const settingsWithKeysHtml = await page.content()
+        fs.writeFileSync(path.join(outDir, 'user_settings_with_ssh_keys.html'), settingsWithKeysHtml)
+        console.log('Saved screenshot and HTML with SSH keys:', path.join(outDir, 'user_settings_with_ssh_keys.png'), path.join(outDir, 'user_settings_with_ssh_keys.html'))
+      } catch (err) {
+        console.error('Error while adding SSH keys in E2E:', err)
+      }
+    }
+
+    // Final capture (baseline)
     await page.screenshot({ path: path.join(outDir, 'user_settings.png'), fullPage: true })
     const settingsHtml = await page.content()
     fs.writeFileSync(path.join(outDir, 'user_settings.html'), settingsHtml)
