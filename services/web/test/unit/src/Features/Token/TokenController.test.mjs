@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import sinon from 'sinon'
-import MockResponse from '../../../../test/unit/src/helpers/MockResponse.js'
+import MockResponse from '../../helpers/MockResponse.js'
 import path from 'node:path'
 
 const modulePath = path.join(import.meta.dirname, '../../../../app/src/Features/Token/TokenController.mjs')
