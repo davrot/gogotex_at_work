@@ -7,6 +7,7 @@ const modulePath = path.join(import.meta.dirname, '../../../../../app/src/Featur
 
 describe('TokenController', function () {
   beforeEach(async function (ctx) {
+    vi.resetModules()
     ctx.req = { params: { userId: 'u1', tokenId: 't1' }, body: {} }
     ctx.res = new MockResponse()
     // Mock PersonalAccessTokenManager

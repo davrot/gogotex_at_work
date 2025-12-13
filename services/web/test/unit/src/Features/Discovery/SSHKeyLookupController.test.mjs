@@ -7,6 +7,7 @@ const modulePath = path.join(import.meta.dirname, '../../../../../app/src/Featur
 
 describe('SSHKeyLookupController', function () {
   beforeEach(async function (ctx) {
+    vi.resetModules()
     ctx.req = { params: { fingerprint: 'SHA256:abcdef' } }
     ctx.res = new MockResponse()
     ctx.UserSSHKey = { findOne: sinon.stub() }
@@ -24,7 +25,14 @@ describe('SSHKeyLookupController', function () {
 
   it('lookup returns 404 when not found', async function (ctx) {
     ctx.UserSSHKey.findOne.returns({ lean: () => ({ exec: async () => null }) })
+    const chain = ctx.UserSSHKey.findOne();
+    // debug: check chain exec result
+    // eslint-disable-next-line no-console
+    console.log('DEBUG: findOne chain exec returns', await chain.lean().exec())
     await ctx.Controller.lookup(ctx.req, ctx.res)
+    // debug: print response for investigation
+    // eslint-disable-next-line no-console
+    console.log('DEBUG: resp', ctx.res.statusCode, ctx.res.body)
     expect(ctx.res.statusCode).to.equal(404)
   })
 
