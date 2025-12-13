@@ -28,7 +28,7 @@ describe('TokenController', function () {
     ctx.req.body = { label: 'l' }
     await ctx.Controller.create(ctx.req, ctx.res)
     expect(ctx.res.statusCode).to.equal(201)
-    const body = ctx.res.jsonBody
+    const body = ctx.res.body ? JSON.parse(ctx.res.body) : null
     expect(body).to.have.property('token')
     expect(ctx.PATM.createToken.called).to.equal(true)
   })
@@ -48,6 +48,6 @@ describe('TokenController', function () {
     ctx.req.body = { token: 'x' }
     await ctx.Controller.introspect(ctx.req, ctx.res)
     expect(ctx.res.statusCode).to.equal(200)
-    expect(ctx.res.jsonBody).to.have.property('active')
+    expect(JSON.parse(ctx.res.body)).to.have.property('active')
   })
 })

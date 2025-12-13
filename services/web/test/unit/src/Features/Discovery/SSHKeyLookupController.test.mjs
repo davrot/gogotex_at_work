@@ -18,7 +18,7 @@ describe('SSHKeyLookupController', function () {
     ctx.UserSSHKey.findOne.returns({ lean: () => ({ exec: async () => ({ userId: 'u1' }) }) })
     await ctx.Controller.lookup(ctx.req, ctx.res)
     expect(ctx.res.statusCode).to.equal(200)
-    expect(ctx.res.jsonBody).to.have.property('userId')
+    expect(JSON.parse(ctx.res.body)).to.have.property('userId')
     expect(ctx.UserSSHKey.findOne.calledWith({ fingerprint: 'SHA256:abcdef' })).to.equal(true)
   })
 
