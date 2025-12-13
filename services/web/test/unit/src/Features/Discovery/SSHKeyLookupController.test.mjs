@@ -13,6 +13,7 @@ describe('SSHKeyLookupController', function () {
     ctx.UserSSHKey = { findOne: sinon.stub() }
     vi.doMock('../../../../../app/src/models/UserSSHKey.js', () => ({ UserSSHKey: ctx.UserSSHKey }))
     vi.doMock('@overleaf/metrics', () => ({ default: { Timer: function () { this.done = () => {} }, inc: () => {} } }))
+    vi.doMock('../../../../../app/src/infrastructure/RateLimiter.js', () => ({ sshFingerprintLookupRateLimiter: { consume: async () => {} } }))
     ctx.Controller = (await import(modulePath))
   })
 
