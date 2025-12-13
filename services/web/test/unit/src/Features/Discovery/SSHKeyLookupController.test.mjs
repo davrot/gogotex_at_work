@@ -27,4 +27,16 @@ describe('SSHKeyLookupController', function () {
     await ctx.Controller.lookup(ctx.req, ctx.res)
     expect(ctx.res.statusCode).to.equal(404)
   })
+
+  it('lookup returns 400 when fingerprint missing', async function (ctx) {
+    ctx.req.params.fingerprint = ''
+    await ctx.Controller.lookup(ctx.req, ctx.res)
+    expect(ctx.res.statusCode).to.equal(400)
+  })
+
+  it('lookup returns 400 when fingerprint malformed', async function (ctx) {
+    ctx.req.params.fingerprint = 'abcdef'
+    await ctx.Controller.lookup(ctx.req, ctx.res)
+    expect(ctx.res.statusCode).to.equal(400)
+  })
 })

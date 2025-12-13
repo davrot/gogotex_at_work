@@ -70,6 +70,7 @@
     "local:test:acceptance:modules:server-ce": "OVERLEAF_APP=server-ce npm run local:test:acceptance:run_modules",
     "local:test:acceptance:modules": "echo saas server-ce server-pro | xargs -n1 sh -c 'npm run local:test:acceptance:modules:${0} || exit 255'",
     "local:test:acceptance": "npm run local:test:acceptance:app && npm run local:test:acceptance:modules",
+    "test:contract": "mocha --recursive --timeout 60000 --require test/acceptance/bootstrap.js test/contract/src",
     "local:test:unit": "npm run test:unit:all",
     "local:test:frontend": "npm run test:frontend",
     "local:test": "npm run local:test:unit && npm run local:test:frontend && npm run local:test:acceptance",

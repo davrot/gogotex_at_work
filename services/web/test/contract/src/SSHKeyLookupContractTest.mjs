@@ -1,6 +1,8 @@
 import { expect } from 'chai'
 import UserHelper from '../../acceptance/src/helpers/User.mjs'
 
+import Settings from '@overleaf/settings'
+
 describe('SSH fingerprint lookup contract tests', function () {
   this.timeout(60 * 1000)
 
@@ -18,14 +20,29 @@ describe('SSH fingerprint lookup contract tests', function () {
     expect(fingerprint).to.be.a('string')
 
     // call private lookup endpoint
-    const res = await user.doRequest('get', { url: `/internal/api/ssh-keys/${encodeURIComponent(fingerprint)}` })
+    // call private lookup endpoint without private auth — expect 401 (protected)
+    const resNoAuth = await user.doRequest('get', { url: `/internal/api/ssh-keys/${encodeURIComponent(fingerprint)}` })
+    expect([401, 404, 403]).to.include(resNoAuth.response.statusCode)
+
+    // call with basic auth: settings.httpAuthUsers should be configured in test harness
+    const [adminUser, adminPass] = Object.entries(Settings.httpAuthUsers)[0]
+    const res = await user.doRequest('get', { url: `/internal/api/ssh-keys/${encodeURIComponent(fingerprint)}`, auth: { user: adminUser, pass: adminPass, sendImmediately: true }, jar: false })
     // If the optional private endpoint is implemented, assert it returns userId
     if (res.response.statusCode === 200) {
       expect(res.body).to.have.property('userId')
       expect(String(res.body.userId)).to.equal(String(user.id))
     } else {
       // Endpoint may be absent (404) if host opts not to implement it — assert contract fallback
-      expect(res.response.statusCode).to.be.oneOf([404, 401, 403])
+      expect(res.response.statusCode).to.be.oneOf([404, 403])
     }
+  })
+
+  it('returns 400 for malformed fingerprint format', async function () {
+    const user = new UserHelper()
+    await user.register()
+    await user.login()
+    const [adminUser, adminPass] = Object.entries(Settings.httpAuthUsers)[0]
+    const res = await user.doRequest('get', { url: '/internal/api/ssh-keys/abcdef', auth: { user: adminUser, pass: adminPass, sendImmediately: true }, jar: false })
+    expect(res.response.statusCode).to.equal(400)
   })
 })

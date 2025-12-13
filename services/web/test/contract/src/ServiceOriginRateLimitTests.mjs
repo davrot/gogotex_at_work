@@ -33,4 +33,27 @@ describe('Service-Origin Rate Limits (contract test scaffold)', function () {
     // Enforce 429 to make this a concrete contract test; CI should configure the rate limiter accordingly.
     expect(res61.statusCode).to.equal(429)
   })
+
+  it('should enforce 60 req/min per service-origin for fingerprint lookup', async function () {
+    const SERVICE_ORIGIN = 'contract-test-service-origin-lookup'
+    const CLIENT = request.defaults({ headers: { 'X-Service-Origin': SERVICE_ORIGIN } })
+    const TARGET = '/internal/api/ssh-keys/SHA256:abcdef'
+    // perform 60 requests; expect 2xx/404/400
+    for (let i = 0; i < 60; i++) {
+      const res = await new Promise((resolve, reject) => {
+        CLIENT.get({ url: TARGET }, (err, response, body) => {
+          if (err) reject(err)
+          else resolve(response)
+        })
+      })
+      expect(res.statusCode).to.be.oneOf([200, 404, 400])
+    }
+    const res61 = await new Promise((resolve, reject) => {
+      CLIENT.get({ url: TARGET }, (err, response, body) => {
+        if (err) reject(err)
+        else resolve(response)
+      })
+    })
+    expect(res61.statusCode).to.equal(429)
+  })
 })

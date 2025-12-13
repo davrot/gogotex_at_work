@@ -6,6 +6,11 @@ export async function lookup(req, res) {
   if (!fingerprint || !fingerprint.trim()) {
     return res.status(400).json({ message: 'fingerprint required' })
   }
+  // Validate canonical fingerprint format: 'SHA256:<base64>'
+  const re = /^SHA256:[A-Za-z0-9+/=]+$/
+  if (!re.test(fingerprint)) {
+    return res.status(400).json({ message: 'invalid fingerprint format' })
+  }
   try {
     const key = await UserSSHKey.findOne({ fingerprint }).lean().exec()
     if (!key) return res.status(404).json({})
