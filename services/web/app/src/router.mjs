@@ -51,6 +51,7 @@ import AnalyticsRouter from './Features/Analytics/AnalyticsRouter.mjs'
 import MetaController from './Features/Metadata/MetaController.mjs'
 import TokenAccessController from './Features/TokenAccess/TokenAccessController.mjs'
 import TokenAccessRouter from './Features/TokenAccess/TokenAccessRouter.mjs'
+import DiscoveryRouter from './Features/Discovery/DiscoveryRouter.mjs'
 import LinkedFilesRouter from './Features/LinkedFiles/LinkedFilesRouter.mjs'
 import TemplatesRouter from './Features/Templates/TemplatesRouter.mjs'
 import UserMembershipRouter from './Features/UserMembership/UserMembershipRouter.mjs'
@@ -193,6 +194,8 @@ const rateLimiters = {
     points: 10,
     duration: 60,
   }),
+  fingerprintLookup: new RateLimiter('fingerprint-lookup', { points: 60, duration: 60 }),
+
 }
 
 async function initialize(webRouter, privateApiRouter, publicApiRouter) {
@@ -279,6 +282,7 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
   TemplatesRouter.apply(webRouter)
   UserMembershipRouter.apply(webRouter)
   TokenAccessRouter.apply(webRouter)
+  DiscoveryRouter.apply(webRouter, privateApiRouter)
   HistoryRouter.apply(webRouter, privateApiRouter)
 
   await Modules.applyRouter(webRouter, privateApiRouter, publicApiRouter)
