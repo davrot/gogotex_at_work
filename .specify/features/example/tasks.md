@@ -59,7 +59,7 @@ This file is the final single-copy of deduplicated tasks for the SSH + HTTPS Git
 - [ ] T025 Contract tests to assert rate-limits & logging masking — services/web/test/contract/rate-limit-service-origin/**, services/web/test/contract/logging/**
 - [ ] T035 Metrics instrumentation & SLI exports — services/web/app/src/Features/Discovery/SSHKeyLookupController.mjs, services/web/app/src/Features/Token/TokenController.mjs
   - Acceptance: Metrics exported for key lookup (histogram/timer) and token introspection (histogram/timer); CI validates p50/p95/p99 for those endpoints.
-- [ ] T026 CI benchmarks for SLOs — key-lookup p95 ≤ 50ms; introspect p95 ≤ 100ms — ci/benchmarks/\*
+- [x] T026 CI benchmarks for SLOs — key-lookup p95 ≤ 50ms; introspect p95 ≤ 100ms — ci/benchmarks/*
   - Acceptance: CI job artifacts include p50/p95/p99 and gating.- [x] T026b Intro micro-benchmark for token introspection — ci/benchmarks/introspection-benchmark/bench.js
   - Acceptance: CI job publishes p50/p95/p99 for local introspection and OAuth2 fallback; includes warm and cold runs.
 ## Final — Documentation, Security & Accessibility
