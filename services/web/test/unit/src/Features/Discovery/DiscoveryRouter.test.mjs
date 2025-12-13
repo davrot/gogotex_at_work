@@ -2,7 +2,7 @@ import { describe, it, beforeEach, expect, vi } from 'vitest'
 import sinon from 'sinon'
 import path from 'node:path'
 
-const modulePath = path.join(import.meta.dirname, '../../../../app/src/Features/Discovery/DiscoveryRouter.mjs')
+const modulePath = path.join(import.meta.dirname, '../../../../../app/src/Features/Discovery/DiscoveryRouter.mjs')
 
 describe('DiscoveryRouter', function () {
   beforeEach(async function (ctx) {

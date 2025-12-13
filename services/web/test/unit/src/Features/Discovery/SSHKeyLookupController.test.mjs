@@ -3,7 +3,7 @@ import sinon from 'sinon'
 import MockResponse from '../../helpers/MockResponse.js'
 import path from 'node:path'
 
-const modulePath = path.join(import.meta.dirname, '../../../../app/src/Features/Discovery/SSHKeyLookupController.mjs')
+const modulePath = path.join(import.meta.dirname, '../../../../../app/src/Features/Discovery/SSHKeyLookupController.mjs')
 
 describe('SSHKeyLookupController', function () {
   beforeEach(async function (ctx) {

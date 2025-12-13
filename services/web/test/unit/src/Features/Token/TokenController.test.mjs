@@ -3,7 +3,7 @@ import sinon from 'sinon'
 import MockResponse from '../../helpers/MockResponse.js'
 import path from 'node:path'
 
-const modulePath = path.join(import.meta.dirname, '../../../../app/src/Features/Token/TokenController.mjs')
+const modulePath = path.join(import.meta.dirname, '../../../../../app/src/Features/Token/TokenController.mjs')
 
 describe('TokenController', function () {
   beforeEach(async function (ctx) {
