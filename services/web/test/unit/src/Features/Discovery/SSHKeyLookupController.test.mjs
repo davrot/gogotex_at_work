@@ -15,7 +15,7 @@ describe('SSHKeyLookupController', function () {
   })
 
   it('lookup returns 200 when found', async function (ctx) {
-    ctx.UserSSHKey.findOne.resolves({ userId: 'u1' })
+    ctx.UserSSHKey.findOne.returns({ lean: () => ({ exec: async () => ({ userId: 'u1' }) }) })
     await ctx.Controller.lookup(ctx.req, ctx.res)
     expect(ctx.res.statusCode).to.equal(200)
     expect(ctx.res.jsonBody).to.have.property('userId')
@@ -23,7 +23,7 @@ describe('SSHKeyLookupController', function () {
   })
 
   it('lookup returns 404 when not found', async function (ctx) {
-    ctx.UserSSHKey.findOne.resolves(null)
+    ctx.UserSSHKey.findOne.returns({ lean: () => ({ exec: async () => null }) })
     await ctx.Controller.lookup(ctx.req, ctx.res)
     expect(ctx.res.statusCode).to.equal(404)
   })
