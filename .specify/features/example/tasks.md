@@ -7,7 +7,7 @@ This file is the final single-copy of deduplicated tasks for the SSH + HTTPS Git
 - [x] T001 Validate project structure, spec and plan presence — .specify/features/example/plan.md, .specify/features/example/spec.md
 - [x] T002 Add CI micro-benchmark skeleton and harness — ci/benchmarks/, .gitlab-ci.yml
 - [x] T003 Ensure linting plugin & config present — libraries/eslint-plugin/index.js
-- [ ] T004 (BLOCKING) Config validation & hash availability checks — services/web/app/src/config/validateConfig.mjs, services/web/app/src/config/hashAvailability.mjs
+- [x] T004 (BLOCKING) Config validation & hash availability checks — services/web/app/src/config/validateConfig.mjs, services/web/app/src/config/hashAvailability.mjs
   - Acceptance: Service fails start-up when `AUTH_TOKEN_HASH_ALGO=argon2id` without runtime support and fallback is not configured.
 
 ## Phase 2 — Foundational
