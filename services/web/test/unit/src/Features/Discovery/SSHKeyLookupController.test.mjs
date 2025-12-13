@@ -28,11 +28,11 @@ describe('SSHKeyLookupController', function () {
     const chain = ctx.UserSSHKey.findOne();
     // debug: check chain exec result
     // eslint-disable-next-line no-console
-    console.log('DEBUG: findOne chain exec returns', await chain.lean().exec())
+    // console.log('DEBUG: findOne chain exec returns', await chain.lean().exec())
     await ctx.Controller.lookup(ctx.req, ctx.res)
     // debug: print response for investigation
     // eslint-disable-next-line no-console
-    console.log('DEBUG: resp', ctx.res.statusCode, ctx.res.body)
+    // console.log('DEBUG: resp', ctx.res.statusCode, ctx.res.body)
     expect(ctx.res.statusCode).to.equal(404)
   })
 
