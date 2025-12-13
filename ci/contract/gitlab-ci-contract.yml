@@ -34,6 +34,13 @@ bench_key_lookup:
 
 bench_introspection:
   stage: bench
+  variables:
+    INTROSPECTION_P95_MS: "100"
   script:
-    - node ci/benchmarks/introspection-benchmark/bench.js
-  allow_failure: true
+    - BENCH_OUTPUT=ci/benchmarks/introspection-benchmark/out.json BENCH_ITER=${BENCH_ITER:-200} BENCH_CONCURRENCY=${BENCH_CONCURRENCY:-20} BENCH_URL=${BENCH_URL:-http://127.0.0.1:3000/internal/api/tokens/introspect} BENCH_TOKEN=${BENCH_TOKEN:-invalid-token} node ci/benchmarks/introspection-benchmark/bench.js
+    - node ci/benchmarks/check-bench-slo.js ci/benchmarks/introspection-benchmark/out.json ${INTROSPECTION_P95_MS}
+  artifacts:
+    paths:
+      - ci/benchmarks/introspection-benchmark/out.json
+    expire_in: 1 week
+  allow_failure: false
