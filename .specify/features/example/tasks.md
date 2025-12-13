@@ -2,7 +2,7 @@
 
 ## Phase 1 — Setup
 
-- [x] T001 Validate plan/spec presence — .specify/features/example/plan.md, .specify/features/example/spec.md
+- [x] T001 Validate project structure, spec and plan presence — .specify/features/example/plan.md, .specify/features/example/spec.md
 - [ ] T002 Add CI micro-benchmark skeleton — ci/benchmarks/, .gitlab-ci.yml
 - [x] T003 Ensure linting plugin & config present — libraries/eslint-plugin/index.js
 - [ ] T004 Config validation & hash availability checks — services/web/app/src/config/validateConfig.mjs, services/web/app/src/config/hashAvailability.mjs
@@ -65,7 +65,7 @@
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-- [x] T001 [P] Validate design docs exist — .specify/features/example/plan.md, .specify/features/example/spec.md
+  
 - [ ] T002 [P] Add CI benchmarks skeleton and micro-benchmark harness — ci/benchmarks/, .gitlab-ci.yml
 - [x] T003 [P] Add/enable minimal eslint plugin to satisfy lint and enforce rules — libraries/eslint-plugin/index.js
 - [ ] T004 [P] Add startup config validation & hash availability checks — services/web/app/src/config/validateConfig.mjs, services/web/app/src/config/hashAvailability.mjs
@@ -185,7 +185,7 @@
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-- [ ] T001 [P] Create project structure and validate plan/spec presence — .specify/features/example/plan.md, .specify/features/example/spec.md
+  
 - [ ] T002 [P] Add CI harness skeleton and micro-benchmark framework — ci/benchmarks/, .gitlab-ci.yml
 - [ ] T003 [P] Configure linting, formatting, and config validation checks — libraries/eslint-plugin/, services/web/app/src/config/validateConfig.mjs
 
@@ -284,7 +284,7 @@ Checklist:
 
 # Tasks for SSH + HTTPS Git Auth (Example)
 
-- [ ] T001 [US1] Define requirements and data models in spec and plan — .specify/features/example/spec.md, .specify/features/example/plan.md
+  
 
 - [ ] T002 [US2] Implement `PersonalAccessToken` model + manager — services/web/app/src/models/PersonalAccessToken.js, services/web/app/src/Features/Token/PersonalAccessTokenManager.mjs. Acceptance: create/list/revoke helpers; tokens hashed with `argon2id` (or explicit `bcrypt` fallback); `hashPrefix` persisted; store `hashAlgorithm` in token metadata; include migration/backfill task to re-hash or re-issue tokens as needed.
 
@@ -346,7 +346,7 @@ Checklist:
 
 # Tasks for SSH + HTTPS Git Auth (Example)
 
-- [x] T001 [US1] Define requirements and data models in spec and plan — .specify/features/example/spec.md, .specify/features/example/plan.md
+  
 
 - [x] T002 [US2] Implement `PersonalAccessToken` model + manager — services/web/app/src/models/PersonalAccessToken.js, services/web/app/src/Features/Token/PersonalAccessTokenManager.mjs. Acceptance: create/list/revoke helpers; tokens hashed with `argon2id` (or `bcrypt` fallback); `hashPrefix` persisted.
 
