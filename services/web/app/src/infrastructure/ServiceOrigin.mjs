@@ -1,3 +1,7 @@
+// ServiceOrigin detection precedence:
+// 1. `X-Service-Origin` header (canonical, authoritative)
+// 2. mTLS client certificate CN (when present)
+// 3. request IP (via `x-forwarded-for` or connection.remoteAddress)
 export function getServiceOrigin(req) {
   if (!req || typeof req !== 'object') return null
   const headers = req.headers || {}

@@ -4,6 +4,12 @@
 
 This feature implements SSH public-key management and a local HTTPS personal-access-token path for Git access to repositories served through `git-bridge`. The external `oauth2` service may be unavailable; this feature provides a safe interim `PersonalAccessToken` manager and introspection endpoint.
 
+## Clarifications
+
+### Session 2025-12-13
+- Q: What is the canonical precedence when deriving a `service-origin`? → A: `X-Service-Origin` header if present, then mTLS client certificate `CN` if available, then client IP. The header should be treated as authoritative when present.
+
+
 ## Functional Requirements
 
 1. User can add/remove SSH public keys for their account. (key-management-add-remove)
@@ -26,7 +32,7 @@ This feature implements SSH public-key management and a local HTTPS personal-acc
 
 ## Non-Functional Requirements
 
-- Security: tokens MUST be stored hashed. Prefer `argon2id` with conservative default parameters (e.g., time=2, memory=65536 KB, parallelism=4) where available; fallback to `bcrypt` with cost ≥ 12 only if `argon2id` is unavailable. The chosen algorithm and parameters MUST be documented in the feature README. Plaintext token material MAY be returned only once at creation. Store a short `hashPrefix` (first 8 hex chars of the hash) for UI/mask comparisons; never return full hashes. Fingerprints MUST be computed as the SHA256 digest of the public key and encoded in base64. The canonical representation is `SHA256:<base64>` where the base64 payload is the standard base64 encoding of the 32-byte SHA256 digest (44 characters including padding). Service-origin identity is expressed via the `X-Service-Origin` HTTP header; in environments using mTLS or API keys, the service MUST also populate this header for compatibility with rate-limiting and contract tests.
+- Security: tokens MUST be stored hashed. Prefer `argon2id` with conservative default parameters (e.g., time=2, memory=65536 KB, parallelism=4) where available; fallback to `bcrypt` with cost ≥ 12 only if `argon2id` is unavailable. The chosen algorithm and parameters MUST be documented in the feature README. Plaintext token material MAY be returned only once at creation. Store a short `hashPrefix` (first 8 hex chars of the hash) for UI/mask comparisons; never return full hashes. Fingerprints MUST be computed as the SHA256 digest of the public key and encoded in base64. The canonical representation is `SHA256:<base64>` where the base64 payload is the standard base64 encoding of the 32-byte SHA256 digest (44 characters including padding). Service-origin identity is expressed via the `X-Service-Origin` HTTP header; in environments using mTLS or API keys, the service MUST also populate this header for compatibility with rate-limiting and contract tests. The canonical precedence when deriving a service-origin is: 1) `X-Service-Origin` header if present and non-empty; 2) mTLS client certificate `CN` when available; 3) request IP (extracted from `x-forwarded-for` or `req.connection.remoteAddress`) as a fallback. Implementations MUST document how to configure and map these values and MUST prefer the header over other sources when present.
   - Fallback & migration semantics: runtime algorithm selection MUST be explicit via `AUTH_TOKEN_HASH_ALGO`. If set to `argon2id` and the runtime environment lacks argon2 support, the service MUST fail to start unless the config explicitly sets `bcrypt` as a fallback; do not silently fall back. Implementations MUST document detection semantics and fail-fast behavior in the feature README. Migration/backfill tasks MUST record original hash algorithm metadata and include a re-hash or re-issue strategy to support algorithm changes (see tasks T002b and T015).
 - Performance: key→user lookup latency <= 50ms p95 in normal conditions; cache TTL for lookups configurable (default 60s).
   - Measurement harness and "normal conditions": benchmarks/SLOs are measured in CI using a reproducible runner profile (recommended: 2 vCPU, 4GB RAM) and a synthetic dataset representative of production (example: 1k-10k keys spread across 200 users). The measurement harness MUST document cold vs warm cache runs; SLOs are measured with a warm cache where appropriate, and CI MUST include cold-cache regression runs. See CI benchmark tasks T026 (key lookup) and T026b (introspection).

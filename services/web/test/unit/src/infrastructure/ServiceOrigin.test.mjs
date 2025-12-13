@@ -20,6 +20,18 @@ describe('ServiceOrigin helper', function () {
     expect(originRateKey(req)).to.equal('service-origin:ip:1.2.3.4')
   })
 
+  it('header overrides mTLS certificate CN when both present', function () {
+    const req = { headers: { 'x-service-origin': 'header-origin' }, socket: { getPeerCertificate: () => ({ subject: { CN: 'cert-cn' } }) } }
+    expect(getServiceOrigin(req)).to.equal('header-origin')
+    expect(originRateKey(req)).to.equal('service-origin:header-origin')
+  })
+
+  it('header overrides ip when both present', function () {
+    const req = { headers: { 'x-service-origin': 'header-origin' }, ip: '1.2.3.4', connection: { remoteAddress: '1.2.3.4' } }
+    expect(getServiceOrigin(req)).to.equal('header-origin')
+    expect(originRateKey(req)).to.equal('service-origin:header-origin')
+  })
+
   it('returns null for invalid req', function () {
     expect(getServiceOrigin(null)).to.equal(null)
   })
