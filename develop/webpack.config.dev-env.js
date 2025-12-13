@@ -4,7 +4,10 @@ const base = require('./webpack.config.dev')
 
 module.exports = merge(base, {
   devServer: {
-    allowedHosts: 'auto',
+    // Allow access from the dev container/network (accept connections on all interfaces)
+    host: '0.0.0.0',
+    // Allow requests from any host (necessary for requests coming from dev containers)
+    allowedHosts: 'all',
     devMiddleware: {
       index: false,
     },
