@@ -195,8 +195,26 @@ async function main() {
 
     // Go to user settings
     await page.goto(`${BASE_URL}/user/settings`, { waitUntil: 'networkidle' })
-    // Some parts of the settings page are rendered client-side; wait a short time for JS to run
-    await page.waitForTimeout(3000)
+    // Wait for client-side render to stabilize for tokens/ssh keys. Wait up to 5s for either a tokens table or "No tokens yet." message, and ensure error banners are cleared.
+    const tokensReady = await (async () => {
+      const start = Date.now()
+      while (Date.now() - start < 5000) {
+        const hasNoTokens = await page.$('.git-tokens-panel p:has-text("No tokens yet")')
+        const hasTokensTable = await page.$('.git-tokens-panel table')
+        const hasTokenError = await page.$('.git-tokens-panel .error')
+        const hasNoKeys = await page.$('.ssh-keys-panel p:has-text("No SSH keys yet")')
+        const hasKeysTable = await page.$('.ssh-keys-panel table')
+        const hasKeysError = await page.$('.ssh-keys-panel .notification-type-error')
+        if ((hasNoTokens || hasTokensTable) && !hasTokenError && (hasNoKeys || hasKeysTable) && !hasKeysError) return true
+        await page.waitForTimeout(250)
+      }
+      return false
+    })()
+    if (!tokensReady) {
+      // fallback wait to let things settle
+      await page.waitForTimeout(2000)
+    }
+
     await page.screenshot({ path: path.join(outDir, 'user_settings.png'), fullPage: true })
     const settingsHtml = await page.content()
     fs.writeFileSync(path.join(outDir, 'user_settings.html'), settingsHtml)
