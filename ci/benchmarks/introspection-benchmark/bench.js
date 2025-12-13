@@ -1,165 +1,89 @@
 #!/usr/bin/env node
-import fetch from 'node-fetch'
-import { performance } from 'perf_hooks'
+/*
+ * Introspection benchmark harness
+ * Usage: BENCH_URL=http://localhost:3000/internal/api/tokens/introspect BENCH_ITER=200 BENCH_OUTPUT=out.json node bench.js
+ */
+const http = require('http')
+const https = require('https')
+const { URL } = require('url')
+const fs = require('fs')
+const path = require('path')
 
-const URL = process.env.BENCH_URL || 'http://localhost:3000/internal/api/tokens/introspect'
-const ITER = parseInt(process.env.BENCH_ITER || '20', 10)
+const TARGET = process.env.BENCH_URL || 'http://localhost:3000/internal/api/tokens/introspect'
+const ITER = parseInt(process.env.BENCH_ITER || '200', 10)
+const CONCURRENCY = parseInt(process.env.BENCH_CONCURRENCY || '20', 10)
 const OUT = process.env.BENCH_OUTPUT || null
-const PAYLOAD = { token: 'dummy-token' }
+const ORIGIN = process.env.SERVICE_ORIGIN || 'bench-client-1'
+const TOKEN = process.env.BENCH_TOKEN || 'invalid-token'
 
-async function run() {
-  const latencies = []
-  for (let i = 0; i < ITER; i++) {
-    const t0 = performance.now()
-    try {
-      await fetch(URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(PAYLOAD) })
-    } catch (err) {
-    }
-    const t1 = performance.now()
-    latencies.push(t1 - t0)
-  }
-  latencies.sort((a,b)=>a-b)
-  const p50 = latencies[Math.floor(latencies.length*0.5)]
-  const p95 = latencies[Math.floor(latencies.length*0.95)]
-  const p99 = latencies[Math.floor(latencies.length*0.99)]
-  const output = { p50, p95, p99, samples: ITER }
-  if (OUT) {
-    const fs = require('fs')
-    try {
-      fs.mkdirSync(require('path').dirname(OUT), { recursive: true })
-      fs.writeFileSync(OUT, JSON.stringify(output))
-      console.log('WROTE_BENCH_OUTPUT=' + OUT)
-    } catch (e) {
-      console.error('Failed writing bench output', e)
-    }
-  } else {
-    console.log(JSON.stringify(output))
-  }
-  process.exit(0)
-}
+function now() { return Date.now() }
 
-run()
-#!/usr/bin/env node
-// Simple benchmark harness for token introspection.
-// Usage: TARGET_URL=http://localhost:3000 REQUESTS=200 CONCURRENCY=20 node bench.js
-
-const http = require('http');
-const https = require('https');
-const { URL } = require('url');
-
-const TARGET = process.env.TARGET_URL || 'http://localhost:3000';
-const PATH = process.env.TARGET_PATH || '/internal/api/tokens/introspect';
-const REQUESTS = parseInt(process.env.REQUESTS || '200', 10);
-const CONCURRENCY = parseInt(process.env.CONCURRENCY || '20', 10);
-const USE_LOCAL_INTROSPECT = process.env.USE_LOCAL_INTROSPECT || 'true';
-
-function now() { return Date.now(); }
-
-function requestOnce(client, options, body) {
+function requestOnce(client, options, bodyObj) {
   return new Promise((resolve, reject) => {
-    const start = now();
+    const start = now()
     const req = client.request(options, (res) => {
-      // drain
-      res.on('data', () => {});
-      res.on('end', () => {
-        resolve(Date.now() - start);
-      });
-    });
-    req.on('error', (err) => reject(err));
-    if (body) req.write(JSON.stringify(body));
-    req.end();
-  });
+      res.on('data', () => {})
+      res.on('end', () => resolve(Date.now() - start))
+    })
+    req.on('error', (err) => reject(err))
+    if (bodyObj) req.write(JSON.stringify(bodyObj))
+    req.end()
+  })
 }
 
-async function run() {
-  const url = new URL(TARGET + PATH);
-  const client = url.protocol === 'https:' ? https : http;
+async function runRequests() {
+  const url = new URL(TARGET)
+  const client = url.protocol === 'https:' ? https : http
   const options = {
     method: 'POST',
     hostname: url.hostname,
     port: url.port,
     path: url.pathname + url.search,
-    headers: {
-      'Content-Type': 'application/json',
-      // Use a client-id header to simulate service-origin identification.
-      'X-Service-Origin': process.env.SERVICE_ORIGIN || 'bench-client-1',
-    },
-  };
+    headers: { 'Content-Type': 'application/json', 'X-Service-Origin': ORIGIN },
+  }
 
-  let inFlight = 0;
-  let completed = 0;
-  const latencies = [];
-  const errors = [];
-
-  const bodyTemplate = process.env.TOKEN || 'invalid-token';
+  let inFlight = 0
+  let completed = 0
+  const latencies = []
+  const errors = []
 
   return new Promise((resolve) => {
     function kick() {
-      while (inFlight < CONCURRENCY && completed + inFlight < REQUESTS) {
-        inFlight++;
-        requestOnce(client, options, { token: bodyTemplate }).then((lat) => {
-          latencies.push(lat);
-          inFlight--;
-          completed++;
-          if (completed === REQUESTS) resolve({ latencies, errors });
-          else kick();
+      while (inFlight < CONCURRENCY && completed + inFlight < ITER) {
+        inFlight++
+        requestOnce(client, options, { token: TOKEN }).then((lat) => {
+          latencies.push(lat)
+          inFlight--
+          completed++
+          if (completed === ITER) resolve({ latencies, errors })
+          else kick()
         }).catch((err) => {
-          errors.push(err.message || String(err));
-          inFlight--;
-          completed++;
-          if (completed === REQUESTS) resolve({ latencies, errors });
-          else kick();
-        });
+          errors.push(err.message || String(err))
+          inFlight--
+          completed++
+          if (completed === ITER) resolve({ latencies, errors })
+          else kick()
+        })
       }
     }
-    kick();
-  });
+    kick()
+  })
 }
 
-function quantiles(arr, q) {
-  if (!arr || arr.length === 0) return null;
-  const s = arr.slice().sort((a,b) => a-b);
-  const idx = Math.floor(q * (s.length - 1));
-  return s[idx];
-}
+function quantile(sorted, q) { if (!sorted || sorted.length === 0) return null; const idx = Math.floor(q * (sorted.length - 1)); return sorted[idx] }
 
-async function runAll() {
-  console.log('Benchmark starting', { TARGET, PATH, REQUESTS, CONCURRENCY });
-  const runs = {}
-  // Optionally perform a cold run by clearing caches if requested
-  if (process.env.COLD_RUN === 'true' || process.env.COLD_RUN === '1') {
-    console.log('Performing cold cache invalidation prior to run')
-    // Attempt to post to cache invalidation endpoint if available
-    try {
-      await new Promise((resolve, reject) => {
-        const url = new URL(TARGET + '/internal/api/cache/invalidate')
-        const client = url.protocol === 'https:' ? https : http
-        const req = client.request({ hostname: url.hostname, port: url.port, path: url.pathname, method: 'POST', headers: { 'Content-Type': 'application/json' } }, (res) => { res.on('data', () => {}); res.on('end', resolve) })
-        req.on('error', reject)
-        req.write(JSON.stringify({ channel: 'auth.cache.invalidate', key: '*' }))
-        req.end()
-      })
-      console.log('Cache invalidation requested')
-    } catch (e) {
-      console.warn('Failed to request cache invalidation', e && e.message ? e.message : e)
-    }
-    runs.cold = await run()
+(async function main() {
+  console.log('Starting introspection bench', { TARGET, ITER, CONCURRENCY, ORIGIN })
+  const result = await runRequests()
+  const sorted = result.latencies.slice().sort((a, b) => a - b)
+  const p50 = quantile(sorted, 0.5)
+  const p95 = quantile(sorted, 0.95)
+  const p99 = quantile(sorted, 0.99)
+  const out = { p50, p95, p99, samples: result.latencies.length, errors: result.errors.length }
+  if (OUT) {
+    try { fs.mkdirSync(path.dirname(OUT), { recursive: true }); fs.writeFileSync(OUT, JSON.stringify(out)) ; console.log('WROTE_BENCH_OUTPUT=' + OUT) } catch (e) { console.error('Failed writing bench output', e) }
+  } else {
+    console.log(JSON.stringify(out))
   }
-  runs.warm = await run()
-  return runs
-}
-
-(async () => {
-  const result = await runAll();
-  const latencies = result.latencies;
-  if (result.cold) {
-    const lat = result.cold.latencies
-    const coldOut = { count: lat.length, errors: result.cold.errors.length, p50: quantiles(lat, 0.5), p95: quantiles(lat, 0.95), p99: quantiles(lat, 0.99), max: Math.max(...lat, 0), min: Math.min(...lat, 0) }
-    console.log('BENCH_RESULT_JSON_COLD: ' + JSON.stringify(coldOut))
-  }
-  const latW = result.warm.latencies
-  const warmOut = { count: latW.length, errors: result.warm.errors.length, p50: quantiles(latW, 0.5), p95: quantiles(latW, 0.95), p99: quantiles(latW, 0.99), max: Math.max(...latW, 0), min: Math.min(...latW, 0) }
-  console.log('BENCH_RESULT_JSON_WARM: ' + JSON.stringify(warmOut))
-  const errorsCount = (result.cold ? result.cold.errors.length : 0) + result.warm.errors.length
-  process.exit(errorsCount > 0 ? 2 : 0)
-})();
+  process.exit(out.errors > 0 ? 2 : 0)
+})()

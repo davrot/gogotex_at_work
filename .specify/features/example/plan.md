@@ -18,6 +18,7 @@
 3. Wire `SSHAuthManager` / `git-bridge` to use key→user mapping and membership check. (phase: integration)
 4. Add frontend pages / UI stubs for token management and SSH keys (phase: frontend).
 5. Tests: unit, contract (introspection shape), and E2E (create token/key → attempt clone). (phase: test)
+6. Instrument metrics & SLO monitoring: Ensure `ssh.key_lookup` and `token.introspect` expose timers/histograms and add CI SLI checks (tie to T035/T026) (phase: observability).
 
 ## Technical Constraints
 
@@ -31,7 +32,7 @@ Note: the `V0ReplacementAdapter` (legacy snapshot parity) is a substantial integ
 
 - The feature defines configuration keys for token hashing and cache tuning in the spec; implementers MUST wire these into the service configuration system. Example keys: `AUTH_TOKEN_HASH_ALGO`, `AUTH_TOKEN_ARGON2_TIME`, `AUTH_TOKEN_ARGON2_MEMORY_KB`, `AUTH_TOKEN_ARGON2_PARALLELISM`, `AUTH_TOKEN_BCRYPT_COST`, `CACHE_LOOKUP_TTL_SECONDS`.
 - Membership API: define and include an API contract for membership checks used by `git-bridge`. This contract should declare both the path and minimum authentication required for `git-bridge` to call (example: `GET /internal/api/projects/{projectId}/members/{userId}`). Create a contract file and include tests in integration/contract phases (T030+).
-- CI: the key→user lookup micro-benchmark (T013) must specify a runner profile (recommended: 2 vCPU, 4GB RAM) and reproducible harness parameters; include baseline artifact upload to CI for historical comparison. Add a companion introspection micro-benchmark (T013b) that measures introspection p50/p95/p99 for both local introspection and OAuth2 fallback paths; this job MUST be gated in CI and use the same runner profile for comparability.
+- CI: the key→user lookup micro-benchmark (T026) must specify a runner profile (recommended: 2 vCPU, 4GB RAM) and reproducible harness parameters; include baseline artifact upload to CI for historical comparison. Add a companion introspection micro-benchmark (T026b) that measures introspection p50/p95/p99 for both local introspection and OAuth2 fallback paths; this job MUST be gated in CI and use the same runner profile for comparability.
 
 ## Rollout & Migration
 

@@ -37,7 +37,7 @@ describe('Service-Origin Rate Limits (contract test scaffold)', function () {
   it('should enforce 60 req/min per service-origin for fingerprint lookup', async function () {
     const SERVICE_ORIGIN = 'contract-test-service-origin-lookup'
     const CLIENT = request.defaults({ headers: { 'X-Service-Origin': SERVICE_ORIGIN } })
-    const TARGET = '/internal/api/ssh-keys/SHA256:abcdef'
+    const TARGET = '/internal/api/ssh-keys/SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
     // perform 60 requests; expect 2xx/404/400
     for (let i = 0; i < 60; i++) {
       const res = await new Promise((resolve, reject) => {

@@ -8,10 +8,11 @@ const modulePath = path.join(import.meta.dirname, '../../../../../app/src/Featur
 describe('SSHKeyLookupController', function () {
   beforeEach(async function (ctx) {
     vi.resetModules()
-    ctx.req = { params: { fingerprint: 'SHA256:abcdef' } }
+    ctx.req = { params: { fingerprint: 'SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' } }
     ctx.res = new MockResponse()
     ctx.UserSSHKey = { findOne: sinon.stub() }
     vi.doMock('../../../../../app/src/models/UserSSHKey.js', () => ({ UserSSHKey: ctx.UserSSHKey }))
+    vi.doMock('@overleaf/metrics', () => ({ default: { Timer: function () { this.done = () => {} }, inc: () => {} } }))
     ctx.Controller = (await import(modulePath))
   })
 
@@ -20,7 +21,7 @@ describe('SSHKeyLookupController', function () {
     await ctx.Controller.lookup(ctx.req, ctx.res)
     expect(ctx.res.statusCode).to.equal(200)
     expect(JSON.parse(ctx.res.body)).to.have.property('userId')
-    expect(ctx.UserSSHKey.findOne.calledWith({ fingerprint: 'SHA256:abcdef' })).to.equal(true)
+    expect(ctx.UserSSHKey.findOne.calledWith({ fingerprint: 'SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' })).to.equal(true)
   })
 
   it('lookup returns 404 when not found', async function (ctx) {

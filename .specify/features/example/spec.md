@@ -26,12 +26,12 @@ This feature implements SSH public-key management and a local HTTPS personal-acc
 
 ## Non-Functional Requirements
 
-- Security: tokens MUST be stored hashed. Prefer `argon2id` with conservative default parameters (e.g., time=2, memory=65536 KB, parallelism=4) where available; fallback to `bcrypt` with cost ≥ 12 only if `argon2id` is unavailable. The chosen algorithm and parameters MUST be documented in the feature README. Plaintext token material MAY be returned only once at creation. Store a short `hashPrefix` (first 8 hex chars of the hash) for UI/mask comparisons; never return full hashes. Fingerprints MUST be computed as the SHA256 digest of the public key and encoded in base64.
+- Security: tokens MUST be stored hashed. Prefer `argon2id` with conservative default parameters (e.g., time=2, memory=65536 KB, parallelism=4) where available; fallback to `bcrypt` with cost ≥ 12 only if `argon2id` is unavailable. The chosen algorithm and parameters MUST be documented in the feature README. Plaintext token material MAY be returned only once at creation. Store a short `hashPrefix` (first 8 hex chars of the hash) for UI/mask comparisons; never return full hashes. Fingerprints MUST be computed as the SHA256 digest of the public key and encoded in base64. The canonical representation is `SHA256:<base64>` where the base64 payload is the standard base64 encoding of the 32-byte SHA256 digest (44 characters including padding). Service-origin identity is expressed via the `X-Service-Origin` HTTP header; in environments using mTLS or API keys, the service MUST also populate this header for compatibility with rate-limiting and contract tests.
   - Fallback & migration semantics: runtime algorithm selection MUST be explicit via `AUTH_TOKEN_HASH_ALGO`. If set to `argon2id` and the runtime environment lacks argon2 support, the service MUST fail to start unless the config explicitly sets `bcrypt` as a fallback; do not silently fall back. Implementations MUST document detection semantics and fail-fast behavior in the feature README. Migration/backfill tasks MUST record original hash algorithm metadata and include a re-hash or re-issue strategy to support algorithm changes (see tasks T002b and T015).
 - Performance: key→user lookup latency <= 50ms p95 in normal conditions; cache TTL for lookups configurable (default 60s).
-  - Measurement harness and "normal conditions": benchmarks/SLOs are measured in CI using a reproducible runner profile (recommended: 2 vCPU, 4GB RAM) and a synthetic dataset representative of production (example: 1k-10k keys spread across 200 users). The measurement harness MUST document cold vs warm cache runs; SLOs are measured with a warm cache where appropriate, and CI MUST include cold-cache regression runs. See CI benchmark tasks T013 (key lookup) and T013b (introspection).
+  - Measurement harness and "normal conditions": benchmarks/SLOs are measured in CI using a reproducible runner profile (recommended: 2 vCPU, 4GB RAM) and a synthetic dataset representative of production (example: 1k-10k keys spread across 200 users). The measurement harness MUST document cold vs warm cache runs; SLOs are measured with a warm cache where appropriate, and CI MUST include cold-cache regression runs. See CI benchmark tasks T026 (key lookup) and T026b (introspection).
 - Introspection: token introspection latency p95 ≤ 100ms in normal conditions; introspection endpoints should be instrumented and benchmarked in CI.
-  - Measurement harness and "normal conditions": see the general performance harness above. Introspection benchmarks MUST be run for local introspection and OAuth2 fallback paths under representative load; CI MUST publish p50/p95/p99 and fail jobs when thresholds are exceeded. Add task T013b for introspection micro-benchmark coverage.
+  - Measurement harness and "normal conditions": see the general performance harness above. Introspection benchmarks MUST be run for local introspection and OAuth2 fallback paths under representative load; CI MUST publish p50/p95/p99 and fail jobs when thresholds are exceeded. Add task T026b for introspection micro-benchmark coverage.
 - Observability: creation/deletion/usage of keys and tokens must emit structured logs with userId, actor, IP, action, resource_id, timestamp.
 - Testability: unit tests for managers, contract tests for introspection shape, and an E2E that exercises key creation + git clone (simulated) must exist and pass in CI.
 
@@ -64,7 +64,7 @@ Specify where and how project-membership is enforced and how `projectId` is deri
 
 - To support fast fingerprint → userId resolutions, the web service MAY expose a private internal API at:
   - `GET /internal/api/ssh-keys/:fingerprint` — returns `{ userId }` (200) when found, otherwise 404.
-- This endpoint MUST be protected via `AuthenticationController.requirePrivateApiAuth()`, implement service-origin rate-limiting (60 req/min default), and only return minimal metadata required to perform auth mapping (no public_key or other PII is returned).
+- This endpoint MUST be protected via `AuthenticationController.requirePrivateApiAuth()`, implement service-origin rate-limiting (60 req/min default), and only return minimal metadata required to perform auth mapping (no public_key or other PII is returned). The fingerprint format accepted is the canonical `SHA256:<44-char base64>`.
 
 - Failure modes: if authentication fails (unknown key / invalid token) return SSH auth failure (for SSH) or HTTP 401 (for HTTPS). If authentication succeeds but membership check fails, the RPC handler MUST respond with 403 and record the event in audit logs. Do not return 200 with an error payload for git RPCs.
 - Acceptance test (example): create user U, add key K, ensure K maps to U; create repo R where U is NOT a member; attempt `git push` over SSH presenting K — outcome: authentication succeeds but RPC is denied with a 403-equivalent response and the `auth.ssh_attempt` audit log contains `userId`, `fingerprint`, `repo`, `outcome: "failure"`, and `reason: "not a project member"`.
@@ -81,7 +81,7 @@ Specify where and how project-membership is enforced and how `projectId` is deri
 ## Data Shapes (examples)
 
 - SSH key object: { id, key_name, public_key, fingerprint, userId, created_at }
-- Token object (stored): { id, userId, label, hashPrefix, hash, scopes, createdAt, expiresAt }
+- Token object (stored): { id, userId, label, hashPrefix, hash, algorithm, scopes, createdAt, expiresAt }
 
 ## Configuration Keys
 

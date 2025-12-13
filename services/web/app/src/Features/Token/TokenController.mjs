@@ -1,5 +1,6 @@
 import PersonalAccessTokenManager from './PersonalAccessTokenManager.mjs'
 import logger from '@overleaf/logger'
+import metrics from '@overleaf/metrics'
 
 export async function create(req, res) {
   const userId = req.params.userId
@@ -43,16 +44,26 @@ export async function remove(req, res) {
 }
 
 export async function introspect(req, res) {
+  const timer = new metrics.Timer('token.introspect')
   const { token } = req.body || {}
-  if (!token) return res.status(400).json({ message: 'token required' })
+  if (!token) {
+    timer.done()
+    return res.status(400).json({ message: 'token required' })
+  }
   try {
     const info = await PersonalAccessTokenManager.introspect(token)
     if (info && info.active) {
       try { logger.info({ type: 'token.used', userId: info.userId, scopes: info.scopes, timestamp: new Date().toISOString() }) } catch (e) {}
+      metrics.inc('token.introspect.hit', 1)
+    } else {
+      metrics.inc('token.introspect.miss', 1)
     }
+    timer.done()
     return res.status(200).json(info)
   } catch (err) {
     logger.err({ err }, 'error introspecting token')
+    metrics.inc('token.introspect.error', 1)
+    timer.done()
     return res.sendStatus(500)
   }
 }

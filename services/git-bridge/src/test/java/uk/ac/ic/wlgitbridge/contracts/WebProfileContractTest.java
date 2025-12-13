@@ -43,7 +43,7 @@ public class WebProfileContractTest {
                 }
             }
         });
-        server.createContext("/internal/api/ssh-keys/SHA256:abcdef", new HttpHandler() {
+        server.createContext("/internal/api/ssh-keys/SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", new HttpHandler() {
             @Override
             public void handle(HttpExchange exchange) throws IOException {
                 String body = "{\"userId\":\"user123\"}";
@@ -85,8 +85,42 @@ public class WebProfileContractTest {
         Assert.assertTrue(auth.endsWith(token));
 
         // Verify fingerprint lookup returns the expected userId
-        java.util.Optional<String> uid = client.getUserIdForFingerprint("SHA256:abcdef");
+        java.util.Optional<String> uid = client.getUserIdForFingerprint("SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
         Assert.assertTrue(uid.isPresent());
         Assert.assertEquals("user123", uid.get());
+
+        // 401: unauthorised when no token provided
+        HttpGet get401 = new HttpGet(baseUrl + "/internal/api/ssh-keys/SHA256:unauth");
+        // We set up a server context that returns 401 if no Authorization header present
+        server.createContext("/internal/api/ssh-keys/SHA256:unauth", new HttpHandler() {
+            @Override
+            public void handle(HttpExchange exchange) throws IOException {
+                String authHeader = exchange.getRequestHeaders().getFirst("Authorization");
+                if (authHeader == null) {
+                    exchange.sendResponseHeaders(401, -1);
+                    return;
+                }
+                String body = "{\"userId\":\"user123\"}";
+                byte[] bytes = body.getBytes();
+                exchange.getResponseHeaders().add("Content-Type", "application/json");
+                exchange.sendResponseHeaders(200, bytes.length);
+                try (OutputStream os = exchange.getResponseBody()) {
+                    os.write(bytes);
+                }
+            }
+        });
+        WebProfileClient noAuthClient = new WebProfileClient(baseUrl, null);
+        java.util.Optional<String> emptyUid = noAuthClient.getUserIdForFingerprint("SHA256:unauth");
+        Assert.assertFalse(emptyUid.isPresent());
+
+        // 429: rate-limited
+        server.createContext("/internal/api/ssh-keys/SHA256:ratelimit", new HttpHandler() {
+            @Override
+            public void handle(HttpExchange exchange) throws IOException {
+                exchange.sendResponseHeaders(429, -1);
+            }
+        });
+        java.util.Optional<String> rlUid = client.getUserIdForFingerprint("SHA256:ratelimit");
+        Assert.assertFalse(rlUid.isPresent());
     }
 }

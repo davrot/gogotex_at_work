@@ -20,6 +20,7 @@ describe('TokenController', function () {
 
     vi.doMock('../../../../../app/src/Features/Token/PersonalAccessTokenManager.mjs', () => ({ default: ctx.PATM }))
     vi.doMock('@overleaf/logger', () => ({ info: () => {}, err: () => {} }))
+    vi.doMock('@overleaf/metrics', () => ({ default: { Timer: function () { this.done = () => {} }, inc: () => {} } }))
 
     ctx.Controller = (await import(modulePath))
   })

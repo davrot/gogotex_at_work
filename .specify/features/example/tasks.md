@@ -23,8 +23,8 @@ This file is the final single-copy of deduplicated tasks for the SSH + HTTPS Git
 - [ ] T010 SSH Keys CRUD controller & routes (private) — services/web/app/src/Features/User/UserSSHKeysController.mjs
   - Acceptance: private API auth enforced; create returns 201/200 idempotently; duplicates handled.
 - [ ] T011 Server-side fingerprint compute & validation — compute SHA256 base64, validate format
-  - Acceptance: 400 on malformed fingerprint; fingerprint stored and returned in GET.
-- [ ] T012 Contract tests for SSH keys — services/web/test/contract/ssh-keys/**
+  - Acceptance: 400 on malformed fingerprint; fingerprint stored and returned in GET. The canonical fingerprint format is `SHA256:<44-char base64>`.
+- [ ] T012 Contract tests for SSH keys — services/web/test/contract/ssh-keys/\*\*
   - Acceptance: contract asserts create/list/delete/duplicate behavior.
 - [ ] T013 Frontend UI for SSH keys — services/web/frontend/js/features/settings/components/SSHKeysPanel.tsx
   - Acceptance: UI shows fingerprint and supports add/remove.
@@ -40,34 +40,38 @@ This file is the final single-copy of deduplicated tasks for the SSH + HTTPS Git
 ## US3 — Git Auth Integration
 
 - [ ] T019 Fingerprint → user fast lookup (private API) — GET /internal/api/ssh-keys/:fingerprint
-  - Acceptance: returns 200 { userId } or 404, 400 for malformed; protected by `requirePrivateApiAuth()` and service-origin rate limit.
+  - Acceptance: returns 200 { userId } or 404, 400 for malformed; protected by `requirePrivateApiAuth()` and service-origin rate limit. Fingerprint format must match `SHA256:<44-char base64>`.
 - [ ] T019a Contract test for fingerprint lookup — services/web/test/contract/src/SSHKeyLookupContractTest.mjs
 - [ ] T020 Short-lived cache + pubsub invalidation — services/web/app/src/lib/cache.js, services/web/lib/pubsub.js, services/git-bridge cache handling
-  - Acceptance: TTL default 60s; invalidation published on revoke/delete.
-- [ ] T021 Wire `git-bridge` to call introspection fallback & fingerprint lookup — services/git-bridge/src/main/java/**/SSHAuthManager.java
+  - Acceptance: TTL default 60s; negative lookup TTL default 5s; invalidation published on revoke/delete.
+- [ ] T021 Wire `git-bridge` to call introspection fallback & fingerprint lookup — services/git-bridge/src/main/java/\*\*/SSHAuthManager.java
   - Acceptance: `git-bridge` uses fast-path lookup and falls back to old behavior gracefully.
 - [ ] T022 Membership enforcement at RPC handler — git-bridge RPC handlers, membership API contract
   - Acceptance: non-member push returns 403; membership contract verified.
-- [ ] T023 Contract test + E2E for git-bridge auth/membership flow — services/git-bridge/test/contract/**, services/web/test/e2e/
+- [ ] T023 Contract test + E2E for git-bridge auth/membership flow — services/git-bridge/test/contract/\*\*, services/web/test/e2e/
 
 ## US4 — Observability, Rate-Limits & Security
 
 - [ ] T024 Rate limiting & service-origin controls — services/web/app/src/infrastructure/RateLimiter.js
   - Acceptance: introspect/list endpoints rate-limited per service-origin; token/ssh-key creation per-user limits enforced.
+- [ ] T024a Define service-origin identification & detection semantics — services/web/app/src/infrastructure/ServiceOrigin.js, docs/ssh-keys.md
+  - Acceptance: `X-Service-Origin` header documented as canonical header for internal clients; support mTLS or API keys in deployment; include contract test coverage.
 - [ ] T025 Contract tests to assert rate-limits & logging masking — services/web/test/contract/rate-limit-service-origin/**, services/web/test/contract/logging/**
-- [ ] T026 CI benchmarks for SLOs — key-lookup p95 ≤ 50ms; introspect p95 ≤ 100ms — ci/benchmarks/*
+- [ ] T035 Metrics instrumentation & SLI exports — services/web/app/src/Features/Discovery/SSHKeyLookupController.mjs, services/web/app/src/Features/Token/TokenController.mjs
+  - Acceptance: Metrics exported for key lookup (histogram/timer) and token introspection (histogram/timer); CI validates p50/p95/p99 for those endpoints.
+- [ ] T026 CI benchmarks for SLOs — key-lookup p95 ≤ 50ms; introspect p95 ≤ 100ms — ci/benchmarks/\*
   - Acceptance: CI job artifacts include p50/p95/p99 and gating.
 
 ## Final — Documentation, Security & Accessibility
 
 - [ ] T027 Documentation & rollout notes — docs/tokens.md, docs/ssh-keys.md, FEATURE_BRANCH_NOTES.md
 - [ ] T028 Security review & privacy checklist — docs/logging-policy.md
-- [ ] T029 Accessibility & frontend e2e screens — services/web/test/e2e/**
+- [ ] T029 Accessibility & frontend e2e screens — services/web/test/e2e/\*\*
 - [ ] T030 Add membership OpenAPI contract — specs/001-ssh-git-auth/contracts/membership.openapi.yaml
 - [ ] T031 Add contract test for membership endpoint — services/git-bridge/test/contract/MembershipContractTest.java
-- [ ] T032 Security review checklist & retention policy verification tests — test/contract/logging/**
+- [ ] T032 Security review checklist & retention policy verification tests — test/contract/logging/\*\*
 - [ ] T033 CI micro-benchmark gating & contract validation (parallel) — .gitlab-ci.yml / Jenkins
-- [ ] T034 Accessibility tests & frontend e2e (parallel) — services/web/test/e2e/**
+- [ ] T034 Accessibility tests & frontend e2e (parallel) — services/web/test/e2e/\*\*
 
 ## Notes
 
