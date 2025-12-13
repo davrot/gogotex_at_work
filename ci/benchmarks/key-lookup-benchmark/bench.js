@@ -7,6 +7,7 @@ import { performance } from 'perf_hooks'
 
 const URL = process.env.BENCH_URL || 'http://localhost:3000/internal/api/ssh-keys/SHA256:dummy'
 const ITER = parseInt(process.env.BENCH_ITER || '20', 10)
+const OUT = process.env.BENCH_OUTPUT || null
 
 async function run() {
   const latencies = []
@@ -25,7 +26,18 @@ async function run() {
   const p95 = latencies[Math.floor(latencies.length*0.95)]
   const p99 = latencies[Math.floor(latencies.length*0.99)]
   const output = { p50, p95, p99, samples: ITER }
-  console.log(JSON.stringify(output))
+  if (OUT) {
+    const fs = require('fs')
+    try {
+      fs.mkdirSync(require('path').dirname(OUT), { recursive: true })
+      fs.writeFileSync(OUT, JSON.stringify(output))
+      console.log('WROTE_BENCH_OUTPUT=' + OUT)
+    } catch (e) {
+      console.error('Failed writing bench output', e)
+    }
+  } else {
+    console.log(JSON.stringify(output))
+  }
   process.exit(0)
 }
 

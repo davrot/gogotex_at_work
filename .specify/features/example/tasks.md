@@ -3,7 +3,7 @@
 ## Phase 1 — Setup
 
 - [x] T001 Validate project structure, spec and plan presence — .specify/features/example/plan.md, .specify/features/example/spec.md
-- [ ] T002 Add CI micro-benchmark skeleton — ci/benchmarks/, .gitlab-ci.yml
+- [x] T002 Add CI micro-benchmark skeleton — ci/benchmarks/, .gitlab-ci.yml
 - [x] T003 Ensure linting plugin & config present — libraries/eslint-plugin/index.js
 - [ ] T004 Config validation & hash availability checks — services/web/app/src/config/validateConfig.mjs, services/web/app/src/config/hashAvailability.mjs
 
@@ -66,7 +66,7 @@
 ## Phase 1: Setup (Shared Infrastructure)
 
   
-- [ ] T002 [P] Add CI benchmarks skeleton and micro-benchmark harness — ci/benchmarks/, .gitlab-ci.yml
+- [x] T002 [P] Add CI benchmarks skeleton and micro-benchmark harness — ci/benchmarks/, .gitlab-ci.yml
 - [x] T003 [P] Add/enable minimal eslint plugin to satisfy lint and enforce rules — libraries/eslint-plugin/index.js
 - [ ] T004 [P] Add startup config validation & hash availability checks — services/web/app/src/config/validateConfig.mjs, services/web/app/src/config/hashAvailability.mjs
 
