@@ -137,8 +137,21 @@ const overleafLoginRateLimiter = new RateLimiter(
   }
 )
 
+// Rate limiters for auth endpoints — default to 60 req/min per service-origin
+const tokenIntrospectRateLimiter = new RateLimiter('token-introspect', {
+  points: 60,
+  duration: 60,
+})
+
+const sshFingerprintLookupRateLimiter = new RateLimiter('ssh-fingerprint-lookup', {
+  points: 60,
+  duration: 60,
+})
+
 module.exports = {
   RateLimiter,
   openProjectRateLimiter,
   overleafLoginRateLimiter,
+  tokenIntrospectRateLimiter,
+  sshFingerprintLookupRateLimiter,
 }

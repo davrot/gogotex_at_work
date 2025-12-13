@@ -1,6 +1,8 @@
 import { UserSSHKey } from '../../models/UserSSHKey.js'
 import logger from '@overleaf/logger'
 import metrics from '@overleaf/metrics'
+import { sshFingerprintLookupRateLimiter } from '../../infrastructure/RateLimiter.js'
+import ServiceOrigin from '../../infrastructure/ServiceOrigin.mjs'
 
 export async function lookup(req, res) {
   const timer = new metrics.Timer('ssh.key_lookup')
@@ -20,6 +22,17 @@ export async function lookup(req, res) {
     timer.done()
     return res.status(400).json({ message: 'invalid fingerprint format' })
   }
+
+  // per service-origin rate limit
+  try {
+    const originKey = ServiceOrigin.originRateKey(req)
+    await sshFingerprintLookupRateLimiter.consume(originKey, 1, { method: 'service-origin' })
+  } catch (err) {
+    try { metrics.inc('ssh.key_lookup.rate_limited', 1) } catch (e) {}
+    timer.done()
+    return res.sendStatus(429)
+  }
+
   try {
     const key = await UserSSHKey.findOne({ fingerprint }).lean().exec()
     if (!key) {

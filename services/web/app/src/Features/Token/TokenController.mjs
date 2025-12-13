@@ -43,6 +43,9 @@ export async function remove(req, res) {
   }
 }
 
+import { tokenIntrospectRateLimiter } from '../../infrastructure/RateLimiter.js'
+import ServiceOrigin from '../../infrastructure/ServiceOrigin.mjs'
+
 export async function introspect(req, res) {
   const timer = new metrics.Timer('token.introspect')
   const { token } = req.body || {}
@@ -50,6 +53,18 @@ export async function introspect(req, res) {
     timer.done()
     return res.status(400).json({ message: 'token required' })
   }
+
+  // rate-limit per service-origin
+  try {
+    const originKey = ServiceOrigin.originRateKey(req)
+    await tokenIntrospectRateLimiter.consume(originKey, 1, { method: 'service-origin' })
+  } catch (err) {
+    // rate-limited
+    try { metrics.inc('token.introspect.rate_limited', 1) } catch (e) {}
+    timer.done()
+    return res.sendStatus(429)
+  }
+
   try {
     const info = await PersonalAccessTokenManager.introspect(token)
     if (info && info.active) {
