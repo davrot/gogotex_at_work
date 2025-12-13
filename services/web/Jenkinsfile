@@ -297,13 +297,13 @@ pipeline {
           }
         }
         stage('Benchmarks') {
-          steps {
+            steps {
             dir('services/web') {
-              sh 'mkdir -p services/web/data/reports'
-              sh 'BENCH_URL=http://localhost:13000 BENCH_ITER=50 BENCH_OUTPUT=services/web/data/reports/bench-key-lookup.json node ../ci/benchmarks/key-lookup-benchmark/bench.js'
-              sh 'BENCH_URL=http://localhost:13000 BENCH_ITER=50 BENCH_OUTPUT=services/web/data/reports/bench-introspection.json node ../ci/benchmarks/introspection-benchmark/bench.js'
+              sh 'mkdir -p data/reports'
+              sh 'BENCH_URL=http://localhost:13000 BENCH_ITER=50 BENCH_OUTPUT=data/reports/bench-key-lookup.json node ../ci/benchmarks/key-lookup-benchmark/bench.js'
+              sh 'BENCH_URL=http://localhost:13000 BENCH_ITER=50 BENCH_OUTPUT=data/reports/bench-introspection.json node ../ci/benchmarks/introspection-benchmark/bench.js'
               // check p95 threshold: 50ms for key lookup, 100ms for introspection
-              sh 'python3 - <<EOF\nimport json\nimport sys\nimport os\ntry:\n  with open("services/web/data/reports/bench-key-lookup.json") as f:\n    k = json.load(f)\n  with open("services/web/data/reports/bench-introspection.json") as f2:\n    i = json.load(f2)\n  if k.get("p95", 0) > 50:\n    print("Key lookup p95 too high:", k.get("p95"))\n    sys.exit(1)\n  if i.get("p95", 0) > 100:\n    print("Introspection p95 too high:", i.get("p95"))\n    sys.exit(1)\n  print("Benchmarks within thresholds")\nexcept Exception as e:\n  print("Bench check failed:", e)\n  sys.exit(1)\nEOF'
+              sh 'python3 - <<EOF\nimport json\nimport sys\nimport os\ntry:\n  with open("data/reports/bench-key-lookup.json") as f:\n    k = json.load(f)\n  with open("data/reports/bench-introspection.json") as f2:\n    i = json.load(f2)\n  if k.get("p95", 0) > 50:\n    print("Key lookup p95 too high:", k.get("p95"))\n    sys.exit(1)\n  if i.get("p95", 0) > 100:\n    print("Introspection p95 too high:", i.get("p95"))\n    sys.exit(1)\n  print("Benchmarks within thresholds")\nexcept Exception as e:\n  print("Bench check failed:", e)\n  sys.exit(1)\nEOF'
             }
           }
         }
