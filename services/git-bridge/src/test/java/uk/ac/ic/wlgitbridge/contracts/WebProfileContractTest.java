@@ -43,6 +43,18 @@ public class WebProfileContractTest {
                 }
             }
         });
+        server.createContext("/internal/api/ssh-keys/SHA256:abcdef", new HttpHandler() {
+            @Override
+            public void handle(HttpExchange exchange) throws IOException {
+                String body = "{\"userId\":\"user123\"}";
+                byte[] bytes = body.getBytes();
+                exchange.getResponseHeaders().add("Content-Type", "application/json");
+                exchange.sendResponseHeaders(200, bytes.length);
+                try (OutputStream os = exchange.getResponseBody()) {
+                    os.write(bytes);
+                }
+            }
+        });
         server.start();
         // brief pause to ensure the server socket is fully ready before the client connects
         try { Thread.sleep(100); } catch (InterruptedException ignored) {}
@@ -71,5 +83,10 @@ public class WebProfileContractTest {
         Assert.assertNotNull("Authorization header was not received by server", auth);
         Assert.assertTrue("Authorization must be Bearer token", auth.startsWith("Bearer "));
         Assert.assertTrue(auth.endsWith(token));
+
+        // Verify fingerprint lookup returns the expected userId
+        java.util.Optional<String> uid = client.getUserIdForFingerprint("SHA256:abcdef");
+        Assert.assertTrue(uid.isPresent());
+        Assert.assertEquals("user123", uid.get());
     }
 }

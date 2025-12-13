@@ -10,8 +10,11 @@ import org.apache.http.util.EntityUtils;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Lightweight client to call the internal web-profile API to retrieve user SSH keys.
@@ -24,6 +27,27 @@ public class WebProfileClient {
     public WebProfileClient(String baseUrl, String apiToken) {
         this.baseUrl = baseUrl;
         this.apiToken = apiToken;
+    }
+
+    public Optional<String> getUserIdForFingerprint(String fingerprint) throws IOException {
+        String url = String.format("%s/internal/api/ssh-keys/%s", baseUrl, URLEncoder.encode(fingerprint, StandardCharsets.UTF_8));
+        try (CloseableHttpClient http = HttpClients.createDefault()) {
+            HttpGet get = new HttpGet(url);
+            if (apiToken != null && !apiToken.isEmpty()) {
+                get.addHeader("Authorization", "Bearer " + apiToken);
+            }
+            try (CloseableHttpResponse resp = http.execute(get)) {
+                int status = resp.getStatusLine().getStatusCode();
+                if (status >= 200 && status < 300) {
+                    String json = EntityUtils.toString(resp.getEntity());
+                    java.util.Map<String, Object> m = gson.fromJson(json, java.util.Map.class);
+                    if (m != null && m.get("userId") != null) {
+                        return Optional.of(String.valueOf(m.get("userId")));
+                    }
+                }
+                return Optional.empty();
+            }
+        }
     }
 
     public List<SSHKey> getUserSSHKeys(String userId) throws IOException {

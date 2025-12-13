@@ -23,9 +23,20 @@ public class SSHAuthManager {
     public boolean isKeyAuthorized(String userId, String presentedPublicKey) {
         if (presentedPublicKey == null) return false;
         try {
-            List<SSHKey> keys = profileClient.getUserSSHKeys(userId);
             String normalizedPresented = normalizePublicKey(presentedPublicKey);
             String presentedFingerprint = fingerprint(normalizedPresented);
+            // Fast path: try direct fingerprint->user lookup
+            if (presentedFingerprint != null && !presentedFingerprint.isEmpty()) {
+                try {
+                    java.util.Optional<String> pf = profileClient.getUserIdForFingerprint("SHA256:" + presentedFingerprint);
+                    if (pf != null && pf.isPresent() && Objects.equals(pf.get(), userId)) {
+                        return true;
+                    }
+                } catch (Exception e) {
+                    Log.debug("fingerprint lookup call failed: {}", e.getMessage());
+                }
+            }
+            List<SSHKey> keys = profileClient.getUserSSHKeys(userId);
             for (SSHKey k : keys) {
                 if (k == null || k.getPublicKey() == null) continue;
                 String stored = normalizePublicKey(k.getPublicKey());
