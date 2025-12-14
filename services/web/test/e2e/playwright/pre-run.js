@@ -32,6 +32,39 @@ async function promptUser() {
 async function main() {
   printReminder()
 
+  const recommended = 'http://develop-webpack-1:3808'
+  const baseUrl = process.env.BASE_URL
+
+  function baseUrlOk(url) {
+    if (!url) return false
+    const u = url.toLowerCase()
+    if (u.includes('develop-webpack') || u.includes('127.0.0.1') || u.includes('localhost') || u.includes(':3808') || u.includes(':80')) return true
+    return false
+  }
+
+  if (!baseUrlOk(baseUrl)) {
+    console.error('\nERROR: BASE_URL does not look correct or is not set.')
+    console.error(`Found BASE_URL=${baseUrl || '<undefined>'}. Recommended: ${recommended}`)
+    console.error("If you're sure your BASE_URL is correct, set CONFIRM_BASE_URL=true to bypass this check.")
+    if (process.env.CI === 'true' || process.env.CONFIRM_BASE_URL === 'true' || process.env.CONFIRM_DEV_SETUP === 'true' || process.env.SKIP_DEVSETUP_CHECK === 'true') {
+      console.log('BASE_URL check bypassed via environment variables (CI/CONFIRM_BASE_URL/CONFIRM_DEV_SETUP/SKIP_DEVSETUP_CHECK)')
+    } else {
+      if (!process.stdin.isTTY) {
+        console.error('Non-interactive shell detected and BASE_URL is not confirmed. Aborting to avoid accidental e2e runs.')
+        process.exit(2)
+      }
+      const rl = require('node:readline').createInterface({ input: process.stdin, output: process.stdout })
+      const answer = await new Promise(resolve => rl.question('Type ALLOW to proceed with the current BASE_URL, or press ENTER to abort: ', a => { rl.close(); resolve(a && a.trim() === 'ALLOW') }))
+      if (!answer) {
+        console.error('BASE_URL not confirmed — aborting e2e run. Set BASE_URL appropriately and re-run (or use CONFIRM_BASE_URL=true to bypass).')
+        process.exit(1)
+      }
+      console.log('BASE_URL confirmed. Proceeding.')
+    }
+  } else {
+    console.log(`BASE_URL looks OK: ${baseUrl}`)
+  }
+
   if (process.env.CI === 'true' || process.env.CONFIRM_DEV_SETUP === 'true' || process.env.SKIP_DEVSETUP_CHECK === 'true') {
     console.log('Pre-run check bypassed via environment variable (CI/CONFIRM_DEV_SETUP/SKIP_DEVSETUP_CHECK)')
     process.exit(0)
