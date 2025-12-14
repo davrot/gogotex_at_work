@@ -284,7 +284,7 @@ export async function remove(req, res) {
 }
 
 export async function listForService(req, res) {
-  const userId = req.params.userId
+  let userId = req.params.userId
   if (!userId) return res.status(400).json({ message: 'user id required' })
   // Basic auth check for trusted callers (dev/test convenience)
   const authHeader = (req.get && req.get('authorization')) || req.headers && req.headers.authorization
@@ -293,8 +293,33 @@ export async function listForService(req, res) {
   const adminUser = process.env.SSH_KEYS_BASIC_USER || 'overleaf'
   const adminPass = process.env.SSH_KEYS_BASIC_PASS || 'overleaf'
   if (!(creds[0] === adminUser && creds[1] === adminPass)) return res.sendStatus(403)
+
   try {
-    const keys = await UserSSHKey.find({ userId }).lean().exec()
+    // Accept either an ObjectId user id (normal) or a dev-friendly username/email.
+    // If userId isn't a valid ObjectId, try to resolve by email to a real user id first.
+    const { User } = await import('../../../models/User.js')
+    let resolvedUserId = null
+    if (ObjectId.isValid(userId)) {
+      resolvedUserId = userId
+    } else {
+      // try to find a user by email matching the supplied identifier
+      const u = await User.findOne({ email: userId }).lean().exec()
+      if (u && u._id) resolvedUserId = String(u._id)
+    }
+
+    let keys = []
+    if (resolvedUserId) {
+      keys = await UserSSHKey.find({ userId: resolvedUserId }).lean().exec()
+    } else {
+      // Fall back to a raw collection lookup to support existing dev-seeded docs
+      // which may have stored userId as a string rather than ObjectId.
+      try {
+        keys = await UserSSHKey.collection.find({ userId }).toArray()
+      } catch (e) {
+        // ignore and leave keys empty
+      }
+    }
+
     const enriched = keys.map(k => ({
       id: String(k._id || k.id),
       key_name: k.keyName || k.key_name || '',
