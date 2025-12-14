@@ -47,7 +47,10 @@
     "format:jenkins:fix": "prettier --write $PWD/'**/Jenkinsfile'",
     "lint": "eslint --max-warnings 0 --format unix .",
     "lint:fix": "eslint --fix .",
-    "postinstall": "patch-package"
+    "postinstall": "patch-package",
+    "test:focused": "npx vitest run test/focused --run && ( [ \"$RUN_E2E\" = \"true\" ] && (cd services/web && npm run e2e:playwright) || true )",
+    "test:focused:unit": "npx vitest run test/focused --run",
+    "test:focused:e2e": "cd services/web && npm run e2e:playwright"
   },
   "workspaces": [
     "jobs/mirror-documentation",
