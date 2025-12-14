@@ -297,7 +297,7 @@ export async function listForService(req, res) {
   try {
     // Accept either an ObjectId user id (normal) or a dev-friendly username/email.
     // If userId isn't a valid ObjectId, try to resolve by email to a real user id first.
-    const { User } = await import('../../../models/User.js')
+    const { User } = await import('../../models/User.js')
     let resolvedUserId = null
     if (ObjectId.isValid(userId)) {
       resolvedUserId = userId
