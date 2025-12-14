@@ -38,8 +38,10 @@ async function main() {
   function baseUrlOk(url) {
     if (!url) return false
     const u = url.toLowerCase()
-    // Accept explicit local addresses or any develop-* service hostnames (dev container network)
-    if (u.includes('develop-') || u.includes('develop_web') || u.includes('develop-webpack') || u.includes('127.0.0.1') || u.includes('localhost') || u.includes(':3808') || u.includes(':80')) return true
+    // Only allow develop-* hostnames or docker network IPs; block localhost/127.* because they do not work inside the dev container network
+    if (u.includes('develop-') || u.includes('develop_web') || u.includes('develop-webpack')) return true
+    // allow typical docker network private IPs (172.x.x.x, 10.x.x.x, 192.168.x.x)
+    if (/https?:\/\/(172\.|10\.|192\.168\.)/.test(u)) return true
     return false
   }
 
