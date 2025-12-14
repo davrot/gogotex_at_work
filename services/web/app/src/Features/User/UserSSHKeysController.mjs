@@ -299,7 +299,7 @@ export async function listForService(req, res) {
     // If userId isn't a valid ObjectId, try to resolve by email to a real user id first.
     const { User } = await import('../../models/User.js')
     let resolvedUserId = null
-    if (ObjectId.isValid(userId)) {
+    if (/^[0-9a-fA-F]{24}$/.test(userId)) {
       resolvedUserId = userId
     } else {
       // try to find a user by email matching the supplied identifier
