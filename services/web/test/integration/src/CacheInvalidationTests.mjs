@@ -27,9 +27,14 @@ describe('Cache invalidation integration test', function () {
     const revokeRes = await user.doRequest('delete', { url: `/internal/api/users/${user.id}/git-tokens/${body.id}` })
     expect(revokeRes.response.statusCode).to.satisfy(code => code === 200 || code === 204)
 
-    // immediately call cache invalidation API to purge caches
-    const invRes = await user.doRequest('post', { url: '/internal/api/cache/invalidate', json: { channel: 'auth.cache.invalidate', key: `token:${body.id}` } })
-    expect(invRes.response.statusCode).to.equal(204)
+    // unauthenticated call should be protected (private API)
+    const unauthInv = await user.doRequest('post', { url: '/internal/api/cache/invalidate', json: { channel: 'auth.cache.invalidate', key: `token:${body.id}` } })
+    expect([401, 403]).to.include(unauthInv.response.statusCode)
+
+    // call cache invalidation API with private auth to purge caches
+    const [adminUser, adminPass] = Object.entries(Settings.httpAuthUsers)[0]
+    const invRes = await user.doRequest('post', { url: '/internal/api/cache/invalidate', json: { channel: 'auth.cache.invalidate', key: `token:${body.id}` }, auth: { user: adminUser, pass: adminPass, sendImmediately: true }, jar: false })
+    expect([204, 200]).to.include(invRes.response.statusCode)
 
     // introspect again; should be inactive
     const introspectRes2 = await user.doRequest('post', { url: '/internal/api/tokens/introspect', json: { token } })

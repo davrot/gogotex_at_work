@@ -2,7 +2,7 @@ import { describe, it, beforeEach, expect, vi } from 'vitest'
 import MockResponse from '../../helpers/MockResponse.js'
 
 // Mock infrastructure mongoose before any modules import it
-let mockMongoose = { models: {}, set: vi.fn(), connect: vi.fn().mockResolvedValue(null), connection: { on: vi.fn(), client: {} }, plugin: vi.fn(), Promise: Promise }
+let mockMongoose = { models: { UserSSHKey: { find: vi.fn(), findOne: vi.fn(), findOneAndDelete: vi.fn(), model: vi.fn() } }, set: vi.fn(), connect: vi.fn().mockResolvedValue(null), connection: { on: vi.fn(), client: {} }, plugin: vi.fn(), Promise: Promise }
 vi.mock('../../../../../app/src/infrastructure/Mongoose.js', () => mockMongoose)
 
 // Mock dependencies
@@ -37,21 +37,39 @@ describe('UserSSHKeysController (ESM)', async () => {
   let UserSSHKey
 
   beforeEach(async () => {
+    // Reset module cache so imports pick up fresh mocks
+    vi.resetModules()
+
     // Load model mocks and set them into the app's infrastructure mongoose before importing the controller
     const model = await import('../../../../../app/src/models/UserSSHKey.js')
     UserSSHKey = model.UserSSHKey
     try {
       const infraMongoose = await import('../../../../../app/src/infrastructure/Mongoose.js')
       if (infraMongoose && infraMongoose.default && infraMongoose.default.models) {
+        // make sure the infrastructure mongoose mock exposes our stubbed query shapes
         infraMongoose.default.models.UserSSHKey = UserSSHKey
         infraMongoose.default.models.User = { findById: vi.fn().mockResolvedValue({ email: 'test@example.com' }) }
+        // ensure query shapes on the infra mock return exec-like promises to avoid real DB calls
+        if (infraMongoose.default.models.UserSSHKey.find) infraMongoose.default.models.UserSSHKey.find.mockReturnValue({ lean: () => ({ exec: async () => [] }) })
+        infraMongoose.default.models.UserSSHKey.findOne = vi.fn().mockReturnValue({ lean: () => ({ exec: async () => null }) })
+        infraMongoose.default.models.UserSSHKey.findOneAndDelete = vi.fn().mockReturnValue({ exec: async () => null })
       }
     } catch (e) {}
     // Fresh import to pick up mocks
     Controller = await import('../../../../../app/src/Features/User/UserSSHKeysController.mjs')
-    // default behaviors
-    UserSSHKey.find.mockReturnValue({ lean: () => ({ exec: async () => [] }) })
-    UserSSHKey.findOneAndDelete.mockReturnValue({ exec: async () => null })
+    // default behaviors - ensure all query shapes are stubbed to avoid real mongoose calls
+    UserSSHKey.find = vi.fn().mockReturnValue({ lean: () => ({ exec: async () => [] }) })
+    UserSSHKey.findOne = vi.fn().mockReturnValue({ lean: () => ({ exec: async () => null }) })
+    UserSSHKey.findOneAndDelete = vi.fn().mockReturnValue({ exec: async () => null })
+
+    // Inject the mocked model into the controller for deterministic isolation
+    if (Controller && typeof Controller.__setUserSSHKeyForTest === 'function') {
+      Controller.__setUserSSHKeyForTest(UserSSHKey)
+    }
+  })
+
+  afterEach(() => {
+    try { if (Controller && typeof Controller.__resetUserSSHKeyForTest === 'function') Controller.__resetUserSSHKeyForTest() } catch (e) {}
   })
 
   it('create returns 201 with fingerprint and caches', async () => {

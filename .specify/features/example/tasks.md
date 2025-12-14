@@ -9,6 +9,8 @@
 - [ ] T003 [P] Ensure linting plugin & config present and applied — libraries/eslint-plugin/
 - [ ] T004 (BLOCKING) Implement config validation & runtime hash availability check — services/web/app/src/config/validateConfig.mjs, services/web/app/src/config/hashAvailability.mjs
   - Acceptance: Service fails to start when `AUTH_TOKEN_HASH_ALGO=argon2id` and argon2 not supported unless an explicit fallback is configured.
+- [ ] T002b Add migration/backfill for PersonalAccessToken re-hash & metadata — services/web/migrations/re-hash-personal-access-tokens.mjs
+  - Acceptance: Migration preserves original algorithm metadata (`algorithm`/`hashPrefix` fields), provides a safe re-hash or re-issue strategy (idempotent, reversible steps documented), and includes tests or a dry-run mode to validate behavior.
 
 ---
 
@@ -30,7 +32,7 @@
 
 - [x] T010 [P] [US1] Ensure SSH Keys CRUD controller & private routes exist and enforce auth — services/web/app/src/Features/User/UserSSHKeysController.mjs
 - [x] T011 [P] [US1] Implement server-side fingerprint computation & validation (SHA256 base64) — services/web/app/src/models/UserSSHKey.js
-- [ ] T012 [US1] Add contract tests for SSH keys endpoints — services/web/test/contract/src/SSHKeysContractTest.mjs
+- [x] T012 [US1] Add contract tests for SSH keys endpoints — services/web/test/contract/src/SSHKeyCRUDContractTest.mjs
 - [ ] T013 [US1] Implement & test frontend UI for SSH keys (inline validation & ARIA) — services/web/frontend/js/features/settings/components/SSHKeysPanel.tsx, services/web/test/frontend/features/settings/components/ssh-keys.test.tsx
 
 ---
@@ -47,6 +49,7 @@
 - [ ] T017 [US2] [P] Frontend: ensure `GitTokensPanel` lists tokens, shows plaintext on create, supports copy-to-clipboard, and handles network errors gracefully — services/web/frontend/js/features/settings/components/GitTokensPanel.tsx, services/web/test/frontend/features/settings/components/git-tokens.test.tsx
 - [ ] T018 [US2] Add contract & service-origin rate-limit tests for token creation/listing — services/web/test/contract/src/ServiceOriginRateLimitTests.mjs
 - [ ] T019 [US2] Reproduce & fix E2E 404 for GET `/internal/api/users/:userId/git-tokens` seen in Playwright run: inspect TokenRouter, AuthenticationController.requireLogin(), router mounting, and server logs during E2E — services/web/app/src/Features/Token/TokenRouter.mjs, services/web/app/src/Features/Token/TokenController.mjs, services/web/app/src/router.mjs, services/web/test/e2e/playwright/out/console.log
+- [x] T019a Contract test for fingerprint lookup — services/web/test/contract/src/SSHKeyLookupContractTest.mjs
   - Acceptance: Playwright run (RESET_DB=true BASE_URL=...) shows no 404 for token list and UI shows token list or empty state instead of generic error.
 
 ---
@@ -71,6 +74,7 @@
 
 - [ ] T023 [P] [US4] Ensure private fingerprint lookup API exists and is contract-covered — GET /internal/api/ssh-keys/:fingerprint, services/web/test/contract/src/SSHKeyLookupContractTest.mjs
 - [ ] T024 [US4] Short-lived cache and pubsub invalidation for fingerprint lookup — services/web/app/src/lib/cache.js, services/web/lib/pubsub.js
+- [ ] T024b Implement synchronous cache invalidation API & contract tests — POST /internal/api/cache/invalidate, services/web/test/contract/src/CacheInvalidationContractTest.mjs
 - [ ] T025 [US4] Wire `git-bridge` to call fingerprint lookup and introspection fallback path — services/git-bridge/src/main/java/**/SSHAuthManager.java, services/git-bridge/test/contract/**
 - [ ] T026 [US4] Membership enforcement tests at RPC handler (integration) — services/git-bridge/test/integration/\*\*
 

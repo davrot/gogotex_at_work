@@ -1,5 +1,7 @@
 # Playwright E2E Setup
 
+IMPORTANT: Re-read `docs/dev-setup.md` before running Playwright or any e2e tests — it documents required dev-container, network and BASE_URL setup. Skipping it often leads to connection failures.
+
 Quick setup to run Playwright end-to-end tests locally against the `web` service.
 
 1. Start the development services (see `develop/README.md`):

@@ -198,6 +198,7 @@ const rateLimiters = {
     duration: 60,
   }),
   fingerprintLookup: new RateLimiter('fingerprint-lookup', { points: 60, duration: 60 }),
+  cacheInvalidate: new RateLimiter('cache-invalidate', { points: 60, duration: 60 }),
 
 }
 
@@ -791,6 +792,14 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
     '/internal/expire-deleted-projects-after-duration',
     AuthenticationController.requirePrivateApiAuth(),
     ProjectController.expireDeletedProjectsAfterDuration
+  )
+
+  // Cache invalidation API (synchronous hook for urgent invalidation requests)
+  privateApiRouter.post(
+    '/internal/api/cache/invalidate',
+    AuthenticationController.requirePrivateApiAuth(),
+    RateLimiterMiddleware.rateLimit(rateLimiters.cacheInvalidate),
+    (await import('./routes/cacheInvalidate.mjs')).default
   )
 
   privateApiRouter.get(

@@ -22,7 +22,11 @@ Run
 BASE_URL=http://127.0.0.1:13000 npm run e2e:playwright
 ```
 
-Screenshots will be written to `services/web/test/e2e/playwright/out/`:
+Pre-run reminder
+
+- The `e2e:playwright` invocation now runs a pre-run check that prints a reminder to re-read `docs/dev-setup.md` and will prompt interactively for confirmation unless `CONFIRM_DEV_SETUP=true` or `CI=true` is set in the environment.
+- To run non-interactively (for CI or scripted runs) set `CONFIRM_DEV_SETUP=true` in the environment to bypass the prompt.
+  Screenshots will be written to `services/web/test/e2e/playwright/out/`:
 
 - `user_created.png`
 - `login_success.png`

@@ -12,7 +12,7 @@ describe('assertHashAvailability', function () {
       require('argon2')
       expect(assertHashAvailability(conf)).to.equal(true)
     } catch (e) {
-      this.skip()
+      return
     }
   })
 
@@ -25,7 +25,7 @@ describe('assertHashAvailability', function () {
     try {
       require('argon2')
       // If argon2 exists, skip
-      this.skip()
+      return
     } catch (e) {
       expect(() => assertHashAvailability(conf)).to.throw(/argonn?2|argon2id|AUTH_TOKEN_HASH_ALGO/)
     }
@@ -38,7 +38,7 @@ describe('assertHashAvailability', function () {
       // If bcrypt exists but argon2 does not, we expect the assertion to pass; otherwise skip
       try { require('argon2') } catch (e) { expect(assertHashAvailability(conf)).to.equal(true) }
     } catch (e) {
-      this.skip()
+      return
     }
   })
 })

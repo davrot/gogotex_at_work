@@ -1,4 +1,8 @@
-import { UserSSHKey } from '../../../models/UserSSHKey.js'
+import { UserSSHKey as _ImportedUserSSHKey } from '../../../models/UserSSHKey.js'
+// Allow tests to override the model binding for isolation
+let UserSSHKey = _ImportedUserSSHKey
+export function __setUserSSHKeyForTest(mock) { UserSSHKey = mock }
+export function __resetUserSSHKeyForTest() { UserSSHKey = _ImportedUserSSHKey }
 import { ObjectId } from 'mongoose'
 import { promisify } from 'node:util'
 import crypto from 'node:crypto'

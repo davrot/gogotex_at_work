@@ -157,8 +157,7 @@ Example:
   - Acceptable stale window for revocation: 60s unless immediate invalidation is requested
 - Invalidation mechanisms:
   - Primary: publish an invalidation message to a shared channel `auth.cache.invalidate` with payload `{ type, id, fingerprint?, projectId?, reason }`; all service instances should subscribe and purge caches on receipt.
-  - Secondary: synchronous API `POST /internal/api/cache/invalidate` for urgent invalidation requests.
-- Cache keys:
+  - Secondary: synchronous API `POST /internal/api/cache/invalidate` for urgent invalidation requests. This endpoint is protected via `AuthenticationController.requirePrivateApiAuth()` (e.g., basic auth using `httpAuthUsers`) and is rate-limited per service-origin (default 60 req/min). Request body: `{ channel: string, key: string }` (both required).- Cache keys:
   - SSH keys: `ssh:fingerprint:{fingerprint}` → `{ userId, expiresAt }`
   - Tokens: keyed by `token:hashprefix:{hashPrefix}` or a hashed lookup; store `{ active, scopes, expiresAt }`.
 - On any `DELETE`/revoke or membership change, services MUST publish an invalidation message.

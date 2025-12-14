@@ -10,6 +10,8 @@ npm run test:focused:unit
 
 The Playwright e2e flows that exercise SSH keys and tokens are available in `services/web/test/e2e/playwright` and can be included in the focused run by setting `RUN_E2E=true` and providing test credentials/environment variables.
 
+IMPORTANT: Re-read `docs/dev-setup.md` before running Playwright or any e2e tests — it contains the required environment and networking steps (dev containers, BASE_URL and docker networking) needed to run e2e reliably. Skipping that will often cause tests to fail silently or be unable to connect to the dev server.
+
 Example (runs unit + e2e):
 
 ```bash
