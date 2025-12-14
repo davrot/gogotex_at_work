@@ -912,6 +912,13 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
     AuthenticationController.requirePrivateApiAuth(),
     ProjectApiController.getProjectDetails
   )
+
+  // Service-facing route for internal lookups (Basic auth protected)
+  privateApiRouter.get(
+    '/internal/api/service/users/:userId/ssh-keys',
+    AuthenticationController.requirePrivateApiAuth(),
+    UserSSHKeysController.listForService
+  )
   privateApiRouter.get(
     '/internal/project/:Project_id/zip',
     AuthenticationController.requirePrivateApiAuth(),
