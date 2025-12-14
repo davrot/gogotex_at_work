@@ -38,7 +38,8 @@ async function main() {
   function baseUrlOk(url) {
     if (!url) return false
     const u = url.toLowerCase()
-    if (u.includes('develop-webpack') || u.includes('127.0.0.1') || u.includes('localhost') || u.includes(':3808') || u.includes(':80')) return true
+    // Accept explicit local addresses or any develop-* service hostnames (dev container network)
+    if (u.includes('develop-') || u.includes('develop_web') || u.includes('develop-webpack') || u.includes('127.0.0.1') || u.includes('localhost') || u.includes(':3808') || u.includes(':80')) return true
     return false
   }
 
