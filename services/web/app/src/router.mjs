@@ -1,4 +1,5 @@
 import AdminController from './Features/ServerAdmin/AdminController.mjs'
+import TokenReissueController from './Features/Admin/TokenReissueController.mjs'
 import ErrorController from './Features/Errors/ErrorController.mjs'
 import Features from './infrastructure/Features.js'
 import ProjectController from './Features/Project/ProjectController.mjs'
@@ -22,6 +23,7 @@ import UserInfoController from './Features/User/UserInfoController.mjs'
 import UserController from './Features/User/UserController.mjs'
 import UserEmailsController from './Features/User/UserEmailsController.mjs'
 import UserPagesController from './Features/User/UserPagesController.mjs'
+import UserSSHKeysController from './Features/User/UserSSHKeysController.mjs'
 import TutorialController from './Features/Tutorial/TutorialController.mjs'
 import DocumentController from './Features/Documents/DocumentController.mjs'
 import CompileManager from './Features/Compile/CompileManager.mjs'
@@ -51,6 +53,7 @@ import AnalyticsRouter from './Features/Analytics/AnalyticsRouter.mjs'
 import MetaController from './Features/Metadata/MetaController.mjs'
 import TokenAccessController from './Features/TokenAccess/TokenAccessController.mjs'
 import TokenAccessRouter from './Features/TokenAccess/TokenAccessRouter.mjs'
+import TokenRouter from './Features/Token/TokenRouter.mjs'
 import DiscoveryRouter from './Features/Discovery/DiscoveryRouter.mjs'
 import LinkedFilesRouter from './Features/LinkedFiles/LinkedFilesRouter.mjs'
 import TemplatesRouter from './Features/Templates/TemplatesRouter.mjs'
@@ -282,6 +285,9 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
   TemplatesRouter.apply(webRouter)
   UserMembershipRouter.apply(webRouter)
   TokenAccessRouter.apply(webRouter)
+  // Token management (user git tokens)
+  TokenRouter.apply(webRouter)
+
   DiscoveryRouter.apply(webRouter, privateApiRouter)
   HistoryRouter.apply(webRouter, privateApiRouter)
 
@@ -309,6 +315,17 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
     AuthenticationController.requireLogin(),
     UserController.updateUserSettings
   )
+
+  // User SSH Keys: list, create, delete (internal/user-facing)
+  // internal form (explicit user id) - controller enforces admin access when acting on other users
+  webRouter.get('/internal/api/users/:userId/ssh-keys', AuthenticationController.requireLogin(), UserSSHKeysController.list)
+  webRouter.post('/internal/api/users/:userId/ssh-keys', AuthenticationController.requireLogin(), UserSSHKeysController.create)
+  webRouter.delete('/internal/api/users/:userId/ssh-keys/:keyId', AuthenticationController.requireLogin(), UserSSHKeysController.remove)
+
+  // User-facing endpoints for managing your own SSH keys (same protection as /user/settings)
+  webRouter.get('/user/ssh-keys', AuthenticationController.requireLogin(), UserSSHKeysController.list)
+  webRouter.post('/user/ssh-keys', AuthenticationController.requireLogin(), UserSSHKeysController.create)
+  webRouter.delete('/user/ssh-keys/:keyId', AuthenticationController.requireLogin(), UserSSHKeysController.remove)
   webRouter.post(
     '/user/password/update',
     AuthenticationController.requireLogin(),
@@ -774,6 +791,12 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
     '/internal/expire-deleted-projects-after-duration',
     AuthenticationController.requirePrivateApiAuth(),
     ProjectController.expireDeletedProjectsAfterDuration
+  )
+
+  privateApiRouter.get(
+    '/internal/api/admin/personal-access-token-reissues/:id',
+    AuthenticationController.requirePrivateApiAuth(),
+    TokenReissueController.get
   )
   privateApiRouter.post(
     '/internal/expire-deleted-users-after-duration',

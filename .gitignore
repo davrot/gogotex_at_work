@@ -8,3 +8,17 @@ docker-compose.override.yml
 node_modules
 services/web/node_modules
 develop_llm
+# Build and output
+dist/
+build/
+coverage/
+
+# Playwright screenshots
+/services/web/test/e2e/playwright/out/
+
+# Logs and misc
+*.log
+*.tmp
+*.swp
+.vscode/
+.DS_Store

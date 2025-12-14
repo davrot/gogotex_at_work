@@ -1,0 +1,9 @@
+[
+  {
+    "userId": "u-fixture-1",
+    "keyName": "fixture-key-1",
+    "publicKey": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCy...fixture1",
+    "fingerprint": "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "createdAt": "2025-12-13T00:00:00Z"
+  }
+]

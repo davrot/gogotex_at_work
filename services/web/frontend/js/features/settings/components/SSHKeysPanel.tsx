@@ -1,5 +1,7 @@
 import React, {useEffect, useState} from 'react'
 import { getJSON, postJSON, deleteJSON, getUserFacingMessage } from '../../../infrastructure/fetch-json'
+import getMeta from '@/utils/meta'
+import { useUserContext } from '@/shared/context/user-context'
 
 type SSHKey = {
   id: string;
@@ -17,7 +19,18 @@ export default function SSHKeysPanel({userId}:{userId?:string|null}){
   const [success, setSuccess] = useState<string|null>(null);
   const [isAdding, setIsAdding] = useState(false);
 
-  useEffect(()=>{ fetchKeys(); }, []);
+  // derive user id from prop, UserContext, or meta to be resilient in client-rendered tests
+  let effectiveUserId: string | undefined = undefined
+  try { const u = useUserContext(); effectiveUserId = u?.id } catch (e) {}
+  function normalizeUserId(id?: string|null){ if(!id) return undefined; if(id === 'undefined') return undefined; return id }
+  effectiveUserId = normalizeUserId(userId ?? effectiveUserId ?? getMeta('ol-user_id'))
+
+  useEffect(()=>{ fetchKeys(); }, [])
+
+  function apiPathForUser(user?: string|null){
+    if (user) return `/internal/api/users/${user}/ssh-keys`
+    return `/user/ssh-keys`
+  }
 
   function validatePublicKey(pk:string){
     const re = /^ssh-(rsa|ed25519|ecdsa) [A-Za-z0-9+/=]+(?: .*)?$/;
@@ -28,7 +41,8 @@ export default function SSHKeysPanel({userId}:{userId?:string|null}){
 
   async function fetchKeys(){
     try{
-      const data = await getJSON(`/internal/api/users/${userId}/ssh-keys`)
+      const path = apiPathForUser(effectiveUserId)
+      const data = await getJSON(path)
       setKeys(Array.isArray(data) ? data : [])
     }catch(e){
       const status = (e as any)?.response?.status
@@ -50,7 +64,9 @@ export default function SSHKeysPanel({userId}:{userId?:string|null}){
     if(!isPublicKeyValid) { setError('Invalid OpenSSH public key format'); return; }
     setIsAdding(true);
     try{
-      await postJSON(`/internal/api/users/${userId}/ssh-keys`, { body: { label, public_key: publicKey } })
+      console.debug('SSHKeysPanel: addKey effectiveUserId=', effectiveUserId)
+      const path = apiPathForUser(effectiveUserId)
+      const resp = await postJSON(path, { body: { key_name: label, public_key: publicKey } })
       setLabel(''); setPublicKey(''); await fetchKeys();
       setSuccess('SSH key added')
     }catch(err){
@@ -65,7 +81,9 @@ export default function SSHKeysPanel({userId}:{userId?:string|null}){
     if(!confirm('Delete this SSH key?')) return;
     setError(null); setSuccess(null);
     try{
-      await deleteJSON(`/internal/api/users/${userId}/ssh-keys/${id}`)
+      const uid = effectiveUserId ?? userId
+      const path = uid ? `/internal/api/users/${uid}/ssh-keys/${id}` : `/user/ssh-keys/${id}`
+      await deleteJSON(path)
       await fetchKeys()
       setSuccess('SSH key deleted')
     }catch(err){

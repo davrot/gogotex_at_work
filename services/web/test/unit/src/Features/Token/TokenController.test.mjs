@@ -53,4 +53,38 @@ describe('TokenController', function () {
     expect(ctx.res.statusCode).to.equal(200)
     expect(JSON.parse(ctx.res.body)).to.have.property('active')
   })
+
+  it('create with expiresAt returns created token and introspect shows expired', async function (ctx) {
+    // create a token with expiresAt in the past
+    const past = new Date(Date.now() - 1000 * 60 * 60).toISOString()
+    ctx.req.body = { label: 'exp', expiresAt: past }
+    ctx.PATM.createToken.resolves({ id: 'tid2', token: 'plain-exp', hashPrefix: 'deadbeef', expiresAt: past })
+    await ctx.Controller.create(ctx.req, ctx.res)
+    expect(ctx.res.statusCode).to.equal(201)
+
+    // introspect expired token should be inactive
+    ctx.PATM.introspect.resolves({ active: false })
+    ctx.req.body = { token: 'plain-exp' }
+    await ctx.Controller.introspect(ctx.req, ctx.res)
+    expect(ctx.res.statusCode).to.equal(200)
+    expect(JSON.parse(ctx.res.body).active).to.be.false
+  })
+
+  it('list returns tokens and does not include plaintext', async function (ctx) {
+    // list returns what manager returns; ensure it includes expected fields
+    ctx.PATM.listTokens.resolves([{ id: 't1', label: 'l1', active: true, hashPrefix: 'abcd' }])
+    await ctx.Controller.list(ctx.req, ctx.res)
+    expect(ctx.res.statusCode).to.equal(200)
+    const listBody = JSON.parse(ctx.res.body)
+    expect(listBody[0]).to.have.property('id')
+    expect(listBody[0]).to.not.have.property('token')
+  })
+
+  it('remove returns 404 when token not found', async function (ctx) {
+    // simulate revoke returning false
+    ctx.PATM.revokeToken.resolves(false)
+    await ctx.Controller.remove(ctx.req, ctx.res)
+    expect(ctx.res.statusCode).to.equal(404)
+    expect(ctx.PATM.revokeToken.called).to.equal(true)
+  })
 })

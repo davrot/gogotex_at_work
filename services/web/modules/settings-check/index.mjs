@@ -14,11 +14,12 @@ try {
     Boolean(process.env.AUTH_TOKEN_HASH_ALGO || process.env.AUTH_TOKEN_ARGON2_TIME || process.env.AUTH_TOKEN_ARGON2_MEMORY_KB || process.env.AUTH_TOKEN_ARGON2_PARALLELISM || process.env.AUTH_TOKEN_BCRYPT_COST)
   if (shouldValidate) {
     // validate structural presence and basic bounds for required configuration keys
-    validateConfig(Settings)
+    // Use process.env so we validate the actual runtime environment variables
+    validateConfig(process.env)
 
     // ensure that requested hash algorithm is available at runtime. This will throw
     // if no suitable algorithm/module is available and configuration does not allow fallback.
-    assertHashAvailability(Settings)
+    assertHashAvailability(process.env)
   }
 } catch (err) {
   // Print a clear error and rethrow so service startup aborts.

@@ -2,10 +2,14 @@ import { describe, it, expect } from 'vitest'
 import { getServiceOrigin, originRateKey } from '../../../../app/src/infrastructure/ServiceOrigin.mjs'
 
 describe('ServiceOrigin helper', function () {
-  it('returns X-Service-Origin header when present', function () {
+  it('returns X-Service-Origin header when present and trusted', function () {
+    process.env.TRUST_X_SERVICE_ORIGIN = 'true'
+    process.env.TRUSTED_PROXIES = ''
     const req = { headers: { 'x-service-origin': 'bench-client-1' } }
     expect(getServiceOrigin(req)).to.equal('bench-client-1')
     expect(originRateKey(req)).to.equal('service-origin:bench-client-1')
+    delete process.env.TRUST_X_SERVICE_ORIGIN
+    delete process.env.TRUSTED_PROXIES
   })
 
   it('falls back to socket certificate CN when header absent', function () {
@@ -20,16 +24,24 @@ describe('ServiceOrigin helper', function () {
     expect(originRateKey(req)).to.equal('service-origin:ip:1.2.3.4')
   })
 
-  it('header overrides mTLS certificate CN when both present', function () {
+  it('header overrides mTLS certificate CN when both present and trusted', function () {
+    process.env.TRUST_X_SERVICE_ORIGIN = 'true'
+    process.env.TRUSTED_PROXIES = ''
     const req = { headers: { 'x-service-origin': 'header-origin' }, socket: { getPeerCertificate: () => ({ subject: { CN: 'cert-cn' } }) } }
     expect(getServiceOrigin(req)).to.equal('header-origin')
     expect(originRateKey(req)).to.equal('service-origin:header-origin')
+    delete process.env.TRUST_X_SERVICE_ORIGIN
+    delete process.env.TRUSTED_PROXIES
   })
 
-  it('header overrides ip when both present', function () {
+  it('header overrides ip when both present and trusted', function () {
+    process.env.TRUST_X_SERVICE_ORIGIN = 'true'
+    process.env.TRUSTED_PROXIES = '1.2.3.4'
     const req = { headers: { 'x-service-origin': 'header-origin' }, ip: '1.2.3.4', connection: { remoteAddress: '1.2.3.4' } }
     expect(getServiceOrigin(req)).to.equal('header-origin')
     expect(originRateKey(req)).to.equal('service-origin:header-origin')
+    delete process.env.TRUST_X_SERVICE_ORIGIN
+    delete process.env.TRUSTED_PROXIES
   })
 
   it('returns null for invalid req', function () {

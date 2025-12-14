@@ -34,13 +34,20 @@ export async function lookup(req, res) {
   }
 
   try {
+    // caching: consult lookup cache first
+    try { const lookupCache = await import('../../lib/lookupCache.mjs'); const cached = lookupCache.default.get(fingerprint); if (typeof cached !== 'undefined') { timer.done(); metrics.inc(cached ? 'ssh.key_lookup.hit' : 'ssh.key_lookup.miss', 1); if (!cached) return res.status(404).json({}); return res.status(200).json({ userId: String(cached.userId) }) } } catch (e) {}
+
     const key = await UserSSHKey.findOne({ fingerprint }).lean().exec()
     if (!key) {
       timer.done()
       metrics.inc('ssh.key_lookup.miss', 1)
+      try { const lookupCache = await import('../../lib/lookupCache.mjs'); lookupCache.default.set(fingerprint, null, Number(process.env.CACHE_NEGATIVE_TTL_SECONDS || 5)) } catch (e) {}
       return res.status(404).json({})
     }
     metrics.inc('ssh.key_lookup.hit', 1)
+
+    try { const lookupCache = await import('../../lib/lookupCache.mjs'); lookupCache.default.set(fingerprint, { userId: key.userId }, Number(process.env.CACHE_LOOKUP_TTL_SECONDS || 60)) } catch (e) {}
+
     timer.done()
     return res.status(200).json({ userId: String(key.userId) })
   } catch (err) {

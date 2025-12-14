@@ -1,7 +1,13 @@
 // Run babel on tests to allow support for import/export statements in Node
+const path = require('path')
+// Ensure tests run with project root as cwd so module-resolver's './frontend/js' works
+process.chdir(path.resolve(__dirname, '..', '..'))
+
 require('@babel/register')({
   extensions: ['.ts', '.tsx', '.js', '.jsx', '.mjs'],
-  plugins: [['module-resolver', { alias: { '^@/(.+)': './frontend/js/\\1' } }]],
+  plugins: [
+    ['module-resolver', { alias: { '^@/(.+)': path.resolve(__dirname, '../../frontend/js') + '/\\1' } }],
+  ],
 })
 
 // Load JSDOM to mock the DOM in Node
@@ -11,7 +17,6 @@ require('jsdom-global')(undefined, {
   url: 'https://www.test-overleaf.com/',
 })
 
-const path = require('path')
 process.env.OVERLEAF_CONFIG = path.resolve(
   __dirname,
   '../../config/settings.webpack.js'

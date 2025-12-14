@@ -8,6 +8,7 @@ import java.security.MessageDigest;
 import java.util.Base64;
 import java.util.List;
 import java.util.Objects;
+import uk.ac.ic.wlgitbridge.auth.WebProfileClient;
 
 /**
  * Manager that validates whether a presented public key is authorized for a user.
@@ -21,6 +22,17 @@ public class SSHAuthManager {
     }
 
     public boolean isKeyAuthorized(String userId, String presentedPublicKey) {
+        return isKeyAuthorized(userId, presentedPublicKey, null, null);
+    }
+
+    /**
+     * Extended version which supports an optional introspection fallback using
+     * the provided WebProfileClient and token. If the fast-path fingerprint
+     * lookup and direct key matching do not authorize the key, and a non-null
+     * token + profileClient are provided, the token will be introspected and
+     * if it maps to the same userId, authorization succeeds.
+     */
+    public boolean isKeyAuthorized(String userId, String presentedPublicKey, WebProfileClient profileClient, String token) {
         if (presentedPublicKey == null) return false;
         try {
             String normalizedPresented = normalizePublicKey(presentedPublicKey);
@@ -50,6 +62,20 @@ public class SSHAuthManager {
                     return true;
                 }
             }
+
+            // Introspection fallback: if token maps to the same userId, authorize
+            if (token != null && profileClient != null) {
+                try {
+                    java.util.Optional<String> tokenUser = profileClient.introspectToken(token);
+                    if (tokenUser != null && tokenUser.isPresent() && Objects.equals(tokenUser.get(), userId)) {
+                        Log.debug("Introspection fallback authorized user {}", userId);
+                        return true;
+                    }
+                } catch (Exception e) {
+                    Log.debug("token introspection call failed: {}", e.getMessage());
+                }
+            }
+
         } catch (Exception e) {
             Log.warn("Error validating SSH key for user {}: {}", userId, e.getMessage());
             return false;

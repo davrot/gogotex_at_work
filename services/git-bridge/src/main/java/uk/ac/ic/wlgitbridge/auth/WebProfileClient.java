@@ -82,4 +82,32 @@ public class WebProfileClient {
             }
         }
     }
+
+    /**
+     * Introspect a token using the web-profile introspection endpoint.
+     * Returns Optional.of(userId) when the token is active and contains a userId.
+     */
+    public Optional<String> introspectToken(String token) throws IOException {
+        String url = String.format("%s/internal/api/tokens/introspect", baseUrl);
+        try (CloseableHttpClient http = HttpClients.createDefault()) {
+            org.apache.http.client.methods.HttpPost post = new org.apache.http.client.methods.HttpPost(url);
+            post.addHeader("Content-Type", "application/json");
+            if (apiToken != null && !apiToken.isEmpty()) {
+                post.addHeader("Authorization", "Bearer " + apiToken);
+            }
+            String body = gson.toJson(java.util.Collections.singletonMap("token", token));
+            post.setEntity(new org.apache.http.entity.StringEntity(body, StandardCharsets.UTF_8));
+            try (CloseableHttpResponse resp = http.execute(post)) {
+                int status = resp.getStatusLine().getStatusCode();
+                if (status >= 200 && status < 300) {
+                    String json = EntityUtils.toString(resp.getEntity());
+                    java.util.Map<String, Object> m = gson.fromJson(json, java.util.Map.class);
+                    if (m != null && Boolean.TRUE.equals(m.get("active")) && m.get("userId") != null) {
+                        return Optional.of(String.valueOf(m.get("userId")));
+                    }
+                }
+                return Optional.empty();
+            }
+        }
+    }
 }

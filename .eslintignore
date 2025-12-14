@@ -1,1 +1,10 @@
 ai_at_work/
+
+# Common ignores
+node_modules/
+**/node_modules/
+dist/
+build/
+coverage/
+.vscode/
+.DS_Store

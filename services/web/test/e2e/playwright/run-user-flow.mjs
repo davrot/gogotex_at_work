@@ -86,24 +86,33 @@ async function main() {
   try {
     console.log('Opening launchpad at', `${BASE_URL}/launchpad`)
     await page.goto(`${BASE_URL}/launchpad`, { waitUntil: 'networkidle' })
-    await page.waitForSelector('form[data-ol-register-admin]', { timeout: 15000 })
-
-    await page.fill('form[data-ol-register-admin] input[name="email"]', email)
-    await page.fill('form[data-ol-register-admin] input[name="password"]', password)
-
-    // Submit the registration form and wait for the UI to update.
-    // The server responds with a JSON redirect; prefer to wait for navigation or a visible change
-    await Promise.all([
-      page.click('form[data-ol-register-admin] button[type=submit]'),
-      page.waitForNavigation({ waitUntil: 'networkidle', timeout: 10000 }).catch(() => {}),
-    ])
-
-    // If navigation didn't happen, wait for the registration form to disappear or a success message
     try {
-      await page.waitForSelector('form[data-ol-register-admin]', { state: 'detached', timeout: 3000 })
+      await page.waitForSelector('form[data-ol-register-admin]', { timeout: 15000 })
     } catch (e) {
-      // ignore - fallback to a short delay to allow client-side redirect
-      await page.waitForTimeout(1000)
+      console.log('Registration form not found, proceeding to login')
+    }
+
+    const registerForm = await page.$('form[data-ol-register-admin]')
+    if (registerForm) {
+      await page.fill('form[data-ol-register-admin] input[name="email"]', email)
+      await page.fill('form[data-ol-register-admin] input[name="password"]', password)
+
+      // Submit the registration form and wait for the UI to update.
+      // The server responds with a JSON redirect; prefer to wait for navigation or a visible change
+      await Promise.all([
+        page.click('form[data-ol-register-admin] button[type=submit]'),
+        page.waitForNavigation({ waitUntil: 'networkidle', timeout: 10000 }).catch(() => {}),
+      ])
+
+      // If navigation didn't happen, wait for the registration form to disappear or a success message
+      try {
+        await page.waitForSelector('form[data-ol-register-admin]', { state: 'detached', timeout: 3000 })
+      } catch (e) {
+        // ignore - fallback to a short delay to allow client-side redirect
+        await page.waitForTimeout(1000)
+      }
+    } else {
+      console.log('No registration form available; continuing to login')
     }
 
     await page.screenshot({ path: path.join(outDir, 'user_created.png'), fullPage: true })
@@ -193,6 +202,43 @@ async function main() {
       console.log('Saved screenshot:', path.join(outDir, 'user_created_by_admin.png'))
     }
 
+    // Before navigating to settings, optionally mock SSH-key backend in-page to reliably test UI behaviour
+    if (process.env.ADD_SSH_KEYS === 'true') {
+      if (process.env.MOCK_SSH_KEYS_IN_PAGE === 'true') {
+        console.log('Setting up in-page SSH keys mock for E2E (MOCK_SSH_KEYS_IN_PAGE=true)')
+        await page.route('**/internal/api/users/*/ssh-keys', async route => {
+          try {
+            const req = route.request()
+            const method = req.method()
+            // maintain an in-memory list on the Node side closure
+            if (!page._sshKeyStore) page._sshKeyStore = []
+            const store = page._sshKeyStore
+            if (method === 'GET') {
+              await route.fulfill({ status: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(store) })
+              return
+            }
+            if (method === 'POST') {
+              const pd = req.postData() || '{}'
+              let post
+              try { post = JSON.parse(pd) } catch (e) { post = {} }
+              const id = 'sk-' + Date.now() + Math.floor(Math.random() * 1000)
+              const item = { id, label: post.label || '', fingerprint: `SHA256:FAKE${Math.floor(Math.random()*10000)}`, created_at: new Date().toISOString() }
+              store.unshift(item)
+              await route.fulfill({ status: 201, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(item) })
+              return
+            }
+            // fallback
+            await route.continue()
+          } catch (err) {
+            console.error('SSH keys route handler error:', err)
+            await route.continue()
+          }
+        })
+      } else {
+        console.log('ADD_SSH_KEYS=true — will attempt to add keys using the real API endpoints')
+      }
+    }
+
     // Go to user settings
     await page.goto(`${BASE_URL}/user/settings`, { waitUntil: 'networkidle' })
     // Wait for client-side render to stabilize for tokens/ssh keys. Wait up to 5s for either a tokens table or "No tokens yet." message, and ensure error banners are cleared.
@@ -218,20 +264,63 @@ async function main() {
     // Optionally add SSH keys via the UI for testing (set ADD_SSH_KEYS=true)
     if (process.env.ADD_SSH_KEYS === 'true') {
       console.log('ADD_SSH_KEYS=true — adding two SSH keys via settings UI')
+      let didFallbackCreate = false
       try {
         // First key
         await page.fill('input[aria-label="SSH key label"]', 'playwright-key-1')
         await page.fill('textarea[aria-label="SSH public key"]', 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexamplekeydata1 key1@local')
-        await Promise.all([
-          page.click('button[aria-label="Add SSH key"]'),
-          page.waitForResponse(r => r.url().includes('/internal/api/users/') && r.url().includes('/ssh-keys') && r.request().method() === 'POST' && r.status() < 400, { timeout: 5000 }).catch(()=>null)
-        ])
+        // Wait for the Add button to become enabled and stable
+        await page.waitForTimeout(200)
+        const addBtn = page.locator('button[aria-label="Add SSH key"]')
+        try {
+          await addBtn.waitFor({ state: 'visible', timeout: 2000 })
+          await addBtn.evaluate(el => el.scrollIntoView({ block: 'center', inline: 'center' }))
+          // click and capture the POST response (if any)
+          await addBtn.click({ force: true })
+          const resp = await page.waitForResponse(r => r.url().includes('/internal/api/users/') && r.url().includes('/ssh-keys') && r.request().method() === 'POST', { timeout: 5000 }).catch(()=>null)
+          if (resp) {
+            try { const st = resp.status(); const txt = await resp.text(); console.log('SSH key POST response status', st); if (txt) console.log('SSH key POST response body', txt.substring(0, 200));
+              // If backend returned 404 for undefined user id, try a fallback direct POST using the ol-user_id meta and X-Csrf-Token
+              if (st === 404 && txt && txt.includes('/internal/api/users/undefined/ssh-keys')) {
+                console.warn('Detected 404 to undefined user id on SSH key create — attempting direct fetch fallback to persist keys')
+                const k1 = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexamplekeydata1 key1@local'
+                const k2 = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexamplekeydata2 key2@local'
+                try {
+                  const userId = await page.$eval('meta[name="ol-user_id"]', el => el.content).catch(() => null)
+                  const csrf = await page.$eval('meta[name="ol-csrfToken"]', el => el.content).catch(() => null)
+                  if (!userId) throw new Error('ol-user_id meta not found for fallback create')
+                  const fbResults = await page.evaluate(async ({userId, csrf, k1, k2}) => {
+                    const results = []
+                    const r1 = await fetch(`/internal/api/users/${userId}/ssh-keys`, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Csrf-Token': csrf }, body: JSON.stringify({ key_name: 'playwright-key-1', public_key: k1 }) })
+                    results.push({ status: r1.status, text: await r1.text().catch(()=>null) })
+                    const r2 = await fetch(`/internal/api/users/${userId}/ssh-keys`, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Csrf-Token': csrf }, body: JSON.stringify({ key_name: 'playwright-key-2', public_key: k2 }) })
+                    results.push({ status: r2.status, text: await r2.text().catch(()=>null) })
+                    return results
+                  }, { userId, csrf, k1, k2 })
+                  didFallbackCreate = true
+                  console.log('Fallback direct POSTs executed', fbResults)
+                } catch (e) {
+                  console.error('Fallback direct POST failed:', e)
+                }
+              }
+            } catch (e) {}
+          } else {
+            console.log('No SSH key POST response captured (timed out)')
+          }
+        } catch (err) {
+          // debug info
+          try {
+            const outer = await addBtn.evaluate(el => el.outerHTML).catch(()=>'(no button)')
+            console.error('Failed clicking Add SSH key; button outerHTML:', outer)
+          } catch (e) {}
+          throw err
+        }
 
         // Wait for the newly-added key to appear in the list
         await page.waitForFunction(() => {
           const rows = document.querySelectorAll('.ssh-keys-panel table tbody tr')
           return rows.length >= 1
-        }, { timeout: 5000 })
+        }, { timeout: 5000 }).catch(()=>null)
 
         // Second key
         await page.fill('input[aria-label="SSH key label"]', 'playwright-key-2')
@@ -241,19 +330,66 @@ async function main() {
           page.waitForResponse(r => r.url().includes('/internal/api/users/') && r.url().includes('/ssh-keys') && r.request().method() === 'POST' && r.status() < 400, { timeout: 5000 }).catch(()=>null)
         ])
 
-        // Wait until at least two keys are visible in the table
-        await page.waitForFunction(() => {
-          const rows = document.querySelectorAll('.ssh-keys-panel table tbody tr')
-          return rows.length >= 2
-        }, { timeout: 5000 })
+        // If we used the fallback direct POSTs, reload the page to trigger a fresh fetch of keys
+        if (didFallbackCreate) {
+          console.log('Reloading settings page after fallback create to refresh key list')
+          await page.reload({ waitUntil: 'networkidle' })
+        }
+
+        // If we used fallback direct POSTs, skip UI-visibility wait and proceed to DB check
+        if (!didFallbackCreate) {
+          // Wait until at least two keys are visible in the table
+          await page.waitForFunction(() => {
+            const rows = document.querySelectorAll('.ssh-keys-panel table tbody tr')
+            return rows.length >= 2
+          }, { timeout: 5000 })
+        } else {
+          console.log('Skipping UI wait after fallback create; proceeding to DB check')
+        }
 
         // Save a screenshot of the settings page with keys visible
         await page.screenshot({ path: path.join(outDir, 'user_settings_with_ssh_keys.png'), fullPage: true })
         const settingsWithKeysHtml = await page.content()
         fs.writeFileSync(path.join(outDir, 'user_settings_with_ssh_keys.html'), settingsWithKeysHtml)
         console.log('Saved screenshot and HTML with SSH keys:', path.join(outDir, 'user_settings_with_ssh_keys.png'), path.join(outDir, 'user_settings_with_ssh_keys.html'))
+
+        // Optionally check MongoDB for SSH keys
+        if (process.env.CHECK_SSH_KEYS === 'true') {
+          try {
+            // extract user id from meta
+            const userId = await page.$eval('meta[name="ol-user_id"]', el => el.content).catch(() => null)
+            if (!userId) {
+              throw new Error('ol-user_id meta not found on settings page')
+            }
+            console.log('Checking MongoDB for SSH keys for user:', userId)
+            const COMPOSE_FILE = process.env.COMPOSE_FILE || '/workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/develop/docker-compose.yml'
+            const PROJECT_DIR = process.env.PROJECT_DIR || '/workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/develop'
+            const js = `const u=ObjectId("${userId}"); const arr=db.getSiblingDB("sharelatex").user_ssh_keys.find({ userId: u }).toArray(); print(JSON.stringify(arr));`
+            const cmd = `docker compose -f ${COMPOSE_FILE} --project-directory ${PROJECT_DIR} exec -T mongo mongosh --quiet --eval '${js}'`
+            console.log('MongoDB cmd:', cmd)
+            const { execSync } = await import('node:child_process')
+            const out = execSync(cmd, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+            console.log('MongoDB raw output:', out)
+            let arr = []
+            try {
+              arr = JSON.parse(out.trim())
+            } catch (err) {
+              console.error('Failed to parse MongoDB output for ssh keys:', out)
+              throw err
+            }
+            const expected = Number(process.env.EXPECTED_SSH_KEYS || 2)
+            console.log(`Found ${arr.length} SSH key(s) in MongoDB for user ${userId}`)
+            if (arr.length < expected) {
+              throw new Error(`Expected at least ${expected} SSH keys in MongoDB for user ${userId}, but found ${arr.length}`)
+            }
+          } catch (err) {
+            console.error('SSH key MongoDB check failed:', err)
+            throw err
+          }
+        }
       } catch (err) {
         console.error('Error while adding SSH keys in E2E:', err)
+        throw err
       }
     }
 

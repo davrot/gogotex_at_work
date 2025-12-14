@@ -12,6 +12,7 @@ import uk.ac.ic.wlgitbridge.git.handler.hook.WriteLatexPutHook;
 import uk.ac.ic.wlgitbridge.server.Oauth2Filter;
 import uk.ac.ic.wlgitbridge.util.Log;
 import uk.ac.ic.wlgitbridge.util.Util;
+import uk.ac.ic.wlgitbridge.auth.WebProfileClient;
 
 /*
  * Created by Winston on 02/11/14.
@@ -67,18 +68,46 @@ public class WLReceivePackFactory implements ReceivePackFactory<HttpServletReque
       if (membershipBase != null && !membershipBase.isEmpty()) {
         Optional<String> userId = Optional.empty();
         if (oauth2.isPresent() && oauth2.get().getAccessToken() != null) {
-          // We do not have a direct mapping to userId here; in a real integration this would
-          // extract the userId from the oauth2 credential or perform token introspection.
-          // For now, skip membership check if userId cannot be determined.
+          // Attempt token introspection via the web-profile service, if configured
+          try {
+            String profileBase = System.getenv("WEB_PROFILE_BASE_URL");
+            String profileApiToken = System.getenv("WEB_PROFILE_API_TOKEN");
+            if (profileBase != null && !profileBase.isEmpty()) {
+              WebProfileClient wpc = new WebProfileClient(profileBase, profileApiToken);
+              java.util.Optional<String> introspected = wpc.introspectToken(oauth2.get().getAccessToken());
+              if (introspected != null && introspected.isPresent()) {
+                userId = introspected;
+              }
+            }
+          } catch (Exception e) {
+            Log.debug("token introspection failed (continuing): {}", e.getMessage());
+          }
         }
         if (userId.isPresent()) {
           String projectId = repository.getWorkTree().getName();
           // Perform check against membership API
-          // Note: lightweight implementation using Instance.httpRequestFactory is preferred,
-          // but to avoid adding a heavy dependency here, membership enforcement is a best-effort
-          // call and will be implemented in full in a follow-up (see T006 acceptance).
+          try (org.apache.http.impl.client.CloseableHttpClient http = org.apache.http.impl.client.HttpClients.createDefault()) {
+            String url = String.format("%s/internal/api/projects/%s/members/%s", membershipBase, java.net.URLEncoder.encode(projectId, java.nio.charset.StandardCharsets.UTF_8), java.net.URLEncoder.encode(userId.get(), java.nio.charset.StandardCharsets.UTF_8));
+            org.apache.http.client.methods.HttpGet get = new org.apache.http.client.methods.HttpGet(url);
+            String membershipApiToken = System.getenv("MEMBERSHIP_API_TOKEN");
+            if (membershipApiToken != null && !membershipApiToken.isEmpty()) {
+              get.addHeader("Authorization", "Bearer " + membershipApiToken);
+            }
+            try (org.apache.http.client.methods.CloseableHttpResponse resp = http.execute(get)) {
+              int status = resp.getStatusLine().getStatusCode();
+              if (status >= 200 && status < 300) {
+                Log.debug("membership check passed for user {} on project {}", userId.get(), projectId);
+              } else {
+                // Explicitly reject the operation by throwing a security exception
+                Log.warn("membership check failed for user {} on project {}: status={}", userId.get(), projectId, status);
+                throw new SecurityException("user is not a member of project");
+              }
+            }
+          }
         }
       }
+    } catch (SecurityException se) {
+      throw se; // allow calling context to handle rejection
     } catch (Exception e) {
       Log.warn("Membership check failed (continuing): {}", e.getMessage());
     }

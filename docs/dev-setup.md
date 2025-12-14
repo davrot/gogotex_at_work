@@ -211,7 +211,7 @@ Once services are running, open `http://localhost/launchpad` to create the first
 
 The webpack dev server runs inside a container and is commonly exposed on host port `3808` (http://localhost:3808) in the `develop` compose setup. If you relied on port `80` previously, use `http://localhost:3808` instead or set up a local reverse-proxy forwarding `:80` to `:3808`.
 
-When running tests or browsers from *inside* a VS Code dev container, use the webpack dev server host directly (it serves assets and proxies API calls to the backend):
+When running tests or browsers from _inside_ a VS Code dev container, use the webpack dev server host directly (it serves assets and proxies API calls to the backend):
 
 ```bash
 # From inside the dev container use the webpack service hostname and port
@@ -219,7 +219,43 @@ When running tests or browsers from *inside* a VS Code dev container, use the we
 BASE_URL=http://develop-webpack-1:3808 npm run e2e:playwright
 ```
 
-Note: We updated `develop/webpack.config.dev-env.js` to listen on `0.0.0.0` and allow hosts so it accepts connections from the dev container network.
+Note: To allow browsers running inside a VS Code dev container (or other containers) to load webpack assets, set the dev server `host` to `0.0.0.0` and `allowedHosts: 'all'` in `develop/webpack.config.dev-env.js`. Example:
+
+```js
+// develop/webpack.config.dev-env.js
+module.exports = merge(base, {
+  devServer: {
+    host: "0.0.0.0",
+    allowedHosts: "all",
+    // ...
+  },
+});
+```
+
+After making this change restart the webpack service (or rebuild the webpack image if you changed Dockerfile-related things):
+
+```bash
+# restart the running webpack container
+docker compose --project-directory /path/to/repo/develop restart webpack
+
+# or rebuild the webpack image then restart it
+cd develop
+bin/build webpack
+docker compose --project-directory "$PWD" restart webpack
+```
+
+For iterative development use the dev script to run webpack in watch mode (recommended):
+
+```bash
+# from the develop directory
+./bin/dev webpack
+```
+
+When running Playwright or browsers from inside the dev container, point `BASE_URL` at the webpack host (it serves JS/CSS and proxies API calls):
+
+```bash
+BASE_URL=http://develop-webpack-1:3808 npm run e2e:playwright
+```
 
 ## Fixing a dev-container build failure for `libraries/eslint-plugin`
 
@@ -242,5 +278,6 @@ Some local builds of the dev containers can fail because `libraries/eslint-plugi
 
 ## Notes
 
+- If the full frontend test suite fails locally due to missing generated artifacts (for example, `lezer-latex/latex.mjs`), regenerate them with `cd services/web && npm run lezer-latex:generate`. If you just want an automated fallback that writes minimal stubs, run `cd services/web && npm run lezer-latex:ensure` (this runs automatically before `npm run test:frontend`). For focused tests, you can still use the lightweight bootstrap: `cd services/web && npm run test:frontend:lite -- path/to/test-file.tsx`.
 - See `develop/README.md` for more details and runtime tips (TeX Live build, Docker socket, and debugging ports).
 - The Playwright e2e runbook is at `docs/runbooks/playwright-e2e.md` for end-to-end test setup and commands.

@@ -1,10 +1,11 @@
 import { expect } from 'chai'
+import { beforeAll, afterAll } from 'vitest'
 import * as PAMod from '../../../../../app/src/Features/Token/PersonalAccessTokenManager.mjs'
 const PersonalAccessTokenManager = PAMod.default || PAMod
 
 describe('PersonalAccessToken rotation behavior', function () {
-  before(async function () { /* DB connection provided by test harness; skip if not present */ })
-  after(async function () { /* cleanup handled by test harness */ })
+  beforeAll(async function () { /* DB connection provided by test harness; skip if not present */ })
+  afterAll(async function () { /* cleanup handled by test harness */ })
 
   it('revokes previous token when replace=true', async function () {
     // Ensure we use bcrypt to avoid argon2 availability issues in CI/dev images

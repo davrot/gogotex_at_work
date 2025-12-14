@@ -148,21 +148,32 @@ export default {
 
   // Introspect by plain token value. Returns null if not found/invalid.
   async introspect (tokenPlain) {
+    const lookupCache = await import('../../../lib/lookupCache.mjs')
+    const cacheKey = `introspect:${computeHashPrefixFromPlain(tokenPlain)}`
+    const cached = lookupCache.default.get(cacheKey)
+    if (typeof cached !== 'undefined') {
+      return cached
+    }
+
     const prefix = computeHashPrefixFromPlain(tokenPlain)
     const candidates = await PersonalAccessToken.find({ hashPrefix: prefix, active: true }).lean()
     for (const c of candidates) {
       const ok = await verifyTokenAgainstHash(tokenPlain, c.hash)
       if (ok) {
         const now = new Date()
-        if (c.expiresAt && new Date(c.expiresAt) < now) return { active: false }
-        return {
+        if (c.expiresAt && new Date(c.expiresAt) < now) { lookupCache.default.set(cacheKey, { active: false }, Number(process.env.CACHE_NEGATIVE_TTL_SECONDS || 5)); return { active: false } }
+        const info = {
           active: true,
           userId: c.userId.toString(),
           scopes: c.scopes || [],
           expiresAt: c.expiresAt || null,
         }
+        lookupCache.default.set(cacheKey, info, Number(process.env.CACHE_LOOKUP_TTL_SECONDS || 60))
+        return info
       }
     }
-    return { active: false }
+    const missInfo = { active: false }
+    lookupCache.default.set(cacheKey, missInfo, Number(process.env.CACHE_NEGATIVE_TTL_SECONDS || 5))
+    return missInfo
   },
 }

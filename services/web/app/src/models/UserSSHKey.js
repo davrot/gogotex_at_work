@@ -24,4 +24,11 @@ UserSSHKeySchema.pre('save', function (next) {
   next()
 })
 
-exports.UserSSHKey = mongoose.model('UserSSHKey', UserSSHKeySchema)
+// Ensure fingerprint uniqueness across keys to support idempotent creates
+try {
+  UserSSHKeySchema.index({ fingerprint: 1 }, { unique: true, sparse: true })
+} catch (e) {
+  // index creation may throw in some environments (e.g., tests); ignore here
+}
+
+exports.UserSSHKey = mongoose.models.UserSSHKey || mongoose.model('UserSSHKey', UserSSHKeySchema)

@@ -30,7 +30,8 @@ export default function GitTokensPanel({ userId }: { userId?: string | null }){
   } catch (e) {
     // not inside a UserProvider or meta missing
   }
-  effectiveUserId = userId ?? effectiveUserId ?? getMeta('ol-user_id')
+  function normalizeUserId(id?: string|null){ if(!id) return undefined; if(id === 'undefined') return undefined; return id }
+  effectiveUserId = normalizeUserId(userId ?? effectiveUserId ?? getMeta('ol-user_id'))
 
   useEffect(()=>{ fetchTokens() }, [])
 
@@ -63,7 +64,7 @@ export default function GitTokensPanel({ userId }: { userId?: string | null }){
     setCopied(false)
     setIsCreating(true)
     try{
-      const res = await postJSON(`/internal/api/users/${userId}/git-tokens`, { body: { label } })
+      const res = await postJSON(`/internal/api/users/${effectiveUserId}/git-tokens`, { body: { label } })
       // API returns { id, token, accessTokenPartial }
       setNewToken(res.token || null)
       setLabel('')
@@ -78,7 +79,7 @@ export default function GitTokensPanel({ userId }: { userId?: string | null }){
     if(!confirm('Revoke this token?')) return
     setError(null); setSuccess(null)
     try{
-      await deleteJSON(`/internal/api/users/${userId}/git-tokens/${id}`)
+      await deleteJSON(`/internal/api/users/${effectiveUserId}/git-tokens/${id}`)
       await fetchTokens()
       setSuccess('Token revoked')
     }catch(err){
