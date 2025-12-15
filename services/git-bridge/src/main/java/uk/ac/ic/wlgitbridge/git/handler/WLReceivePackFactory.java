@@ -65,18 +65,24 @@ public class WLReceivePackFactory implements ReceivePackFactory<HttpServletReque
     // expose an endpoint: GET /internal/api/projects/:projectId/members/:userId -> 200 if member.
     try {
       String membershipBase = System.getenv("MEMBERSHIP_API_BASE_URL");
+        if (membershipBase == null || membershipBase.isEmpty()) {
+          membershipBase = System.getProperty("MEMBERSHIP_API_BASE_URL");
+        }
       if (membershipBase != null && !membershipBase.isEmpty()) {
         Optional<String> userId = Optional.empty();
         if (oauth2.isPresent() && oauth2.get().getAccessToken() != null) {
           // Attempt token introspection via the web-profile service, if configured
           try {
             String profileBase = System.getenv("WEB_PROFILE_BASE_URL");
+            if (profileBase == null || profileBase.isEmpty()) {
+              profileBase = System.getProperty("WEB_PROFILE_BASE_URL");
+            }
             String profileApiToken = System.getenv("WEB_PROFILE_API_TOKEN");
             if (profileBase != null && !profileBase.isEmpty()) {
               WebProfileClient wpc = new WebProfileClient(profileBase, profileApiToken);
-              java.util.Optional<String> introspected = wpc.introspectToken(oauth2.get().getAccessToken());
-              if (introspected != null && introspected.isPresent()) {
-                userId = introspected;
+              WebProfileClient.TokenIntrospection ti = wpc.introspectToken(oauth2.get().getAccessToken());
+              if (ti != null && ti.active && ti.userId.isPresent()) {
+                userId = ti.userId;
               }
             }
           } catch (Exception e) {

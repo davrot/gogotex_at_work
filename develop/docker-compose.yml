@@ -9,6 +9,8 @@ volumes:
   sharelatex-data:
   web-data:
   history-v1-buckets:
+  git-bridge-data:
+
 
 services:
   chat:
@@ -63,8 +65,8 @@ services:
       dockerfile: services/filestore/Dockerfile
     env_file:
       - dev.env
-#    environment:
-#      - ENABLE_CONVERSIONS=true
+    #    environment:
+    #      - ENABLE_CONVERSIONS=true
     volumes:
       - filestore-public-files:/overleaf/services/filestore/public_files
       - filestore-template-files:/overleaf/services/filestore/template_files
@@ -75,7 +77,7 @@ services:
       context: ..
       dockerfile: services/history-v1/Dockerfile
     env_file:
-        - dev.env
+      - dev.env
     environment:
       OVERLEAF_EDITOR_ANALYTICS_BUCKET: "/buckets/analytics"
       OVERLEAF_EDITOR_BLOBS_BUCKET: "/buckets/blobs"
@@ -84,7 +86,7 @@ services:
       OVERLEAF_EDITOR_ZIPS_BUCKET: "/buckets/zips"
       PERSISTOR_BACKEND: fs
     volumes:
-        - history-v1-buckets:/buckets
+      - history-v1-buckets:/buckets
 
   mongo:
     image: mongo:8.0
@@ -114,7 +116,7 @@ services:
       context: ..
       dockerfile: services/project-history/Dockerfile
     env_file:
-        - dev.env
+      - dev.env
 
   real-time:
     build:
@@ -143,7 +145,8 @@ services:
       - EMAIL_CONFIRMATION_DISABLED=true
       - NODE_ENV=development
       - OVERLEAF_ALLOW_PUBLIC_ACCESS=true
-    command: ["node", "app.mjs"]
+      - ENABLED_SERVICES=web,api
+    command: [ "node", "app.mjs" ]
     volumes:
       - sharelatex-data:/var/lib/overleaf
       - web-data:/overleaf/services/web/data
@@ -161,14 +164,38 @@ services:
       - project-history
       - real-time
 
+  git-bridge:
+    build:
+      context: ../services/git-bridge
+      dockerfile: Dockerfile
+    env_file:
+      - dev.env
+    environment:
+      - GIT_BRIDGE_API_BASE_URL=http://web:3000
+      - GIT_BRIDGE_POSTBACK_BASE_URL=http://git-bridge:8000
+      - GIT_BRIDGE_ROOT_DIR=/data/git-bridge
+      - GIT_BRIDGE_WEB_PROFILE_API_URL=http://web:3000
+      - GIT_BRIDGE_SSH_ENABLED=true
+      - GIT_BRIDGE_SSH_PORT=2222
+      - WEB_PROFILE_API_TOKEN=overleaf:overleaf
+    ports:
+      - "2223:2222"
+    volumes:
+      - git-bridge-data:/data/git-bridge
+    user: root
+    command: [ "/server-pro-start.sh" ]
+    depends_on:
+      - web
+      - mongo
+      - redis
+
   webpack:
     build:
       context: ..
       dockerfile: services/web/Dockerfile
       target: webpack
-    command: ["npx", "webpack", "serve", "--config", "webpack.config.dev-env.js"]
+    command: [ "npx", "webpack", "serve", "--config", "webpack.config.dev-env.js" ]
     ports:
       - "127.0.0.1:80:3808"
     volumes:
       - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/develop/webpack.config.dev-env.js:/overleaf/services/web/webpack.config.dev-env.js
-

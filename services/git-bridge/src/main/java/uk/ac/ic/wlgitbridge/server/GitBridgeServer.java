@@ -47,16 +47,25 @@ public class GitBridgeServer {
   private String rootGitDirectoryPath;
   private String apiBaseURL;
 
+  private final RepoStore repoStore;
+
+  // Optional embedded SSH server
+  private uk.ac.ic.wlgitbridge.auth.SSHServerManager sshServerManager = null;
+
+  private final Config config;
+
   public GitBridgeServer(Config config) throws ServletException {
+    this.config = config;
     org.eclipse.jetty.util.log.Log.setLog(new NullLogger());
     this.port = config.getPort();
     this.rootGitDirectoryPath = config.getRootGitDirectory();
     RepoStore repoStore =
         new FSGitRepoStore(
             rootGitDirectoryPath, config.getRepoStore().flatMap(RepoStoreConfig::getMaxFileSize));
+    this.repoStore = repoStore;
     DBStore dbStore =
         new SqliteDBStore(
-            Paths.get(repoStore.getRootDirectory().getAbsolutePath())
+            Paths.get(this.repoStore.getRootDirectory().getAbsolutePath())
                 .resolve(".wlgb")
                 .resolve("wlgb.db")
                 .toFile(),
@@ -86,6 +95,20 @@ public class GitBridgeServer {
       Log.info("Bridged to: " + apiBaseURL);
       Log.info("Postback base URL: " + Util.getPostbackURL());
       Log.info("Root git directory path: " + rootGitDirectoryPath);
+
+      // Start embedded SSH server if enabled in config
+      if (config.isSshEnabled()) {
+        try {
+          org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(GitBridgeServer.class);
+          logger.info("Starting embedded SSH server on port {}", config.getSshPort());
+          uk.ac.ic.wlgitbridge.auth.SSHAuthManager authManager = new uk.ac.ic.wlgitbridge.auth.SSHAuthManager(new uk.ac.ic.wlgitbridge.auth.WebProfileClient(config.getAPIBaseURL(), System.getenv("WEB_PROFILE_API_TOKEN")));
+          sshServerManager = new uk.ac.ic.wlgitbridge.auth.SSHServerManager(config.getSshPort(), authManager, this.repoStore, rootGitDirectoryPath);
+          sshServerManager.start();
+        } catch (Exception e) {
+          Log.error("Failed to start embedded SSH server", e);
+        }
+      }
+
     } catch (BindException e) {
       Log.error("Failed to bind Jetty", e);
     } catch (Exception e) {

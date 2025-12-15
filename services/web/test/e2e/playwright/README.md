@@ -31,3 +31,9 @@ Pre-run reminder
 - `user_created.png`
 - `login_success.png`
 - `user_settings.png`
+
+Optional environment variables
+
+- `ADD_SSH_KEYS=true` — populate the user settings with example SSH keys (the script already supports this)
+- `ADD_TOKEN=true` — create a personal access token via the UI and save it to `out/created_token.txt`
+- `CHECK_TOKEN_GIT=true` and `PROJECT_ID=<projectId>` — if set, after creating the token the script will attempt a `git ls-remote` using the token against the given project id and save output to `out/git_ls_remote.txt`

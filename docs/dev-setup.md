@@ -31,37 +31,72 @@ npx playwright install-deps
 
 - Java & Maven (required by some services/build tasks):
 
-Install OpenJDK 17 (or newer) and Maven 3.8+ on Linux or macOS.
+Install OpenJDK 21 (or newer) and Maven 3.8+ on Linux or macOS. Several git-bridge tests and builds target Java 21, so please prefer a Java 21 JDK for local development.
 
-Debian/Ubuntu (apt):
+Debian/Ubuntu (apt; Corretto/Temurin examples):
+
+Option A — Amazon Corretto 21 (apt):
 
 ```bash
+# Add Corretto apt repo (follow vendor instructions if keys change)
+sudo curl -fsSL https://apt.corretto.aws/corretto.key | sudo apt-key add -
+echo "deb https://apt.corretto.aws stable main" | sudo tee /etc/apt/sources.list.d/corretto.list
 sudo apt-get update
-sudo apt-get install -y openjdk-17-jdk maven
+sudo apt-get install -y java-21-amazon-corretto-jdk maven
+```
+
+Option B — Temurin 21 (if available for your distro):
+
+```bash
+# Example (may vary by distro):
+sudo apt-get update
+sudo apt-get install -y temurin-21-jdk maven
+```
+
+Option C — tarball install (fallback):
+
+```bash
+# download and extract to /usr/lib/jvm
+curl -fsSL -o /tmp/corretto21.tar.gz "https://corretto.aws/downloads/latest/amazon-corretto-21-x64-linux-jdk.tar.gz"
+sudo mkdir -p /usr/lib/jvm
+sudo tar -xzf /tmp/corretto21.tar.gz -C /usr/lib/jvm
+# register the new java as an alternative (example)
+sudo update-alternatives --install /usr/bin/java java /usr/lib/jvm/amazon-corretto-21*/bin/java 2000
+sudo update-alternatives --set java /usr/lib/jvm/amazon-corretto-21*/bin/java
 ```
 
 macOS (Homebrew):
 
 ```bash
 brew update
-brew install openjdk@17 maven
-# follow brew post-install instructions for JAVA_HOME if shown
+brew install temurin21 maven
+# follow any post-install instructions to set JAVA_HOME if shown
 ```
 
 Verify the installations:
 
 ```bash
-java -version   # should show OpenJDK 17 or newer
+java -version   # should show OpenJDK 21 or newer
 mvn -v          # should show Maven 3.8.x or newer
 ```
 
 If you install Java via a package manager, ensure `JAVA_HOME` is set for builds that require it (example for Linux):
 
 ```bash
-export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+export JAVA_HOME=/usr/lib/jvm/java-21-amazon-corretto
 ```
 
 If your environment uses the VS Code dev container, install Java/Maven on the host (recommended) or in the dev container if you prefer local dev installs.
+
+Running Maven tests without host JDK 21:
+
+If you cannot (or prefer not to) install JDK 21 on your host, you can run Maven in a container that provides Java 21:
+
+```bash
+docker run --rm -v /absolute/path/to/services/git-bridge:/app -w /app maven:3-amazoncorretto-21-debian mvn -Dtest=WebProfileUserKeysAuthContractTest test
+```
+
+This is a convenient fallback for CI-like test runs or temporary verification.
 
 ## Build & Start Services
 
@@ -71,6 +106,20 @@ From the `develop` directory, build and start services:
 cd develop
 bin/build
 bin/up
+```
+
+If you only need to build or run the `git-bridge` service during development or for contract tests, you can build/start it individually. Building `git-bridge` requires Java 21 and Maven (see the Java & Maven section above):
+
+```bash
+# Build just the git-bridge image using the develop compose setup
+cd develop
+# Option A: use the project directory to avoid host-PWD mount issues
+docker compose --project-directory /absolute/path/to/repo/develop build git-bridge
+docker compose --project-directory /absolute/path/to/repo/develop up -d git-bridge
+
+# Option B: build the jar locally (requires host JDK 21 + Maven)
+cd /absolute/path/to/repo/services/git-bridge
+mvn package
 ```
 
 ### Starting from inside the VS Code dev container
@@ -207,9 +256,30 @@ Notes:
 
 Once services are running, open `http://localhost/launchpad` to create the first admin account. The launchpad page provides forms for creating an initial admin if no admin users exist.
 
+## First SSH acceptance check
+
+A helper script automates the first-stage SSH acceptance check (dev-only). It:
+
+- Starts `mongo`, `web`, and `git-bridge` via the develop compose file
+- Generates a temporary SSH keypair
+- Seeds the public key into Mongo for a supplied `userId`
+- Verifies `git-bridge` can lookup the fingerprint via the web-profile API
+
+Run it like:
+
+```bash
+scripts/e2e/first-ssh-acceptance.sh [userId]
+```
+
+It prints the generated key location and fingerprint so you can attempt a manual SSH connection with the private key afterwards.
+
+For full git-over-SSH acceptance against a local `git-bridge` instance (when `sshEnabled` is configured), use `scripts/e2e/git-ssh-acceptance.sh` to seed a key and attempt a remote `git ls-remote` over SSH.
+
 ## Webpack Dev Server Ports
 
 The webpack dev server runs inside a container and is commonly exposed on host port `3808` (http://localhost:3808) in the `develop` compose setup. If you relied on port `80` previously, use `http://localhost:3808` instead or set up a local reverse-proxy forwarding `:80` to `:3808`.
+
+Note: HTTPS termination for services (including `git-bridge` in production) is handled by the common nginx proxy / load balancer. Individual services typically listen on HTTP and rely on the proxy for TLS; for local development this is often emulated by exposing service ports directly or by configuring a local reverse-proxy.
 
 When running tests or browsers from _inside_ a VS Code dev container, use the webpack dev server host directly (it serves assets and proxies API calls to the backend):
 

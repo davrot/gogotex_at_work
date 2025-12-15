@@ -1,0 +1,92 @@
+openapi: 3.0.3
+info:
+  title: Web-profile SSH Keys API
+  version: 1.0.0
+paths:
+  /internal/api/users/{userId}/ssh-keys:
+    get:
+      summary: List SSH keys for a user
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Array of SSH key metadata
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserSSHKey"
+    post:
+      summary: Create an SSH key for a user
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [publicKey]
+              properties:
+                keyName:
+                  type: string
+                publicKey:
+                  type: string
+      responses:
+        "201":
+          description: SSH key created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserSSHKey"
+        "400":
+          description: Invalid public key
+  /internal/api/users/{userId}/ssh-keys/{keyId}:
+    delete:
+      summary: Delete an SSH key
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: keyId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+components:
+  schemas:
+    UserSSHKey:
+      type: object
+      properties:
+        _id:
+          type: string
+        userId:
+          type: string
+        keyName:
+          type: string
+        publicKey:
+          type: string
+        fingerprint:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time

@@ -37,16 +37,45 @@ async function main() {
     await page.goto(`${BASE_URL}/user/settings`, { waitUntil: 'networkidle' })
     await page.waitForTimeout(500)
 
-    // Add two keys via UI
-    for (const i of [1,2]) {
-      const label = `playwright-key-${i}`
-      const key = `ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexamplekeydata${i} key${i}@local`
-      await page.fill('input[aria-label="SSH key label"]', label)
-      await page.fill('textarea[aria-label="SSH public key"]', key)
-      await page.click('button[aria-label="Add SSH key"]')
-      // wait for POST response or row
-      await page.waitForResponse(r => r.url().includes('/internal/api/users/') && r.url().includes('/ssh-keys') && r.request().method() === 'POST', { timeout: 5000 }).catch(()=>{})
-      await page.waitForTimeout(500)
+    // Generate a real keypair and add two keys via UI (so we can test real SSH flows)
+    const tmpKeyBase = '/tmp/playwright_e2e_key'
+    try { await page.evaluate(() => {}) } catch (e) {}
+    // generate keypair on the host running this script
+    const { execSync } = await import('node:child_process')
+    try {
+      execSync(`ssh-keygen -t rsa -b 2048 -f ${tmpKeyBase} -N '' -C 'playwright-e2e'`, { stdio: 'ignore' })
+    } catch (e) {
+      // if already exists, continue
+    }
+    const pub = (await import('node:fs')).readFileSync(tmpKeyBase + '.pub', 'utf8').trim()
+
+    const label = `playwright-key-e2e`
+    await page.fill('input[aria-label="SSH key label"]', label)
+    await page.fill('textarea[aria-label="SSH public key"]', pub)
+    await page.click('button[aria-label="Add SSH key"]')
+    // wait for POST response or row
+    await page.waitForResponse(r => r.url().includes('/internal/api/users/') && r.url().includes('/ssh-keys') && r.request().method() === 'POST', { timeout: 5000 }).catch(()=>{})
+    await page.waitForTimeout(500)
+
+    // Optionally run a git push using the generated private key if RUN_GIT is set
+    if (process.env.RUN_GIT === 'true') {
+      const SK = tmpKeyBase
+      const repo = 'playwright-e2e-repo.git'
+      console.log('Creating bare repo on git-bridge container', repo)
+      try {
+        execSync(`docker exec develop-git-bridge-1 bash -lc "mkdir -p /data/git-bridge/${repo} && git init --bare /data/git-bridge/${repo}"`, { stdio: 'inherit' })
+      } catch (e) { console.warn('Could not create bare repo', e) }
+
+      // Create a local temp repo and push
+      const work = '/tmp/playwright_e2e_work'
+      try { execSync(`rm -rf ${work} && mkdir -p ${work} && cd ${work} && git init && echo hello > README.md && git add README.md && git commit -m init && GIT_SSH_COMMAND="ssh -i ${SK} -o StrictHostKeyChecking=no -p 2222 -l ${EMAIL}" git remote add origin ssh://develop-git-bridge-1:2222/${repo} && GIT_SSH_COMMAND="ssh -i ${SK} -o StrictHostKeyChecking=no -p 2222 -l ${EMAIL}" git push origin master`, { stdio: 'inherit' }) } catch (e) { console.error('git push failed', e) }
+
+      // Check git-bridge logs for an RPC auth.ssh_attempt with repo allowed
+      const logs = execSync('docker logs develop-git-bridge-1 --since 2m || true', { encoding: 'utf8' })
+      if (!/"repo"/.test(logs) || !/"outcome":"allowed"/.test(logs)) {
+        throw new Error('RPC auth event not observed or not allowed')
+      }
+      console.log('Git push flow succeeded and RPC auth observed')
     }
 
     await page.screenshot({ path: path.join(outDir, 'user_settings_with_ssh_keys.png'), fullPage: true })

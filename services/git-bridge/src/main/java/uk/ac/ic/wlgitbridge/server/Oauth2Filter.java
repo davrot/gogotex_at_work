@@ -109,6 +109,8 @@ public class Oauth2Filter implements Filter {
       // return a 401 without a custom error message.
       int statusCode = checkAccessToken(this.oauth2Server, password, getClientIp(request));
       if (statusCode == 429) {
+        // rate limited
+        Log.info("{\"service\":\"git-bridge\",\"project\":\"%s\",\"event\":\"auth.http_attempt\",\"outcome\":\"rate_limited\"}", projectId);
         handleRateLimit(projectId, username, request, response);
         return;
       } else if (statusCode == 401) {
@@ -122,10 +124,14 @@ public class Oauth2Filter implements Filter {
             Log.warn("Local introspect check failed: {}", e.getMessage());
           }
           if (!active) {
+            Log.info("{\"service\":\"git-bridge\",\"project\":\"%s\",\"event\":\"auth.http_attempt\",\"outcome\":\"denied\"}", projectId);
             handleBadAccessToken(projectId, request, response);
             return;
+          } else {
+            Log.info("{\"service\":\"git-bridge\",\"project\":\"%s\",\"event\":\"auth.http_attempt\",\"outcome\":\"success\",\"method\":\"local-introspect\"}", projectId);
           }
         } else {
+          Log.info("{\"service\":\"git-bridge\",\"project\":\"%s\",\"event\":\"auth.http_attempt\",\"outcome\":\"denied\"}", projectId);
           handleBadAccessToken(projectId, request, response);
           return;
         }
@@ -140,10 +146,14 @@ public class Oauth2Filter implements Filter {
             Log.warn("Local introspect check failed: {}", e.getMessage());
           }
           if (!active) {
+            Log.info("{\"service\":\"git-bridge\",\"project\":\"%s\",\"event\":\"auth.http_attempt\",\"outcome\":\"denied\",\"status\":%d}", projectId, statusCode);
             handleUnknownOauthServerError(projectId, statusCode, request, response);
             return;
+          } else {
+            Log.info("{\"service\":\"git-bridge\",\"project\":\"%s\",\"event\":\"auth.http_attempt\",\"outcome\":\"success\",\"method\":\"local-introspect\"}", projectId);
           }
         } else {
+          Log.info("{\"service\":\"git-bridge\",\"project\":\"%s\",\"event\":\"auth.http_attempt\",\"outcome\":\"unknown_oauth_error\",\"status\":%d}", projectId, statusCode);
           handleUnknownOauthServerError(projectId, statusCode, request, response);
           return;
         }

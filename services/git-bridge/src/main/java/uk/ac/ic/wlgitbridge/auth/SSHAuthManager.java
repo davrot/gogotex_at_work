@@ -22,7 +22,7 @@ public class SSHAuthManager {
     }
 
     public boolean isKeyAuthorized(String userId, String presentedPublicKey) {
-        return isKeyAuthorized(userId, presentedPublicKey, null, null);
+        return isKeyAuthorized(userId, presentedPublicKey, this.profileClient, null);
     }
 
     /**
@@ -36,7 +36,7 @@ public class SSHAuthManager {
         if (presentedPublicKey == null) return false;
         try {
             String normalizedPresented = normalizePublicKey(presentedPublicKey);
-            String presentedFingerprint = fingerprint(normalizedPresented);
+            String presentedFingerprint = fingerprintOpenSSH(normalizedPresented);
             // Fast path: try direct fingerprint->user lookup
             if (presentedFingerprint != null && !presentedFingerprint.isEmpty()) {
                 try {
@@ -56,7 +56,7 @@ public class SSHAuthManager {
                     System.out.println("Exact match for key: " + stored);
                     return true;
                 }
-                String storedFp = fingerprint(stored);
+                String storedFp = fingerprintOpenSSH(stored);
                 if (!storedFp.isEmpty() && !presentedFingerprint.isEmpty() && Objects.equals(storedFp, presentedFingerprint)) {
                     System.out.println("Fingerprint match for user " + userId + ": storedFp=" + storedFp + " presentedFp=" + presentedFingerprint);
                     return true;
@@ -66,8 +66,8 @@ public class SSHAuthManager {
             // Introspection fallback: if token maps to the same userId, authorize
             if (token != null && profileClient != null) {
                 try {
-                    java.util.Optional<String> tokenUser = profileClient.introspectToken(token);
-                    if (tokenUser != null && tokenUser.isPresent() && Objects.equals(tokenUser.get(), userId)) {
+                    WebProfileClient.TokenIntrospection ti = profileClient.introspectToken(token);
+                    if (ti != null && ti.active && ti.userId.isPresent() && Objects.equals(ti.userId.get(), userId)) {
                         Log.debug("Introspection fallback authorized user {}", userId);
                         return true;
                     }
@@ -92,7 +92,7 @@ public class SSHAuthManager {
         return s;
     }
 
-    private static String fingerprint(String pubkey) {
+    public static String fingerprintOpenSSH(String pubkey) {
         try {
             // pubkey format: <type> <base64> [comment]
             String[] parts = pubkey.split(" ", 3);
@@ -104,5 +104,28 @@ public class SSHAuthManager {
         } catch (Exception e) {
             return "";
         }
+    }
+
+    /**
+     * Lookup a userId for the presented public key using the profile client fast-path.
+     */
+    public java.util.Optional<String> getUserIdForKey(String presentedPublicKey) {
+        try {
+            String normalizedPresented = normalizePublicKey(presentedPublicKey);
+            String presentedFingerprint = fingerprintOpenSSH(normalizedPresented);
+            if (presentedFingerprint != null && !presentedFingerprint.isEmpty()) {
+                try {
+                    java.util.Optional<String> pf = profileClient.getUserIdForFingerprint("SHA256:" + presentedFingerprint);
+                    if (pf != null && pf.isPresent()) {
+                        return pf;
+                    }
+                } catch (Exception e) {
+                    Log.debug("fingerprint lookup call failed: {}", e.getMessage());
+                }
+            }
+        } catch (Exception e) {
+            Log.debug("Error looking up user for key: {}", e.getMessage());
+        }
+        return java.util.Optional.empty();
     }
 }

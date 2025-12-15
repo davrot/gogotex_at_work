@@ -53,6 +53,10 @@ public class Config implements JSONSource {
   @Nullable private SwapJobConfig swapJob;
   private int sqliteHeapLimitBytes = 0;
 
+  // SSH server configuration (optional)
+  private boolean sshEnabled = false;
+  private int sshPort = 22;
+
   public Config(String configFilePath) throws ConfigFileException, IOException {
     this(new FileReader(configFilePath));
   }
@@ -124,6 +128,22 @@ public class Config implements JSONSource {
     if (configObject.has("sqliteHeapLimitBytes")) {
       sqliteHeapLimitBytes = getElement(configObject, "sqliteHeapLimitBytes").getAsInt();
     }
+
+    // Optional SSH config
+    if (configObject.has("sshEnabled")) {
+      sshEnabled = getElement(configObject, "sshEnabled").getAsBoolean();
+    }
+    if (configObject.has("sshPort")) {
+      sshPort = getElement(configObject, "sshPort").getAsInt();
+    }
+  }
+
+  public boolean isSshEnabled() {
+    return sshEnabled;
+  }
+
+  public int getSshPort() {
+    return sshPort;
   }
 
   public String getSanitisedString() {

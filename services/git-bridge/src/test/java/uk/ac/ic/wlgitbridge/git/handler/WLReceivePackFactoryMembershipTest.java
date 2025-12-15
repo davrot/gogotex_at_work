@@ -36,28 +36,37 @@ public class WLReceivePackFactoryMembershipTest {
         });
         introspect.start();
 
-        HttpServer members = HttpServer.create(new InetSocketAddress(0), 0);
-        members.createContext("/internal/api/projects/proj/members/user1", new HttpHandler() {
-            @Override
-            public void handle(HttpExchange exchange) throws IOException {
-                exchange.sendResponseHeaders(200, -1);
-            }
-        });
-        members.start();
-
+        HttpServer members = null;
         try {
-            System.setProperty("MEMBERSHIP_API_BASE_URL", "http://127.0.0.1:" + members.getAddress().getPort());
-            System.setProperty("WEB_PROFILE_BASE_URL", "http://127.0.0.1:" + introspect.getAddress().getPort());
             // Build a temporary repository to pass into create
             Path repoDir = Files.createTempDirectory("repo");
             Repository repo = FileRepositoryBuilder.create(repoDir.resolve(".git").toFile());
             repo.create();
 
+            members = HttpServer.create(new InetSocketAddress(0), 0);
+            String projectPath = "/internal/api/projects/" + repo.getWorkTree().getName() + "/members/user1";
+            members.createContext("/internal/api/projects", new HttpHandler() {
+                @Override
+                public void handle(HttpExchange exchange) throws IOException {
+                    String path = exchange.getRequestURI().getPath();
+                    if (projectPath.equals(path)) {
+                        exchange.sendResponseHeaders(200, -1);
+                    } else {
+                        exchange.sendResponseHeaders(404, -1);
+                    }
+                }
+            });
+            members.start();
+
+            System.setProperty("MEMBERSHIP_API_BASE_URL", "http://127.0.0.1:" + members.getAddress().getPort());
+            System.setProperty("WEB_PROFILE_BASE_URL", "http://127.0.0.1:" + introspect.getAddress().getPort());
+
             WLReceivePackFactory f = new WLReceivePackFactory(null, null);
 
             HttpServletRequest req = mock(HttpServletRequest.class);
             // create a fake oauth credential object with getAccessToken method
-            Object credential = new Object() { public String getAccessToken() { return "tok"; } };
+            com.google.api.client.auth.oauth2.Credential credential = mock(com.google.api.client.auth.oauth2.Credential.class);
+            when(credential.getAccessToken()).thenReturn("tok");
             when(req.getAttribute(org.mockito.ArgumentMatchers.eq(uk.ac.ic.wlgitbridge.server.Oauth2Filter.ATTRIBUTE_KEY))).thenReturn(credential);
 
             ReceivePack rp = f.create(req, repo);
@@ -97,7 +106,8 @@ public class WLReceivePackFactoryMembershipTest {
             WLReceivePackFactory f = new WLReceivePackFactory(null, null);
 
             HttpServletRequest req = mock(HttpServletRequest.class);
-            Object credential = new Object() { public String getAccessToken() { return "tok"; } };
+            com.google.api.client.auth.oauth2.Credential credential = mock(com.google.api.client.auth.oauth2.Credential.class);
+            when(credential.getAccessToken()).thenReturn("tok");
             when(req.getAttribute(org.mockito.ArgumentMatchers.eq(uk.ac.ic.wlgitbridge.server.Oauth2Filter.ATTRIBUTE_KEY))).thenReturn(credential);
 
             try {

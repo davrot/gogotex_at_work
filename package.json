@@ -48,6 +48,7 @@
     "lint": "eslint --max-warnings 0 --format unix .",
     "lint:fix": "eslint --fix .",
     "postinstall": "patch-package",
+    "pretest:focused": "node -e \"console.log('Reminder: re-read docs/dev-setup.md and ensure dev-container/network/BASE_URL are configured before running e2e tests')\"",
     "test:focused": "npx vitest run test/focused --run && ( [ \"$RUN_E2E\" = \"true\" ] && (cd services/web && npm run e2e:playwright) || true )",
     "test:focused:unit": "npx vitest run test/focused --run",
     "test:focused:e2e": "cd services/web && npm run e2e:playwright"

@@ -29,5 +29,8 @@
     "intervalMillis": ${GIT_BRIDGE_SWAPJOB_INTERVAL_MILLIS:-3600000},
     "compressionMethod": "${GIT_BRIDGE_SWAPJOB_COMPRESSION_METHOD:-gzip}"
   },
-  "sqliteHeapLimitBytes": ${GIT_BRIDGE_SQLITE_HEAP_LIMIT_BYTES:-0}
+  "sqliteHeapLimitBytes": ${GIT_BRIDGE_SQLITE_HEAP_LIMIT_BYTES:-0},
+
+  "sshEnabled": ${GIT_BRIDGE_SSH_ENABLED:-false},
+  "sshPort": ${GIT_BRIDGE_SSH_PORT:-22}
 }

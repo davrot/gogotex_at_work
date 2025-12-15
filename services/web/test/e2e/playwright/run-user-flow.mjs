@@ -364,7 +364,7 @@ async function main() {
             console.log('Checking MongoDB for SSH keys for user:', userId)
             const COMPOSE_FILE = process.env.COMPOSE_FILE || '/workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/develop/docker-compose.yml'
             const PROJECT_DIR = process.env.PROJECT_DIR || '/workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/develop'
-            const js = `const u=ObjectId("${userId}"); const arr=db.getSiblingDB("sharelatex").user_ssh_keys.find({ userId: u }).toArray(); print(JSON.stringify(arr));`
+            const js = `const u=ObjectId("${userId}"); const arr=db.getSiblingDB("sharelatex").usersshkeys.find({ userId: u }).toArray(); print(JSON.stringify(arr));`
             const cmd = `docker compose -f ${COMPOSE_FILE} --project-directory ${PROJECT_DIR} exec -T mongo mongosh --quiet --eval '${js}'`
             console.log('MongoDB cmd:', cmd)
             const { execSync } = await import('node:child_process')
@@ -389,6 +389,66 @@ async function main() {
         }
       } catch (err) {
         console.error('Error while adding SSH keys in E2E:', err)
+        throw err
+      }
+    }
+
+    // Optionally create a personal access token via the UI (set ADD_TOKEN=true)
+    if (process.env.ADD_TOKEN === 'true') {
+      try {
+        console.log('ADD_TOKEN=true — creating a personal access token via settings UI')
+        const label = process.env.TOKEN_LABEL || `playwright-token-${timestamp}`
+        // Fill token label within the git-tokens panel
+        await page.fill('.git-tokens-panel input', label)
+        await page.click('.git-tokens-panel button[type="submit"]')
+        // Wait for the new token preview to appear and capture token
+        await page.waitForSelector('.git-tokens-panel .new-token pre', { timeout: 5000 })
+        const tokenText = await page.$eval('.git-tokens-panel .new-token pre', el => el.textContent?.trim() || '')
+        if (!tokenText) throw new Error('Token preview did not contain a token')
+        fs.writeFileSync(path.join(outDir, 'created_token.txt'), tokenText)
+        console.log('Saved created token to', path.join(outDir, 'created_token.txt'))
+
+        // Assert success UI appears and tokens list shows the new token entry
+        try {
+          await page.waitForSelector('.git-tokens-panel .success', { timeout: 3000 })
+          // Wait for tokens table to reflect at least one token (created token may take a short while to appear)
+          await page.waitForFunction(() => {
+            const table = document.querySelector('.git-tokens-panel table')
+            if (!table) return false
+            const rows = table.querySelectorAll('tbody tr')
+            return rows.length >= 1
+          }, { timeout: 5000 })
+          console.log('Token creation success UI found and tokens list updated')
+        } catch (e) {
+          console.warn('Token UI success or tokens list did not appear within expected time:', e.message || e)
+        }
+
+        // Optionally try a git-over-HTTPS request using the token (requires PROJECT_ID env)
+        if (process.env.CHECK_TOKEN_GIT === 'true' && process.env.PROJECT_ID) {
+          const projectId = process.env.PROJECT_ID
+          console.log('Attempting git ls-remote using created token for project', projectId)
+          const tmpdir = fs.mkdtempSync(path.join('/tmp','playwright-token-'))
+          // Allow overriding GIT_HOST and GIT_PORT to target git-bridge
+          const gitHost = process.env.GIT_HOST || new URL(BASE_URL).hostname
+          const gitPort = process.env.GIT_PORT || new URL(BASE_URL).port || '80'
+          const cmd = `git ls-remote https://git:${tokenText}@${gitHost}:${gitPort}/${projectId}.git`
+          try {
+            const { execSync } = await import('node:child_process')
+            const out = execSync(cmd, { cwd: tmpdir, encoding: 'utf8', stdio: ['ignore','pipe','pipe'] })
+            console.log('git ls-remote output:', out.substring(0, 200))
+            fs.writeFileSync(path.join(outDir, 'git_ls_remote.txt'), out)
+          } catch (e) {
+            console.error('git ls-remote failed:', e.message || e)
+          }
+        }
+
+        // Save a screenshot of the tokens panel with the preview visible
+        await page.screenshot({ path: path.join(outDir, 'user_settings_with_token.png'), fullPage: true })
+        const settingsWithTokenHtml = await page.content()
+        fs.writeFileSync(path.join(outDir, 'user_settings_with_token.html'), settingsWithTokenHtml)
+        console.log('Saved screenshot and HTML with token preview:', path.join(outDir, 'user_settings_with_token.png'), path.join(outDir, 'user_settings_with_token.html'))
+      } catch (err) {
+        console.error('Error while creating token in E2E:', err)
         throw err
       }
     }

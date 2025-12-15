@@ -10,6 +10,10 @@ This feature implements SSH public-key management and a local HTTPS personal-acc
 
 - Q: What is the canonical precedence when deriving a `service-origin`? → A: `X-Service-Origin` header if present, then mTLS client certificate `CN` if available, then client IP. The header should be treated as authoritative when present.
 
+### Session 2025-12-14
+
+- Q: How should SSH support be provided for `git-bridge` to enable full git-over-SSH tests and audits? → A: Option A (embed an SSH server directly in `git-bridge`). Rationale: keeps auth, audit, and membership checks colocated for simpler tracing and fewer moving parts.
+
 ## Functional Requirements
 
 1. User can add/remove SSH public keys for their account. (key-management-add-remove)
@@ -74,6 +78,18 @@ Specify where and how project-membership is enforced and how `projectId` is deri
 - To support fast fingerprint → userId resolutions, the web service MAY expose a private internal API at:
   - `GET /internal/api/ssh-keys/:fingerprint` — returns `{ userId }` (200) when found, otherwise 404.
 - This endpoint MUST be protected via `AuthenticationController.requirePrivateApiAuth()`, implement service-origin rate-limiting (60 req/min default), and only return minimal metadata required to perform auth mapping (no public_key or other PII is returned). The fingerprint format accepted is the canonical `SHA256:<44-char base64>`.
+
+**Implementation Approach (clarified 2025-12-14):**
+
+- The SSH server SHALL be embedded directly in `git-bridge` (single-process) to handle SSH auth and git RPCs. The server will:
+  - perform fingerprint → `userId` lookups (via short-lived cache + private API when needed),
+  - spawn `git` subprocesses to serve `upload-pack` / `receive-pack`,
+  - enforce membership checks during RPC handling, and
+  - emit `auth.ssh_attempt` structured events (including `fingerprint`, `userId`, `repo`, `outcome`) for every authentication attempt.
+
+- Rationale: colocation simplifies tracing, auditing, and membership enforcement; reduces cross-service deployment complexity compared to a separate `sshd` or sidecar approach.
+
+- Acceptance test: add an e2e that seeds a key, performs a git clone/push over the embedded SSH endpoint, and asserts emission of `auth.ssh_attempt` with expected fields and outcomes.
 
 - Failure modes: if authentication fails (unknown key / invalid token) return SSH auth failure (for SSH) or HTTP 401 (for HTTPS). If authentication succeeds but membership check fails, the RPC handler MUST respond with 403 and record the event in audit logs. Do not return 200 with an error payload for git RPCs.
 - Acceptance test (example): create user U, add key K, ensure K maps to U; create repo R where U is NOT a member; attempt `git push` over SSH presenting K — outcome: authentication succeeds but RPC is denied with a 403-equivalent response and the `auth.ssh_attempt` audit log contains `userId`, `fingerprint`, `repo`, `outcome: "failure"`, and `reason: "not a project member"`.

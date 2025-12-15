@@ -18,6 +18,7 @@ import java.net.InetSocketAddress;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.http.client.methods.HttpGet;
 
 public class WebProfileContractTest {
     private HttpServer server;

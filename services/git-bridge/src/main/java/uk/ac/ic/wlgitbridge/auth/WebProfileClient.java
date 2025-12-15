@@ -34,7 +34,12 @@ public class WebProfileClient {
         try (CloseableHttpClient http = HttpClients.createDefault()) {
             HttpGet get = new HttpGet(url);
             if (apiToken != null && !apiToken.isEmpty()) {
-                get.addHeader("Authorization", "Bearer " + apiToken);
+                if (apiToken.contains(":")) {
+                    String b64 = java.util.Base64.getEncoder().encodeToString(apiToken.getBytes(StandardCharsets.UTF_8));
+                    get.addHeader("Authorization", "Basic " + b64);
+                } else {
+                    get.addHeader("Authorization", "Bearer " + apiToken);
+                }
             }
             try (CloseableHttpResponse resp = http.execute(get)) {
                 int status = resp.getStatusLine().getStatusCode();
@@ -55,7 +60,12 @@ public class WebProfileClient {
         try (CloseableHttpClient http = HttpClients.createDefault()) {
             HttpGet get = new HttpGet(url);
             if (apiToken != null && !apiToken.isEmpty()) {
-                get.addHeader("Authorization", "Bearer " + apiToken);
+                if (apiToken.contains(":")) {
+                    String b64 = java.util.Base64.getEncoder().encodeToString(apiToken.getBytes(StandardCharsets.UTF_8));
+                    get.addHeader("Authorization", "Basic " + b64);
+                } else {
+                    get.addHeader("Authorization", "Bearer " + apiToken);
+                }
             }
             try (CloseableHttpResponse resp = http.execute(get)) {
                 int status = resp.getStatusLine().getStatusCode();
@@ -87,13 +97,32 @@ public class WebProfileClient {
      * Introspect a token using the web-profile introspection endpoint.
      * Returns Optional.of(userId) when the token is active and contains a userId.
      */
-    public Optional<String> introspectToken(String token) throws IOException {
+    public static class TokenIntrospection {
+        public final boolean active;
+        public final java.util.Optional<String> userId;
+        public final java.util.List<String> scopes;
+        public final String expiresAt;
+
+        public TokenIntrospection(boolean active, java.util.Optional<String> userId, java.util.List<String> scopes, String expiresAt) {
+            this.active = active;
+            this.userId = userId;
+            this.scopes = scopes;
+            this.expiresAt = expiresAt;
+        }
+    }
+
+    public TokenIntrospection introspectToken(String token) throws IOException {
         String url = String.format("%s/internal/api/tokens/introspect", baseUrl);
         try (CloseableHttpClient http = HttpClients.createDefault()) {
             org.apache.http.client.methods.HttpPost post = new org.apache.http.client.methods.HttpPost(url);
             post.addHeader("Content-Type", "application/json");
             if (apiToken != null && !apiToken.isEmpty()) {
-                post.addHeader("Authorization", "Bearer " + apiToken);
+                if (apiToken.contains(":")) {
+                    String b64 = java.util.Base64.getEncoder().encodeToString(apiToken.getBytes(StandardCharsets.UTF_8));
+                    post.addHeader("Authorization", "Basic " + b64);
+                } else {
+                    post.addHeader("Authorization", "Bearer " + apiToken);
+                }
             }
             String body = gson.toJson(java.util.Collections.singletonMap("token", token));
             post.setEntity(new org.apache.http.entity.StringEntity(body, StandardCharsets.UTF_8));
@@ -102,11 +131,20 @@ public class WebProfileClient {
                 if (status >= 200 && status < 300) {
                     String json = EntityUtils.toString(resp.getEntity());
                     java.util.Map<String, Object> m = gson.fromJson(json, java.util.Map.class);
-                    if (m != null && Boolean.TRUE.equals(m.get("active")) && m.get("userId") != null) {
-                        return Optional.of(String.valueOf(m.get("userId")));
+                    boolean active = m != null && Boolean.TRUE.equals(m.get("active"));
+                    java.util.Optional<String> uid = java.util.Optional.empty();
+                    java.util.List<String> scopes = java.util.Collections.emptyList();
+                    String expiresAt = null;
+                    if (m != null) {
+                        if (m.get("userId") != null) uid = java.util.Optional.of(String.valueOf(m.get("userId")));
+                        if (m.get("scopes") instanceof java.util.List) {
+                            scopes = (java.util.List<String>) m.get("scopes");
+                        }
+                        if (m.get("expiresAt") != null) expiresAt = String.valueOf(m.get("expiresAt"));
                     }
+                    return new TokenIntrospection(active, uid, scopes, expiresAt);
                 }
-                return Optional.empty();
+                return new TokenIntrospection(false, java.util.Optional.empty(), java.util.Collections.emptyList(), null);
             }
         }
     }

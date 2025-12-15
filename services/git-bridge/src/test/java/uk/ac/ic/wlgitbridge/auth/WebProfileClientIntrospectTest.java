@@ -31,9 +31,10 @@ public class WebProfileClientIntrospectTest {
             int port = server.getAddress().getPort();
             String baseUrl = "http://127.0.0.1:" + port;
             WebProfileClient client = new WebProfileClient(baseUrl, null);
-            Optional<String> uid = client.introspectToken("sometoken");
-            Assert.assertTrue(uid.isPresent());
-            Assert.assertEquals("u123", uid.get());
+            WebProfileClient.TokenIntrospection ti = client.introspectToken("sometoken");
+            Assert.assertTrue(ti.active);
+            Assert.assertTrue(ti.userId.isPresent());
+            Assert.assertEquals("u123", ti.userId.get());
         } finally {
             server.stop(0);
         }
@@ -58,8 +59,8 @@ public class WebProfileClientIntrospectTest {
             int port = server.getAddress().getPort();
             String baseUrl = "http://127.0.0.1:" + port;
             WebProfileClient client = new WebProfileClient(baseUrl, null);
-            Optional<String> uid = client.introspectToken("sometoken");
-            Assert.assertFalse(uid.isPresent());
+            WebProfileClient.TokenIntrospection ti = client.introspectToken("sometoken");
+            Assert.assertFalse(ti.active);
         } finally {
             server.stop(0);
         }

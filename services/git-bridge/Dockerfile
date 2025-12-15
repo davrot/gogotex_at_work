@@ -9,7 +9,7 @@ RUN go install github.com/a8m/envsubst/cmd/envsubst@latest
 FROM maven:3-amazoncorretto-21-debian AS base
 
 RUN apt-get update && apt-get install -y make git sqlite3 \
- && rm -rf /var/lib/apt/lists
+      && rm -rf /var/lib/apt/lists
 
 COPY --from=envsubst_builder /go/bin/envsubst /opt/envsubst
 RUN chmod +x /opt/envsubst
@@ -23,9 +23,9 @@ COPY . /app
 WORKDIR /app
 
 RUN make package \
-# The name of the created jar contains the current version tag.
-# Rename it to a static path that can be used for copying.
-&&  find /app/target \
+      # The name of the created jar contains the current version tag.
+      # Rename it to a static path that can be used for copying.
+      &&  find /app/target \
       -name 'writelatex-git-bridge*jar-with-dependencies.jar' \
       -exec mv {} /git-bridge.jar \;
 
@@ -38,6 +38,9 @@ ENV LD_PRELOAD=/usr/lib/libjemalloc.so.2
 RUN adduser -D node
 
 COPY --from=builder /git-bridge.jar /
+
+# Expose SSH port for embedded SSH server (optional)
+EXPOSE 22
 
 COPY --from=envsubst_builder /go/bin/envsubst /opt/envsubst
 RUN chmod +x /opt/envsubst

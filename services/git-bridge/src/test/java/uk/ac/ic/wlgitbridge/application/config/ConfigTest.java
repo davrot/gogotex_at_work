@@ -87,7 +87,9 @@ public class ConfigTest {
             + "  \"repoStore\": null,\n"
             + "  \"swapStore\": null,\n"
             + "  \"swapJob\": null,\n"
-            + "  \"sqliteHeapLimitBytes\": 0\n"
+            + "  \"sqliteHeapLimitBytes\": 0,\n"
+            + "  \"sshEnabled\": false,\n"
+            + "  \"sshPort\": 22\n"
             + "}";
     assertEquals(
         "sanitised config did not hide sensitive fields", expected, config.getSanitisedString());

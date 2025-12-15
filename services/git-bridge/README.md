@@ -3,7 +3,9 @@
 ## Docker
 
 The `Dockerfile` contains all the requirements for building and running the
- writelatex-git-bridge.
+writelatex-git-bridge.
+
+Note: In production the service is expected to be fronted by the common nginx proxy/load-balancer which handles TLS termination (HTTPS). The `git-bridge` process listens on an internal HTTP port and relies on the proxy for HTTPS exposure; in local dev you may run the service directly and use the develop network or a local reverse-proxy for HTTPS emulation.
 
 ```bash
 # build the image
@@ -17,8 +19,8 @@ docker run -v `pwd`/conf/local.json:/conf/runtime.json writelatex-git-bridge
 
 ### Required packages
 
-  * `maven` (for building, running tests and packaging)
-  * `jdk-8` (for compiling and running)
+- `maven` (for building, running tests and packaging)
+- `jdk-8` (for compiling and running)
 
 ### Commands
 
@@ -115,7 +117,6 @@ The configuration file is in `.json` format.
     }
 
 You have to restart the server for configuration changes to take effect.
-
 
 ## Creating OAuth app
 

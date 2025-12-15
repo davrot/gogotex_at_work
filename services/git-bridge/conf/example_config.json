@@ -26,5 +26,8 @@
         "intervalMillis": 3600000,
         "compressionMethod": "gzip"
     },
-    "sqliteHeapLimitBytes": 512000000
+    "sqliteHeapLimitBytes": 512000000,
+
+    "sshEnabled": false,
+    "sshPort": 22
 }

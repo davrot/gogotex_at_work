@@ -21,8 +21,8 @@ public class SSHAuthManagerIntrospectFallbackTest {
             }
 
             @Override
-            public Optional<String> introspectToken(String token) {
-                return Optional.of("user123");
+            public TokenIntrospection introspectToken(String token) {
+                return new TokenIntrospection(true, Optional.of("user123"), Collections.emptyList(), null);
             }
         };
 
@@ -45,8 +45,8 @@ public class SSHAuthManagerIntrospectFallbackTest {
             }
 
             @Override
-            public Optional<String> introspectToken(String token) {
-                return Optional.of("other-user");
+            public TokenIntrospection introspectToken(String token) {
+                return new TokenIntrospection(true, Optional.of("other-user"), Collections.emptyList(), null);
             }
         };
 
