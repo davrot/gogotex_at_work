@@ -131,8 +131,11 @@ describe('Tags', function () {
     })
   })
 
-  describe('get tags via api', function () {
-    const auth = Buffer.from('overleaf:password').toString('base64')
+  import Settings from '@overleaf/settings'
+
+describe('get tags via api', function () {
+    const [adminUser, adminPass] = Object.entries(Settings.httpAuthUsers)[0]
+    const auth = Buffer.from(`${adminUser}:${adminPass}`).toString('base64')
     const authedRequest = request.defaults({
       headers: {
         Authorization: `Basic ${auth}`,

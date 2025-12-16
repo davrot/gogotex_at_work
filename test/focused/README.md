@@ -15,7 +15,9 @@ IMPORTANT: Re-read `docs/dev-setup.md` before running Playwright or any e2e test
 Example (runs unit + e2e):
 
 ```bash
-RUN_E2E=true BASE_URL=http://127.0.0.1:13000 TEST_USER_EMAIL=test@example.com TEST_USER_PASSWORD=pass npm run test:focused
+RUN_E2E=true BASE_URL=http://develop-webpack-1:3808 TEST_USER_EMAIL=test@example.com TEST_USER_PASSWORD=pass npm run test:focused
+
+Note: 127.0.0.1 and localhost are blocked for e2e runs; point `BASE_URL` at the webpack dev host on the dev compose network (e.g. http://develop-webpack-1:3808).
 ```
 
 Or run e2e directly:

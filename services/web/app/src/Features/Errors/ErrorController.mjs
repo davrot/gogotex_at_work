@@ -33,6 +33,8 @@ async function handleError(error, req, res, next) {
   if (error.code === 'EBADCSRFTOKEN') {
     req.logger.addFields({ user })
     req.logger.setLevel('warn')
+    // Debug: surface request headers/session when csrf token validation fails
+    try { console.error('[ErrorController] EBADCSRFTOKEN', { method: req.method, path: req.path, headers: { cookie: req.headers && req.headers.cookie, 'x-csrf-token': req.get && req.get('x-csrf-token') }, session: { exists: !!req.session, sessionUserId: SessionManager.getSessionUser ? (SessionManager.getSessionUser(req.session)?._id || null) : null } }) } catch (e) {}
     if (shouldSendErrorResponse) {
       res.sendStatus(403)
     }

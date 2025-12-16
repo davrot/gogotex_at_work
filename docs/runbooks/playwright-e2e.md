@@ -25,11 +25,13 @@ npx playwright install-deps
 3. Run the baseline script (example using port 80):
 
 ```bash
-BASE_URL=http://127.0.0.1:80 CREATE_TEST_USER=true npm run e2e:playwright
+BASE_URL=http://develop-webpack-1:3808 CREATE_TEST_USER=true npm run e2e:playwright
+
+Note: 127.0.0.1 and localhost are blocked for our tests — use the dev compose host (e.g. http://develop-webpack-1:3808).
 ```
 
 Notes
 
-- If your dev environment exposes the webpack server on `:3808`, use `BASE_URL=http://localhost:3808`.
+- If your dev environment exposes the webpack server on `:3808`, use `BASE_URL=http://develop-webpack-1:3808`.
 - `npx playwright install-deps` requires sudo on some systems; CI images should have these packages installed.
 - Screenshots are written to `services/web/test/e2e/playwright/out/`.

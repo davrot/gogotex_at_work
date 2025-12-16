@@ -1,5 +1,5 @@
 import { expect } from 'chai'
-import UserHelper from '../../acceptance/src/helpers/User.mjs'
+import UserHelper from '../../acceptance/src/helpers/UserHelper.mjs'
 import Settings from '@overleaf/settings'
 
 describe('Membership API contract tests', function () {
@@ -8,25 +8,18 @@ describe('Membership API contract tests', function () {
   it('returns 200 for member and 404 for non-member', async function () {
     const user = new UserHelper()
     const owner = new UserHelper()
+    // Debug: show prototypes before registration
+    // eslint-disable-next-line no-console
+    console.debug('[MembershipContractTest] user proto:', Object.getOwnPropertyNames(Object.getPrototypeOf(user)), 'owner proto:', Object.getOwnPropertyNames(Object.getPrototypeOf(owner)))
     await user.register()
     await owner.register()
     await owner.login()
 
     // Owner creates a project
-    const projectId = await new Promise((resolve, reject) => {
-      owner.createProject('membership-contract-proj', (err, id) => {
-        if (err) return reject(err)
-        resolve(id)
-      })
-    })
+    const projectId = await owner.createProject('membership-contract-proj')
 
     // Add 'user' as collaborator to the project
-    await new Promise((resolve, reject) => {
-      owner.addUserToProject(projectId, user, 'readAndWrite', err => {
-        if (err) return reject(err)
-        resolve()
-      })
-    })
+    await owner.addUserToProject(projectId, user, 'readAndWrite')
 
     // call private membership endpoint without auth — expect 401/403/404
     const resNoAuth = await owner.doRequest('get', { url: `/internal/api/projects/${projectId}/members/${user.id}` })

@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BASE_URL=${BASE_URL:-http://127.0.0.1:80}
+BASE_URL=${BASE_URL:-http://develop-webpack-1:3808}
+
+# Disallow localhost/127.0.0.1 for e2e scripts — tests must use the dev compose host on the docker network
+if echo "$BASE_URL" | grep -E "localhost|127\.0\.0\.1" >/dev/null 2>&1; then
+  echo "ERROR: BASE_URL must not be localhost or 127.0.0.1 for e2e scripts. Use the webpack dev host (e.g. http://develop-webpack-1:3808)."
+  exit 2
+fi
 EMAIL=${1:-}
 PASSWORD=${2:-}
 

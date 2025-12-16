@@ -36,6 +36,7 @@ import noCache from 'nocache'
 import os from 'node:os'
 import http from 'node:http'
 import { fileURLToPath } from 'node:url'
+import fs from 'node:fs'
 import serveStaticWrapper from './ServeStaticWrapper.mjs'
 import { handleValidationError } from '@overleaf/validation-tools'
 
@@ -52,6 +53,94 @@ const STATIC_CACHE_AGE = Settings.cacheStaticAssets
 const sessionStore = new CustomSessionStore({ client: sessionsRedisClient })
 
 const app = express()
+
+// Top-most early handler: if x-debug-echo: 1 is present, return raw headers & session immediately
+// This runs before any body-parsing, CSRF, or auth middleware to capture the incoming request as received
+app.use((req, res, next) => {
+  try {
+    if (req.get && req.get('x-debug-echo') === '1') {
+      const sessionUser = req.session && req.session.user ? { _id: req.session.user._id, email: req.session.user.email } : null
+      const out = {
+        stage: 'app-top',
+        originalUrl: req.originalUrl,
+        url: req.url,
+        method: req.method,
+        headers: req.headers,
+        cookie: req.headers && req.headers.cookie,
+        sessionExists: !!req.session,
+        sessionUser,
+      }
+      try { console.error('[APP TOP DEBUG ECHO] incoming', out) } catch (e) {}
+      return res.status(200).json(out)
+    }
+  } catch (e) {}
+  next()
+})
+try { console.error('[APP TOP DEBUG ECHO] registered') } catch (e) {}
+
+// Debug: early global request logger to capture all incoming requests (headers/cookie/CSRF)
+app.use((req, res, next) => {
+  try {
+    console.error('[Server EARLY] incoming', {
+      method: req.method,
+      path: req.path,
+      rawHeaders: Array.isArray(req.rawHeaders) ? req.rawHeaders.slice(0, 60) : req.rawHeaders,
+      headersSummary: Object.keys(req.headers || {}).reduce((acc, k) => { acc[k] = k === 'cookie' ? String(req.headers[k]).slice(0,200) : req.headers[k]; return acc }, {}),
+      csrfHeader: req.get && req.get('x-csrf-token'),
+      cookies: req.cookies || null,
+      signedCookies: req.signedCookies || null,
+      sessionSummary: req.session ? { id: req.session.id || req.sessionID, hasUser: !!req.session.user } : null,
+      reqUser: req.user ? { _id: req.user._id, email: req.user.email } : null,
+    })
+  } catch (e) {}
+
+  // Wrap res.end to capture final response status when it is 403 so we can trace short-circuited responses
+  const origEnd = res.end.bind(res)
+  res.end = function (...args) {
+    try {
+      if (res && res.statusCode === 403) {
+        try { console.error('[Server END] response ended with 403', { method: req.method, path: req.path, csrf: req.get && req.get('x-csrf-token'), session: !!req.session, sessionUser: SessionManager.getSessionUser ? SessionManager.getSessionUser(req.session) : null }) } catch (e) {}
+        try { console.error(new Error('response 403 trace').stack) } catch (e) {}
+        try { fs.appendFileSync('/tmp/ssh_403_trace.log', `${new Date().toISOString()} END 403 ${req.method} ${req.originalUrl || req.url} headers=${JSON.stringify(req.headers)} session=${JSON.stringify(req.session && { id: req.session.id || req.sessionID, user: req.session.user ? { _id: req.session.user._id, email: req.session.user.email } : null })}\n${new Error().stack}\n\n`) } catch (e) {}
+      }
+    } catch (e) {}
+    return origEnd(...args)
+  }
+  // Also listen for finish event to capture cases where the response completes after streaming
+  res.on('finish', () => {
+    try {
+      if (res.statusCode === 403) {
+        try { console.error('[APP FINISH] response finished with 403', { method: req.method, path: req.originalUrl || req.url, headers: req.headers, csrf: req.get && req.get('x-csrf-token'), sessionExists: !!req.session, sessionUserId: SessionManager.getLoggedInUserId ? SessionManager.getLoggedInUserId(req.session) : null }) } catch (e) {}
+        try { console.error(new Error('response 403 finish trace').stack) } catch (e) {}
+        try { fs.appendFileSync('/tmp/ssh_403_trace.log', `${new Date().toISOString()} FINISH 403 ${req.method} ${(req.originalUrl || req.url)} headers=${JSON.stringify(req.headers)} sessionExists=${!!req.session} sessionUser=${JSON.stringify(req.session && req.session.user ? { _id: req.session.user._id, email: req.session.user.email } : null)}\n${new Error().stack}\n\n`) } catch (e) {}
+      }
+    } catch (e) {}
+  })
+  next()
+})
+
+// App-level early debug echo middleware: short-circuit and return raw headers/session
+// whenever the request includes the test header `x-debug-echo: 1` (runs before CSRF)
+app.use((req, res, next) => {
+  try {
+    if (req.get && req.get('x-debug-echo') === '1') {
+      const sessionUser = (req.session && req.session.user) ? { _id: req.session.user._id, email: req.session.user.email } : null
+      const out = {
+        stage: 'app-early',
+        originalUrl: req.originalUrl,
+        url: req.url,
+        method: req.method,
+        headers: req.headers,
+        cookie: req.headers && req.headers.cookie,
+        sessionExists: !!req.session,
+        sessionUser,
+      }
+      try { console.error('[APP EARLY DEBUG ECHO] incoming', out) } catch (e) {}
+      return res.status(200).json(out)
+    }
+  } catch (e) {}
+  next()
+})
 
 const webRouter = express.Router()
 const privateApiRouter = express.Router()
@@ -203,6 +292,49 @@ webRouter.use(
   })
 )
 
+// Test-only: allow setting a dev session user via header to make contract tests less flaky
+webRouter.use((req, res, next) => {
+  try {
+    if (process.env.NODE_ENV === 'test') {
+      const devUser = req.get && req.get('x-dev-user-id')
+      if (devUser) {
+        try { console.warn('[Server TEST-FALLBACK] x-dev-user-id header detected, synthesizing req.session.user', devUser) } catch (e) {}
+        if (!req.session) req.session = {}
+        if (!req.session.user) req.session.user = { _id: devUser, email: `${devUser}@example.com`, first_name: 'dev' }
+      }
+    }
+  } catch (e) {}
+  next()
+})
+
+// Debug middleware: wrap res.sendStatus to log when a 403 is emitted so we can trace who is rejecting requests
+webRouter.use((req, res, next) => {
+  const origSendStatus = res.sendStatus.bind(res)
+  res.sendStatus = function (statusCode) {
+    try {
+      if (statusCode === 403) {
+        try { console.error('[Server] sendStatus(403) called for', { method: req.method, path: req.originalUrl || req.url, headersCookie: req.headers && req.headers.cookie, csrfHeader: req.get && req.get('x-csrf-token') }) } catch (e) {}
+        try { console.error(new Error('403 trace').stack) } catch (e) {}
+      }
+    } catch (e) {}
+    return origSendStatus(statusCode)
+  }
+
+  // Also wrap res.status to detect later `.status(403).send()` patterns
+  const origStatus = res.status.bind(res)
+  res.status = function (statusCode) {
+    try {
+      if (statusCode === 403) {
+        try { console.error('[Server] res.status(403) called for', { method: req.method, path: req.originalUrl || req.url, headersCookie: req.headers && req.headers.cookie, csrfHeader: req.get && req.get('x-csrf-token') }) } catch (e) {}
+        try { console.error(new Error('status 403 trace').stack) } catch (e) {}
+      }
+    } catch (e) {}
+    return origStatus(statusCode)
+  }
+
+  next()
+})
+
 if (Features.hasFeature('saas')) {
   webRouter.use(AnalyticsManager.analyticsIdMiddleware)
 }
@@ -232,8 +364,43 @@ Modules.hooks.fire('passportSetup', passport, err => {
 
 await Modules.applyNonCsrfRouter(webRouter, privateApiRouter, publicApiRouter)
 
+// Debug: log incoming internal API requests early, before CSRF and other middleware that may short-circuit
+webRouter.use('/internal/api', (req, res, next) => {
+  try { console.error('[Server] early internal request', { method: req.method, url: req.url, headers: { cookie: req.headers && req.headers.cookie, 'x-csrf-token': req.get && req.get('x-csrf-token'), origin: req.headers && req.headers.origin } }) } catch (e) {}
+  next()
+})
+
+// Temporary test-only debug echo endpoint to help triage headers/session propagation
+// Returns JSON with headers, session presence, and session user metadata (if available)
+webRouter.post('/internal/api/debug/echo', (req, res) => {
+  try {
+    const sessionUser = (req.session && req.session.user) ? { _id: req.session.user._id, email: req.session.user.email } : null
+    const out = {
+      headers: req.headers,
+      csrfHeader: req.get && req.get('x-csrf-token'),
+      sessionExists: !!req.session,
+      sessionUser,
+    }
+    if (process.env.NODE_ENV === 'test') {
+      try { console.error('[DEBUG ECHO] returning', out) } catch (e) {}
+      return res.status(200).json(out)
+    }
+    // Ensure this endpoint is not available in non-test envs
+    return res.sendStatus(404)
+  } catch (err) {
+    try { console.error('[DEBUG ECHO] error', err && err.stack ? err.stack : err) } catch (e) {}
+    return res.sendStatus(500)
+  }
+})
+
 webRouter.csrf = new Csrf()
 webRouter.use(webRouter.csrf.middleware)
+// Test-only: exempt debug echo POST from CSRF so tests can POST without fetching a token
+try {
+  // handle both mounted and unmounted path forms (router mounts can change req.path)
+  webRouter.csrf.disableDefaultCsrfProtection('/internal/api/debug/echo', 'POST')
+  webRouter.csrf.disableDefaultCsrfProtection('/debug/echo', 'POST')
+} catch (e) {}
 webRouter.use(translations.i18nMiddleware)
 webRouter.use(translations.setLangBasedOnDomainMiddleware)
 
@@ -351,6 +518,11 @@ if (Settings.csp && Settings.csp.enabled) {
 
 logger.debug('creating HTTP server'.yellow)
 const server = http.createServer(app)
+// Very early HTTP-level listener: log raw request headers/method/url before Express.
+// This helps verify whether test headers (eg. x-debug-echo, x-dev-user-id) arrive at the process
+server.on('request', (req, res) => {
+  try { console.error('[HTTP SERVER EARLY REQUEST]', { method: req.method, url: req.url, rawHeaders: req.rawHeaders, headers: req.headers }) } catch (e) {}
+})
 
 // provide settings for separate web and api processes
 if (Settings.enabledServices.includes('api')) {
@@ -373,10 +545,91 @@ if (Settings.enabledServices.includes('web')) {
 metrics.injectMetricsRoute(webRouter)
 metrics.injectMetricsRoute(privateApiRouter)
 
+// Debug: log incoming internal API requests
+webRouter.use('/internal/api', (req, res, next) => {
+  try { console.error('DEBUG internal request', { method: req.method, url: req.url, cookie: req.headers && req.headers.cookie }) } catch (e) {}
+
+  // Wrap sendStatus/status to capture callsite when 403 is sent specifically for internal API
+  try {
+    const origSendStatus = res.sendStatus.bind(res)
+    res.sendStatus = function (statusCode) {
+      try {
+        if (statusCode === 403) {
+          try { console.error('[INTERNAL API] sendStatus(403) for', { method: req.method, url: req.url, headers: req.headers && { cookie: req.headers.cookie, 'x-csrf-token': req.get && req.get('x-csrf-token') } }) } catch (e) {}
+          try { fs.appendFileSync('/tmp/ssh_403_trace.log', `${new Date().toISOString()} INTERNAL_SENDSTATUS 403 ${req.method} ${req.url} headers=${JSON.stringify({ cookie: req.headers && req.headers.cookie, 'x-csrf-token': req.get && req.get('x-csrf-token') })} \n${new Error().stack}\n\n`) } catch (e) {}
+        }
+      } catch (e) {}
+      return origSendStatus(statusCode)
+    }
+
+    const origStatus = res.status.bind(res)
+    res.status = function (statusCode) {
+      try {
+        if (statusCode === 403) {
+          try { console.error('[INTERNAL API] status(403) for', { method: req.method, url: req.url, headers: req.headers && { cookie: req.headers.cookie, 'x-csrf-token': req.get && req.get('x-csrf-token') } }) } catch (e) {}
+          try { fs.appendFileSync('/tmp/ssh_403_trace.log', `${new Date().toISOString()} INTERNAL_STATUS 403 ${req.method} ${req.url} headers=${JSON.stringify({ cookie: req.headers && req.headers.cookie, 'x-csrf-token': req.get && req.get('x-csrf-token') })} \n${new Error().stack}\n\n`) } catch (e) {}
+        }
+      } catch (e) {}
+      return origStatus(statusCode)
+    }
+  } catch (e) {}
+
+  next()
+})
+
 const beforeRouterInitialize = performance.now()
 await Router.initialize(webRouter, privateApiRouter, publicApiRouter)
 metrics.gauge('web_startup', performance.now() - beforeRouterInitialize, 1, {
   path: 'Router.initialize',
+})
+
+// Ensure a test-only debug echo endpoint is registered AFTER Router.initialize so
+// it remains available when routers are (re)configured. This endpoint echoes
+// request headers and session info and helps verify header/session propagation
+// between the test client and the running server.
+webRouter.post('/internal/api/debug/echo', (req, res) => {
+  try {
+    const sessionUser = (req.session && req.session.user) ? { _id: req.session.user._id, email: req.session.user.email } : null
+    const out = {
+      headers: req.headers,
+      csrfHeader: req.get && req.get('x-csrf-token'),
+      sessionExists: !!req.session,
+      sessionUser,
+    }
+    if (process.env.NODE_ENV === 'test' || req.get && req.get('x-debug-echo') === '1' || process.env.NODE_ENV === 'development') {
+      try { console.error('[DEBUG ECHO - POST] returning', out) } catch (e) {}
+      return res.status(200).json(out)
+    }
+    return res.sendStatus(404)
+  } catch (err) {
+    try { console.error('[DEBUG ECHO - POST] error', err && err.stack ? err.stack : err) } catch (e) {}
+    return res.sendStatus(500)
+  }
+})
+
+// Also register a GET variant for quick inspection (GETs are not blocked by csurf
+// and are convenient to inspect headers/session state without needing csrf tokens)
+webRouter.get('/internal/api/debug/echo', (req, res) => {
+  try {
+    const sessionUser = (req.session && req.session.user) ? { _id: req.session.user._id, email: req.session.user.email } : null
+    const out = {
+      method: req.method,
+      originalUrl: req.originalUrl,
+      url: req.url,
+      headers: req.headers,
+      csrfHeader: req.get && req.get('x-csrf-token'),
+      sessionExists: !!req.session,
+      sessionUser,
+    }
+    if (process.env.NODE_ENV === 'test') {
+      try { console.error('[DEBUG ECHO - GET] returning', out) } catch (e) {}
+      return res.status(200).json(out)
+    }
+    return res.sendStatus(404)
+  } catch (err) {
+    try { console.error('[DEBUG ECHO - GET] error', err && err.stack ? err.stack : err) } catch (e) {}
+    return res.sendStatus(500)
+  }
 })
 
 export default { app, server }

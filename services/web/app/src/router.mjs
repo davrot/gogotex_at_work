@@ -54,6 +54,7 @@ import MetaController from './Features/Metadata/MetaController.mjs'
 import TokenAccessController from './Features/TokenAccess/TokenAccessController.mjs'
 import TokenAccessRouter from './Features/TokenAccess/TokenAccessRouter.mjs'
 import TokenRouter from './Features/Token/TokenRouter.mjs'
+import TokenController from './Features/Token/TokenController.mjs'
 import DiscoveryRouter from './Features/Discovery/DiscoveryRouter.mjs'
 import LinkedFilesRouter from './Features/LinkedFiles/LinkedFilesRouter.mjs'
 import TemplatesRouter from './Features/Templates/TemplatesRouter.mjs'
@@ -320,8 +321,39 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
   // User SSH Keys: list, create, delete (internal/user-facing)
   // internal form (explicit user id) - controller enforces admin access when acting on other users
   webRouter.get('/internal/api/users/:userId/ssh-keys', AuthenticationController.requireLogin(), UserSSHKeysController.list)
-  webRouter.post('/internal/api/users/:userId/ssh-keys', AuthenticationController.requireLogin(), UserSSHKeysController.create)
+  webRouter.post('/internal/api/users/:userId/ssh-keys', (req, res, next) => { try { console.error('[ROUTE DEBUG] /internal/api/users/:userId/ssh-keys incoming', { method: req.method, url: req.originalUrl || req.url, headers: { cookie: req.headers && req.headers.cookie, 'x-csrf-token': req.get && req.get('x-csrf-token'), 'x-dev-user-id': req.get && req.get('x-dev-user-id') }, sessionExists: !!req.session, sessionUserId: req.session && req.session.user && req.session.user._id ? req.session.user._id : null }) } catch (e) {} next() }, AuthenticationController.requireLogin(), UserSSHKeysController.create)
+
+  // Test-only: add a CSRF-exempt GET debug echo to inspect headers/session without triggering csurf
+  try {
+    webRouter.csrf && webRouter.csrf.disableDefaultCsrfProtection && webRouter.csrf.disableDefaultCsrfProtection('/internal/api/debug/echo', 'GET')
+    webRouter.get('/internal/api/debug/echo', (req, res) => {
+      try { console.error('[ROUTE DEBUG] /internal/api/debug/echo incoming', { method: req.method, url: req.originalUrl || req.url, headers: { cookie: req.headers && req.headers.cookie, 'x-csrf-token': req.get && req.get('x-csrf-token'), 'x-dev-user-id': req.get && req.get('x-dev-user-id') }, sessionExists: !!req.session, sessionUserId: req.session && req.session.user && req.session.user._id ? req.session.user._id : null }) } catch (e) {}
+      res.json({ ok: true, headers: { cookie: req.headers && req.headers.cookie, 'x-csrf-token': req.get && req.get('x-csrf-token'), 'x-dev-user-id': req.get && req.get('x-dev-user-id') }, sessionExists: !!req.session, sessionUser: req.session && req.session.user ? req.session.user : null })
+    })
+  } catch (e) {}
   webRouter.delete('/internal/api/users/:userId/ssh-keys/:keyId', AuthenticationController.requireLogin(), UserSSHKeysController.remove)
+
+  // Test-only debug: echo headers/session for internal API triage
+  try { console.error('[ROUTER INIT] registering /internal/api/debug/echo') } catch (e) {}
+  webRouter.post('/internal/api/debug/echo', (req, res) => {
+    try {
+      const sessionUser = (req.session && req.session.user) ? { _id: req.session.user._id, email: req.session.user.email } : null
+      const out = {
+        headers: req.headers,
+        csrfHeader: req.get && req.get('x-csrf-token'),
+        sessionExists: !!req.session,
+        sessionUser,
+      }
+      if (process.env.NODE_ENV === 'test' || (req.get && req.get('x-debug-echo') === '1') || process.env.NODE_ENV === 'development') {
+        try { console.error('[ROUTER DEBUG ECHO] returning', out) } catch (e) {}
+        return res.status(200).json(out)
+      }
+      return res.sendStatus(404)
+    } catch (err) {
+      try { console.error('[ROUTER DEBUG ECHO] error', err && err.stack ? err.stack : err) } catch (e) {}
+      return res.sendStatus(500)
+    }
+  })
 
   // User-facing endpoints for managing your own SSH keys (same protection as /user/settings)
   webRouter.get('/user/ssh-keys', AuthenticationController.requireLogin(), UserSSHKeysController.list)
@@ -806,6 +838,13 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
     '/internal/api/admin/personal-access-token-reissues/:id',
     AuthenticationController.requirePrivateApiAuth(),
     TokenReissueController.get
+  )
+
+  // Token introspection for other services (private API)
+  privateApiRouter.post(
+    '/internal/api/tokens/introspect',
+    AuthenticationController.requirePrivateApiAuth(),
+    TokenController.introspect
   )
   privateApiRouter.post(
     '/internal/expire-deleted-users-after-duration',

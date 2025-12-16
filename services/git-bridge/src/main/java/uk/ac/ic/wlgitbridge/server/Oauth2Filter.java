@@ -110,7 +110,7 @@ public class Oauth2Filter implements Filter {
       int statusCode = checkAccessToken(this.oauth2Server, password, getClientIp(request));
       if (statusCode == 429) {
         // rate limited
-        Log.info("{\"service\":\"git-bridge\",\"project\":\"%s\",\"event\":\"auth.http_attempt\",\"outcome\":\"rate_limited\"}", projectId);
+        Log.info(String.format("{\"service\":\"git-bridge\",\"project\":\"%s\",\"event\":\"auth.http_attempt\",\"outcome\":\"rate_limited\"}", projectId));
         handleRateLimit(projectId, username, request, response);
         return;
       } else if (statusCode == 401) {
@@ -124,14 +124,14 @@ public class Oauth2Filter implements Filter {
             Log.warn("Local introspect check failed: {}", e.getMessage());
           }
           if (!active) {
-            Log.info("{\"service\":\"git-bridge\",\"project\":\"%s\",\"event\":\"auth.http_attempt\",\"outcome\":\"denied\"}", projectId);
+            Log.info(String.format("{\"service\":\"git-bridge\",\"project\":\"%s\",\"event\":\"auth.http_attempt\",\"outcome\":\"denied\"}", projectId));
             handleBadAccessToken(projectId, request, response);
             return;
           } else {
-            Log.info("{\"service\":\"git-bridge\",\"project\":\"%s\",\"event\":\"auth.http_attempt\",\"outcome\":\"success\",\"method\":\"local-introspect\"}", projectId);
+            Log.info(String.format("{\"service\":\"git-bridge\",\"project\":\"%s\",\"event\":\"auth.http_attempt\",\"outcome\":\"success\",\"method\":\"local-introspect\"}", projectId));
           }
         } else {
-          Log.info("{\"service\":\"git-bridge\",\"project\":\"%s\",\"event\":\"auth.http_attempt\",\"outcome\":\"denied\"}", projectId);
+          Log.info(String.format("{\"service\":\"git-bridge\",\"project\":\"%s\",\"event\":\"auth.http_attempt\",\"outcome\":\"denied\"}", projectId));
           handleBadAccessToken(projectId, request, response);
           return;
         }
@@ -146,14 +146,14 @@ public class Oauth2Filter implements Filter {
             Log.warn("Local introspect check failed: {}", e.getMessage());
           }
           if (!active) {
-            Log.info("{\"service\":\"git-bridge\",\"project\":\"%s\",\"event\":\"auth.http_attempt\",\"outcome\":\"denied\",\"status\":%d}", projectId, statusCode);
+            Log.info(String.format("{\"service\":\"git-bridge\",\"project\":\"%s\",\"event\":\"auth.http_attempt\",\"outcome\":\"denied\",\"status\":%d}", projectId, statusCode));
             handleUnknownOauthServerError(projectId, statusCode, request, response);
             return;
           } else {
-            Log.info("{\"service\":\"git-bridge\",\"project\":\"%s\",\"event\":\"auth.http_attempt\",\"outcome\":\"success\",\"method\":\"local-introspect\"}", projectId);
+            Log.info(String.format("{\"service\":\"git-bridge\",\"project\":\"%s\",\"event\":\"auth.http_attempt\",\"outcome\":\"success\",\"method\":\"local-introspect\"}", projectId));
           }
         } else {
-          Log.info("{\"service\":\"git-bridge\",\"project\":\"%s\",\"event\":\"auth.http_attempt\",\"outcome\":\"unknown_oauth_error\",\"status\":%d}", projectId, statusCode);
+          Log.info(String.format("{\"service\":\"git-bridge\",\"project\":\"%s\",\"event\":\"auth.http_attempt\",\"outcome\":\"unknown_oauth_error\",\"status\":%d}", projectId, statusCode));
           handleUnknownOauthServerError(projectId, statusCode, request, response);
           return;
         }
@@ -296,6 +296,12 @@ public class Oauth2Filter implements Filter {
     HttpRequest request = Instance.httpRequestFactory.buildPostRequest(url, null);
     request.setThrowExceptionOnExecuteError(false);
     request.getHeaders().setContentType("application/json");
+    // If a service token is configured for internal API access, use it as Basic auth
+    String serviceToken = System.getenv("WEB_PROFILE_API_TOKEN");
+    if (serviceToken != null && !serviceToken.isEmpty()) {
+      String basic = org.apache.commons.codec.binary.Base64.encodeBase64String(serviceToken.getBytes());
+      request.getHeaders().setAuthorization("Basic " + basic);
+    }
     String body = String.format("{\"token\":\"%s\"}", token.replace("\"","\\\""));
     request.setContent(new com.google.api.client.http.ByteArrayContent("application/json", body.getBytes()));
     HttpResponse response = request.execute();

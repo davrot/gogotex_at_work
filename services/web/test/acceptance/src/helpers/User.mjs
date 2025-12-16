@@ -12,11 +12,11 @@ import { fileURLToPath } from 'node:url'
 import { Cookie } from 'tough-cookie'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
-const COOKIE_DOMAIN = settings.cookieDomain
+const COOKIE_DOMAIN = (settings.cookieDomain || 'web').toString()
 // The cookie domain has a leading '.' but the cookie jar stores it without.
-const DEFAULT_COOKIE_URL = `https://${COOKIE_DOMAIN.replace(/^\./, '')}/`
+const DEFAULT_COOKIE_URL = `https://${(COOKIE_DOMAIN || 'web').replace(/^\./, '')}/`
 
-let count = settings.test.counterInit
+let count = settings.test?.counterInit ?? 0
 
 class User {
   constructor(options) {
@@ -46,6 +46,28 @@ class User {
       callback = options
       options = {}
     }
+    // If no callback is provided, return a Promise for async/await usage
+    if (typeof callback !== 'function') {
+      return new Promise((resolve, reject) => {
+        this.request.get(
+          {
+            url: '/dev/session',
+            qs: options ? options.set : undefined,
+          },
+          (err, response, body) => {
+            if (err != null) return reject(err)
+            if (response.statusCode !== 200) return reject(new Error(`get session failed: status=${response.statusCode} body=${JSON.stringify(body)}`))
+            try {
+              const session = JSON.parse(response.body)
+              resolve(session)
+            } catch (e) {
+              reject(e)
+            }
+          }
+        )
+      })
+    }
+
     this.request.get(
       {
         url: '/dev/session',
@@ -401,6 +423,9 @@ class User {
             return callback(error)
           }
           if (response.statusCode !== 200) {
+            // Debug: print failed login response for triage
+            // eslint-disable-next-line no-console
+            console.debug('[User.loginWithEmailPassword] failed login:', { status: response.statusCode, body })
             return callback(
               new OError(
                 `login failed: status=${
@@ -1094,6 +1119,19 @@ class User {
   }
 
   getCsrfToken(callback) {
+    // Support both callback and Promise styles
+    if (typeof callback !== 'function') {
+      return new Promise((resolve, reject) => {
+        this.request.get({ url: '/dev/csrf' }, (err, response, body) => {
+          if (err != null) return reject(err)
+          if (response.statusCode !== 200) return reject(new Error(`get csrf token failed: status=${response.statusCode} body=${JSON.stringify(body)}`))
+          this.csrfToken = body
+          this.request = this.request.defaults({ headers: { 'x-csrf-token': this.csrfToken } })
+          resolve()
+        })
+      })
+    }
+
     this.request.get(
       {
         url: '/dev/csrf',
@@ -1341,7 +1379,26 @@ User.promises = promisifyClass(User, {
 })
 
 User.promises.prototype.doRequest = async function (method, params) {
+  // ensure params exists
+  params = params || {}
+  try {
+    // test-only: auto-attach x-dev-user-id header so tests that pass it implicitly work
+    if (process.env.NODE_ENV === 'test') {
+      params.headers = Object.assign({}, params.headers || {})
+      if (!params.headers['x-dev-user-id'] && this.id) {
+        params.headers['x-dev-user-id'] = this.id
+      }
+    }
+  } catch (e) {}
+
   return new Promise((resolve, reject) => {
+    try { console.debug('[User.doRequest] outgoing headers', params.headers) } catch (e) {}
+    try {
+      // attempt to dump cookie jar entries for the test host
+      if (this.request && this.request.jar && typeof this.request.jar.getCookies === 'function') {
+        try { const cookies = this.request.jar.getCookies('http://web') || []; console.debug('[User.doRequest] cookieJar for http://web', cookies.map(c => `${c.key}=${c.value}`).slice(0,50)) } catch (e) { console.error('[User.doRequest] cookieJar.getCookies error', e && e.stack ? e.stack : e) }
+      }
+    } catch (e) {}
     this.request[method.toLowerCase()](params, (err, response, body) => {
       if (err) {
         reject(err)

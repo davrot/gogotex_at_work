@@ -1,5 +1,5 @@
 import { expect } from 'chai'
-import UserHelper from '../../acceptance/src/helpers/User.mjs'
+import UserHelper from '../../acceptance/src/helpers/UserHelper.mjs'
 
 import Settings from '@overleaf/settings'
 
@@ -8,6 +8,9 @@ describe('SSH fingerprint lookup contract tests', function () {
 
   it('returns userId for a known fingerprint', async function () {
     const user = new UserHelper()
+    // Debug: inspect user helper before calling register
+    // eslint-disable-next-line no-console
+    console.debug('[SSHKeyLookupContractTest] user proto keys:', Object.getOwnPropertyNames(Object.getPrototypeOf(user)), 'has.register=', typeof user.register)
     await user.register()
     await user.login()
 

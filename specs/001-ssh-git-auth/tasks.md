@@ -11,6 +11,7 @@ description: "Tasks for SSH-only Git authentication feature"
 - [ ] T001 Create this tasks file at specs/001-ssh-git-auth/tasks.md
 - [ ] T002 Verify and add runtime config keys in services/git-bridge/conf/envsubst_template.json (GIT_BRIDGE_WEB_PROFILE_API_URL, GIT_BRIDGE_WEB_PROFILE_API_TOKEN, GIT_BRIDGE_SSH_ONLY_FLAG)
 - [ ] T003 [P] Add/verify README documentation for git-bridge runtime config in services/git-bridge/README.md
+- [ ] T003a Ensure developers rebuild and restart the development containers (run `develop/bin/build` then `./bin/up`) before running contract tests (critical)
 
 ---
 
@@ -23,8 +24,8 @@ description: "Tasks for SSH-only Git authentication feature"
 - [ ] T008 Add feature-flag wiring and environment checks to services/git-bridge/conf/envsubst_template.json and services/git-bridge/README.md
 - [ ] T030 Create API contract (OpenAPI) for web-profile SSH keys: specs/001-ssh-git-auth/contracts/web-profile-ssh-keys.openapi.yaml
 - [ ] T031 [P] Add contract tests validating API schema and auth behaviour (use MockServer): tests/contract/web-profile-ssh-keys.contract.test (or service-specific test paths)
- - [ ] T032 Create API contract (OpenAPI) for membership checks: specs/001-ssh-git-auth/contracts/membership.openapi.yaml
- - [ ] T033 [P] Add contract tests validating membership behaviour (use MockServer): services/git-bridge/src/test/java/uk/ac/ic/wlgitbridge/contracts/MembershipContractTest.java
+- [ ] T032 Create API contract (OpenAPI) for membership checks: specs/001-ssh-git-auth/contracts/membership.openapi.yaml
+- [ ] T033 [P] Add contract tests validating membership behaviour (use MockServer): services/git-bridge/src/test/java/uk/ac/ic/wlgitbridge/contracts/MembershipContractTest.java
 
 ---
 
@@ -89,7 +90,7 @@ description: "Tasks for SSH-only Git authentication feature"
 
 ## Phase N: Polish & Cross-Cutting Concerns
 
-- [ ] T026 [P] Update codebase scanning/CI to assert no OAuth2/HTTP Basic handlers remain in services/git-bridge: .github/workflows/** or CI scripts
+- [ ] T026 [P] Update codebase scanning/CI to assert no OAuth2/HTTP Basic handlers remain in services/git-bridge: .github/workflows/\*\* or CI scripts
 - [ ] T027 [P] Add performance smoke test for Git clone/push latency in services/git-bridge/test/perf/ (simple harness)
 - [ ] T028 [P] Update developer quickstart and docker-compose dev files to document SSH-only testing and env vars: develop/docker-compose.dev.yml and services/git-bridge/README.md
 - [ ] T029 [P] Security review and documentation updates in docs/security/ssh-git-auth.md

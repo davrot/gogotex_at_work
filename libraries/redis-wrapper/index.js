@@ -42,6 +42,15 @@ function createClient(opts) {
     client = new Redis(standardOpts)
   }
   monkeyPatchIoRedisExec(client)
+  // defensive: prevent unhandled 'error' events from bubbling up
+  // ioredis will emit 'error' if it cannot connect (e.g., ECONNREFUSED)
+  client.on('error', err => {
+    try {
+      console.error('[redis-wrapper] ioredis error:', err && err.stack ? err.stack : err)
+    } catch (e) {
+      // swallow any logging errors to avoid cascading failures
+    }
+  })
   client.healthCheck = callback => {
     if (callback) {
       // callback based invocation

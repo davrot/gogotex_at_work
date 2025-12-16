@@ -5,8 +5,14 @@ set -euo pipefail
 # Usage: ./scripts/e2e/git-ssh-acceptance.sh <userId> <git_bridge_host> <ssh_port>
 
 USER_ID=${1:-user123}
-GIT_HOST=${2:-localhost}
+GIT_HOST=${2:-}
 SSH_PORT=${3:-22}
+
+# Disallow localhost/127.* for acceptance scripts — require an explicit, resolvable git host on the dev compose network
+if echo "${GIT_HOST:-}" | grep -E "localhost|127\.0\.0\.1" >/dev/null 2>&1; then
+  echo "ERROR: GIT_HOST must not be localhost or 127.0.0.1 for acceptance tests. Set GIT_HOST to the git-bridge host on the dev compose network (for example, develop-git-bridge or the host part of BASE_URL)."
+  exit 2
+fi
 
 TMPDIR=$(mktemp -d)
 KEY=${TMPDIR}/id_ed25519

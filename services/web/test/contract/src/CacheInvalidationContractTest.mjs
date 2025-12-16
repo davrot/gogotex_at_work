@@ -1,5 +1,5 @@
 import { expect } from 'chai'
-import UserHelper from '../../acceptance/src/helpers/User.mjs'
+import UserHelper from '../../acceptance/src/helpers/UserHelper.mjs'
 import Settings from '@overleaf/settings'
 
 describe('Cache invalidation contract tests', function () {
@@ -7,6 +7,9 @@ describe('Cache invalidation contract tests', function () {
 
   it('is protected and requires private auth', async function () {
     const user = new UserHelper()
+    // Debug: surface instance shape when register() is missing
+    // eslint-disable-next-line no-console
+    console.debug('[CacheInvalidationContractTest] user proto keys:', Object.getOwnPropertyNames(Object.getPrototypeOf(user)), 'has.register=', typeof user.register)
     await user.register()
     await user.login()
 

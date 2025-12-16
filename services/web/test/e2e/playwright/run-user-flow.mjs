@@ -423,22 +423,53 @@ async function main() {
           console.warn('Token UI success or tokens list did not appear within expected time:', e.message || e)
         }
 
-        // Optionally try a git-over-HTTPS request using the token (requires PROJECT_ID env)
-        if (process.env.CHECK_TOKEN_GIT === 'true' && process.env.PROJECT_ID) {
-          const projectId = process.env.PROJECT_ID
-          console.log('Attempting git ls-remote using created token for project', projectId)
-          const tmpdir = fs.mkdtempSync(path.join('/tmp','playwright-token-'))
-          // Allow overriding GIT_HOST and GIT_PORT to target git-bridge
-          const gitHost = process.env.GIT_HOST || new URL(BASE_URL).hostname
-          const gitPort = process.env.GIT_PORT || new URL(BASE_URL).port || '80'
-          const cmd = `git ls-remote https://git:${tokenText}@${gitHost}:${gitPort}/${projectId}.git`
-          try {
-            const { execSync } = await import('node:child_process')
-            const out = execSync(cmd, { cwd: tmpdir, encoding: 'utf8', stdio: ['ignore','pipe','pipe'] })
-            console.log('git ls-remote output:', out.substring(0, 200))
-            fs.writeFileSync(path.join(outDir, 'git_ls_remote.txt'), out)
-          } catch (e) {
-            console.error('git ls-remote failed:', e.message || e)
+        // Optionally try a git-over-HTTPS request using the token
+        if (process.env.CHECK_TOKEN_GIT === 'true') {
+          let projectId = process.env.PROJECT_ID
+
+          // If no PROJECT_ID provided, try server-side creation helper as a fallback
+          if (!projectId) {
+            try {
+              const uid = await page.$eval('meta[name="ol-user_id"]', el => el.getAttribute('content')).catch(() => null)
+              if (uid) {
+                const { execSync } = await import('node:child_process')
+                const script = process.env.CREATE_PROJECT_SCRIPT || '/workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/scripts/e2e/create_project_server.sh'
+                const pname = `playwright-project-${Date.now()}`
+                console.log('Attempting server-side project creation for user', uid)
+                const out = execSync(`${script} ${uid} "${pname}"`, { encoding: 'utf8', stdio: ['ignore','pipe','pipe'] })
+                projectId = out.toString().trim().split('\n').pop()
+                if (projectId) {
+                  try { fs.writeFileSync(path.join(outDir, 'created_project_id.txt'), projectId) } catch (e) {}
+                  console.log('Created project via server helper', projectId)
+                } else {
+                  console.warn('Server helper returned no project id; output:', out.toString())
+                }
+              } else {
+                console.warn('No ol-user_id found; skipping server-side project creation')
+              }
+            } catch (e) {
+              console.error('Server-side project creation failed:', e.message || e)
+            }
+          }
+
+          if (projectId) {
+            console.log('Attempting git ls-remote using created token for project', projectId)
+            const tmpdir = fs.mkdtempSync(path.join('/tmp','playwright-token-'))
+            // Allow overriding GIT_HOST and GIT_PORT to target git-bridge
+            const gitHost = process.env.GIT_HOST || new URL(BASE_URL).hostname
+            const gitPort = process.env.GIT_PORT || new URL(BASE_URL).port || '80'
+            const gitProtocol = process.env.GIT_PROTOCOL || (gitPort === '8000' ? 'http' : 'https')
+            const cmd = `git ls-remote ${gitProtocol}://git:${tokenText}@${gitHost}:${gitPort}/${projectId}.git`
+            try {
+              const { execSync } = await import('node:child_process')
+              const out = execSync(cmd, { cwd: tmpdir, encoding: 'utf8', stdio: ['ignore','pipe','pipe'] })
+              console.log('git ls-remote output:', out.substring(0, 200))
+              fs.writeFileSync(path.join(outDir, 'git_ls_remote.txt'), out)
+            } catch (e) {
+              console.error('git ls-remote failed:', e.message || e)
+            }
+          } else {
+            console.warn('No project id available; skipping git check')
           }
         }
 

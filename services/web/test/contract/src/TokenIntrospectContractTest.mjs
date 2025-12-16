@@ -1,13 +1,14 @@
 import { expect } from 'chai'
-import UserHelper from '../../acceptance/src/helpers/User.mjs'
+import UserHelper from '../../acceptance/src/helpers/UserHelper.mjs'
+import Settings from '@overleaf/settings'
 
 describe('Token introspection contract tests', function () {
   this.timeout(60 * 1000)
 
   it('introspects a valid token and returns shape', async function () {
-    const user = new UserHelper()
-    await user.register()
-    await user.login()
+    const password = 'Password-123!'
+    const user = await UserHelper.createUser({ password })
+    await UserHelper.loginUser({ email: user.email, password })
 
     // create a token
     const { response, body } = await user.doRequest('post', {
@@ -15,11 +16,12 @@ describe('Token introspection contract tests', function () {
       json: { label: 'contract-introspect' },
     })
     expect([200, 201]).to.include(response.statusCode)
-    const token = body && body.plaintext
+    const token = body && (body.plaintext || body.token)
     expect(token).to.be.a('string')
 
-    // introspect the token
-    const introspectRes = await user.doRequest('post', { url: '/internal/api/tokens/introspect', json: { token } })
+    // introspect the token using service-origin/admin auth
+    const [adminUser, adminPass] = Object.entries(Settings.httpAuthUsers)[0]
+    const introspectRes = await user.doRequest('post', { url: '/internal/api/tokens/introspect', json: { token }, auth: { user: adminUser, pass: adminPass, sendImmediately: true }, jar: false })
     expect(introspectRes.response.statusCode).to.equal(200)
     expect(introspectRes.body).to.have.property('active')
     expect(introspectRes.body).to.have.property('userId')
@@ -29,16 +31,16 @@ describe('Token introspection contract tests', function () {
   })
 
   it('returns inactive for revoked token', async function () {
-    const user = new UserHelper()
-    await user.register()
-    await user.login()
+    const password = 'Password-123!'
+    const user = await UserHelper.createUser({ password })
+    await UserHelper.loginUser({ email: user.email, password })
 
     // create token
     const { body } = await user.doRequest('post', {
       url: `/internal/api/users/${user.id}/git-tokens`,
       json: { label: 'contract-introspect-revoke' },
     })
-    const token = body && body.plaintext
+    const token = body && (body.plaintext || body.token)
     expect(token).to.be.a('string')
 
     // revoke via API
@@ -46,8 +48,30 @@ describe('Token introspection contract tests', function () {
     expect([200, 204]).to.include(revokeRes.response.statusCode)
 
     // introspect should be inactive
-    const introspectRes2 = await user.doRequest('post', { url: '/internal/api/tokens/introspect', json: { token } })
+    const [adminUser, adminPass] = Object.entries(Settings.httpAuthUsers)[0]
+    const introspectRes2 = await user.doRequest('post', { url: '/internal/api/tokens/introspect', json: { token }, auth: { user: adminUser, pass: adminPass, sendImmediately: true }, jar: false })
     expect(introspectRes2.response.statusCode).to.equal(200)
     expect(introspectRes2.body && introspectRes2.body.active).to.be.false
+  })
+
+  it('allows service-origin basic auth introspection', async function () {
+    const password = 'Password-123!'
+    const user = await UserHelper.createUser({ password })
+    await UserHelper.loginUser({ email: user.email, password })
+
+    // create token
+    const { body } = await user.doRequest('post', {
+      url: `/internal/api/users/${user.id}/git-tokens`,
+      json: { label: 'service-auth' },
+    })
+    const token = body && (body.plaintext || body.token)
+    expect(token).to.be.a('string')
+
+    const [adminUser, adminPass] = Object.entries(Settings.httpAuthUsers)[0]
+
+    const res = await user.doRequest('post', { url: '/internal/api/tokens/introspect', json: { token }, auth: { user: adminUser, pass: adminPass, sendImmediately: true }, jar: false })
+    expect(res.response.statusCode).to.equal(200)
+    expect(res.body && res.body.active).to.be.true
+    expect(res.body).to.have.property('userId')
   })
 })

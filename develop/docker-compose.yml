@@ -178,6 +178,8 @@ services:
       - GIT_BRIDGE_SSH_ENABLED=true
       - GIT_BRIDGE_SSH_PORT=2222
       - WEB_PROFILE_API_TOKEN=overleaf:overleaf
+      - AUTH_LOCAL_INTROSPECT_URL=http://web:3000/internal/api/tokens/introspect
+      - GIT_BRIDGE_OAUTH2_SERVER=http://web:3000
     ports:
       - "2223:2222"
     volumes:
@@ -196,6 +198,6 @@ services:
       target: webpack
     command: [ "npx", "webpack", "serve", "--config", "webpack.config.dev-env.js" ]
     ports:
-      - "127.0.0.1:80:3808"
+      - "3808:3808"
     volumes:
       - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/develop/webpack.config.dev-env.js:/overleaf/services/web/webpack.config.dev-env.js

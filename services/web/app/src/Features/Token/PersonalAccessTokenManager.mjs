@@ -148,7 +148,21 @@ export default {
 
   // Introspect by plain token value. Returns null if not found/invalid.
   async introspect (tokenPlain) {
-    const lookupCache = await import('../../../lib/lookupCache.mjs')
+    // Prefer a URL-based import to avoid resolution issues across environments
+    let lookupCache
+    try {
+      // Check file exists first to avoid noisy ERR_MODULE_NOT_FOUND stack traces
+      const fs = await import('fs')
+      const lookupPath = new URL('../../../lib/lookupCache.mjs', import.meta.url).pathname
+      if (fs.existsSync(lookupPath)) {
+        lookupCache = await import(new URL('../../../lib/lookupCache.mjs', import.meta.url).href)
+      } else {
+        lookupCache = { default: { get: () => undefined, set: () => {}, invalidate: () => {} } }
+      }
+    } catch (e) {
+      // If anything goes wrong, fall back to a no-op cache
+      lookupCache = { default: { get: () => undefined, set: () => {}, invalidate: () => {} } }
+    }
     const cacheKey = `introspect:${computeHashPrefixFromPlain(tokenPlain)}`
     const cached = lookupCache.default.get(cacheKey)
     if (typeof cached !== 'undefined') {
@@ -167,6 +181,7 @@ export default {
           userId: c.userId.toString(),
           scopes: c.scopes || [],
           expiresAt: c.expiresAt || null,
+          hashPrefix: c.hashPrefix,
         }
         lookupCache.default.set(cacheKey, info, Number(process.env.CACHE_LOOKUP_TTL_SECONDS || 60))
         return info

@@ -7,9 +7,24 @@ const httpAuthPass = 'password'
 const httpAuthUsers = {}
 httpAuthUsers[httpAuthUser] = httpAuthPass
 
-const overleafHost =
-  process.env.V2_URL ||
-  `http://${process.env.HTTP_TEST_HOST || '127.0.0.1'}:23000`
+const overleafHost = (function () {
+  if (process.env.V2_URL) return process.env.V2_URL
+  if (process.env.HTTP_TEST_HOST) return `http://${process.env.HTTP_TEST_HOST}:${process.env.HTTP_TEST_PORT || 3000}`
+  try {
+    const { execSync } = require('child_process')
+    const out = execSync('docker ps --format "{{.Names}} {{.Image}}"', { encoding: 'utf8' })
+    const lines = out.split('\n').map(l => l.trim()).filter(Boolean)
+    for (const line of lines) {
+      const parts = line.split(/\s+/, 2)
+      const name = parts[0]
+      const image = parts[1] || ''
+      if (!name) continue
+      if (/^develop-web(-\d+)?$/i.test(name) || /(^|\/)develop-web$/i.test(image)) return `http://${name}:${process.env.HTTP_TEST_PORT || 3000}`
+      if (/(^|-)web(-|$|\d)/i.test(name)) return `http://${name}:${process.env.HTTP_TEST_PORT || 3000}`
+    }
+  } catch (e) {}
+  throw new Error('HTTP_TEST_HOST not set and no suitable web container detected via docker ps')
+})()
 
 const overrides = {
   appName: 'Overleaf',

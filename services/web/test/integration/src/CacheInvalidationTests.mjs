@@ -1,5 +1,5 @@
 import { expect } from 'chai'
-import UserHelper from '../../acceptance/src/helpers/User.mjs'
+import UserHelper from '../../acceptance/src/helpers/UserHelper.mjs'
 
 describe('Cache invalidation integration test', function () {
   this.timeout(60 * 1000)

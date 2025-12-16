@@ -42,11 +42,33 @@ module.exports = {
       url: process.env.LINKED_URL_PROXY,
     },
 
-    web: {
-      url: 'http://127.0.0.1:23000',
-      user: httpAuthUser,
-      pass: httpAuthPass,
-    },
+    web: (function () {
+      const { execSync } = require('child_process')
+      function detectHost() {
+        if (process.env.HTTP_TEST_HOST) return process.env.HTTP_TEST_HOST
+        try {
+          const out = execSync('docker ps --format "{{.Names}} {{.Image}}"', { encoding: 'utf8' })
+          const lines = out.split('\n').map(l => l.trim()).filter(Boolean)
+          const candidates = []
+          for (const line of lines) {
+            const parts = line.split(/\s+/, 2)
+            const name = parts[0]
+            const image = parts[1] || ''
+            if (!name) continue
+            if (/webpack/i.test(name) || /\brun\b/i.test(name)) continue
+            if (/^develop-web(-\d+)?$/i.test(name) || /(^|\/)develop-web$/i.test(image)) {
+              candidates.push(name)
+              continue
+            }
+            if (/(^|-)web(-|$|\d)/i.test(name)) candidates.push(name)
+          }
+          if (candidates.length > 0) return candidates[0]
+        } catch (e) {}
+        throw new Error('HTTP_TEST_HOST not set and no suitable web container detected via docker ps')
+      }
+      const host = detectHost()
+      return { url: `http://${host}:${process.env.HTTP_TEST_PORT || 3000}`, user: httpAuthUser, pass: httpAuthPass }
+    })(),
 
     haveIBeenPwned: {
       enabled: false,

@@ -62,6 +62,15 @@ export async function introspect(req, res) {
     return res.status(400).json({ message: 'token required' })
   }
 
+  // Debug: log token received for introspection
+  try { console.log('[TokenController.introspect] token=', token) } catch (e) {}
+
+  // Reject obviously malformed tokens (tokens are hex strings)
+  if (!/^[0-9a-f]+$/i.test(token)) {
+    timer.done()
+    return res.status(400).json({ message: 'invalid token format' })
+  }
+
   // rate-limit per service-origin
   try {
     const originKey = ServiceOrigin.originRateKey(req)
@@ -75,16 +84,33 @@ export async function introspect(req, res) {
 
   try {
     const info = await PersonalAccessTokenManager.introspect(token)
+
+    // Debug: log introspect results and origin
+    try { logger.debug({ origin: ServiceOrigin.getServiceOrigin(req), tokenMask: token && token.slice(0,8) + '...', result: info }, 'token.introspect debug') } catch (e) {}
+
     if (info && info.active) {
       try { logger.info({ type: 'token.used', userId: info.userId, scopes: info.scopes, timestamp: new Date().toISOString() }) } catch (e) {}
       metrics.inc('token.introspect.hit', 1)
     } else {
       metrics.inc('token.introspect.miss', 1)
     }
+
+    // Record audit entry for token introspect so retention/PII test can find it
+    try {
+      const UserAuditLogHandler = (await import('../User/UserAuditLogHandler.mjs')).default
+      const entryInfo = { scopes: info?.scopes || [], outcome: info?.active ? 'success' : 'failure', resourceId: info?.hashPrefix }
+      // allow null initiatorId (service-origin) — handler updated to accept token.introspect without initiator
+      await UserAuditLogHandler.promises.addEntry(info && info.userId ? info.userId : null, 'token.introspect', null, req.ip, entryInfo)
+    } catch (e) {
+      try { logger.err({ err: e }, 'failed to write token.introspect audit entry') } catch (e2) {}
+    }
+
     timer.done()
     return res.status(200).json(info)
   } catch (err) {
-    logger.err({ err }, 'error introspecting token')
+    logger.err({ err, stack: err && err.stack }, 'error introspecting token')
+    // Ensure error visible in test logs
+    try { console.error(err && (err.stack || err)) } catch (e) {}
     metrics.inc('token.introspect.error', 1)
     timer.done()
     return res.sendStatus(500)

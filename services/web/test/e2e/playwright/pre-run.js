@@ -35,10 +35,19 @@ async function main() {
   const recommended = 'http://develop-webpack-1:3808'
   const baseUrl = process.env.BASE_URL
 
+  // Strict block: do not allow localhost or 127.* for any tests — these hosts don't work inside the dev compose network
+  if (baseUrl && /localhost|127\.0\.0\.1/.test(baseUrl.toLowerCase())) {
+    console.error('\nERROR: BASE_URL contains a forbidden host (localhost/127.0.0.1).')
+    console.error('Tests must point to the dev compose webpack host on the docker network, e.g. http://develop-webpack-1:3808')
+    process.exit(2)
+  }
+
   function baseUrlOk(url) {
     if (!url) return false
     const u = url.toLowerCase()
-    // Only allow develop-* hostnames or docker network IPs; block localhost/127.* because they do not work inside the dev container network
+    // Explicitly block localhost and 127.* — tests must use the dev compose host (e.g. develop-webpack-1:3808)
+    if (u.includes('localhost') || u.includes('127.0.0.1')) return false
+    // Only allow develop-* hostnames or docker network IPs
     if (u.includes('develop-') || u.includes('develop_web') || u.includes('develop-webpack')) return true
     // allow typical docker network private IPs (172.x.x.x, 10.x.x.x, 192.168.x.x)
     if (/https?:\/\/(172\.|10\.|192\.168\.)/.test(u)) return true

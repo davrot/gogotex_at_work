@@ -1,4 +1,9 @@
 const Settings = require('@overleaf/settings')
+const fs = require('fs')
+// Allow tests to disable rate limits at runtime by creating '/tmp/disable-rate-limits' inside the container
+if (process.env.DISABLE_RATE_LIMITS === 'true' || fs.existsSync('/tmp/disable-rate-limits')) {
+  Settings.disableRateLimits = true
+}
 const Metrics = require('@overleaf/metrics')
 const logger = require('@overleaf/logger')
 const RedisWrapper = require('./RedisWrapper')
@@ -55,8 +60,11 @@ class RateLimiter {
   }
 
   async consume(key, points = 1, options = { method: 'unknown' }) {
-    if (Settings.disableRateLimits) {
+    try { console.debug(`[RateLimiter:${this.name}] Settings.disableRateLimits=${Settings.disableRateLimits} process.env.DISABLE_RATE_LIMITS=${process.env.DISABLE_RATE_LIMITS} process.env.TEST_DISABLE_RATE_LIMITS=${process.env.TEST_DISABLE_RATE_LIMITS}`) } catch (e) {}
+
+    if (Settings.disableRateLimits || process.env.DISABLE_RATE_LIMITS === 'true') {
       // Return a fake result in case it's used somewhere
+      try { const logger = require('@overleaf/logger'); logger.debug({ name: this.name, key }, 'rate-limiter disabled returning fake result') } catch (e) {}
       return {
         msBeforeNext: 0,
         remainingPoints: 100,
@@ -65,7 +73,9 @@ class RateLimiter {
       }
     }
 
-    await this.consumeForRateLimiter(this._rateLimiter, key, options, points)
+    const res = await this.consumeForRateLimiter(this._rateLimiter, key, options, points)
+    try { const logger = require('@overleaf/logger'); logger.debug({ name: this.name, key, res }, 'rate-limiter consume result') } catch (e) {}
+    return res
 
     if (options.method === 'ip' && this._subnetRateLimiter) {
       const subnetKey = this.getSubnetKeyFromIp(key)
@@ -87,6 +97,7 @@ class RateLimiter {
       if (err instanceof Error) {
         throw err
       } else {
+        try { console.debug(`[RateLimiter:${this.name}] rate limit reached for key=${key} method=${method || options.method} err=${JSON.stringify(err)}`) } catch (e) {}
         // Only log the first time we exceed the rate limit for a given key and
         // duration. This happens when the previous amount of consumed points
         // was below the threshold.

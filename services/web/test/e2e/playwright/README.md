@@ -13,13 +13,15 @@ npx playwright install
 npx playwright install-deps
 ```
 
-- If you need help starting the dev services see `develop/README.md` for the local dev setup and `http://localhost/launchpad` to create the first admin account.
+- If you need help starting the dev services see `develop/README.md` for the local dev setup and `http://develop-webpack-1:3808/launchpad` to create the first admin account.
 
 Run
 
 ```bash
 # from repo root
-BASE_URL=http://127.0.0.1:13000 npm run e2e:playwright
+BASE_URL=http://develop-webpack-1:3808 npm run e2e:playwright
+
+Note: 127.0.0.1 and localhost are intentionally blocked for e2e tests — point `BASE_URL` at the dev compose webpack host (e.g. `http://develop-webpack-1:3808`).
 ```
 
 Pre-run reminder
