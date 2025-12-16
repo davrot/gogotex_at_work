@@ -24,8 +24,31 @@ function createClient(opts) {
   const standardOpts = Object.assign({}, opts)
   delete standardOpts.key_schema
 
+  // Ensure a reasonable host is set: prefer an explicit env var, then use
+  // the docker service name during test runs, and finally fall back to localhost.
+  if (!standardOpts.host) {
+    standardOpts.host = process.env.REDIS_HOST || (process.env.NODE_ENV === 'test' ? 'redis' : '127.0.0.1')
+  }
+
+  // Defensive override: if a caller explicitly provided '127.0.0.1' via settings
+  // but REDIS_HOST was not set, and we're running in a dockerized test environment,
+  // prefer connecting to the 'redis' service name so tests connect to containerized
+  // Redis instead of local host. This helps when module imports happen before
+  // test bootstrap sets env vars.
+  if (!process.env.REDIS_HOST && standardOpts.host === '127.0.0.1') {
+    try { standardOpts.host = 'redis' } catch (e) {}
+  }
+
   if (standardOpts.retry_max_delay == null) {
     standardOpts.retry_max_delay = 5000 // ms
+  }
+
+  // Avoid eager connection attempts during module import by defaulting to lazyConnect.
+  // This prevents clients from immediately trying to connect to the network (and
+  // producing ECONNREFUSED) before test bootstrap/env vars are applied. Callers can
+  // override by explicitly passing lazyConnect:false if they need immediate connection.
+  if (standardOpts.lazyConnect == null) {
+    standardOpts.lazyConnect = true
   }
 
   if (standardOpts.endpoints) {
@@ -42,11 +65,21 @@ function createClient(opts) {
     client = new Redis(standardOpts)
   }
   monkeyPatchIoRedisExec(client)
+  // Capture a stack trace at creation so we can identify the caller later.
+  try {
+    const creationStack = (new Error('redis-client-created')).stack
+    client._creationStack = creationStack
+    try { fs.appendFileSync('/tmp/redis_clients.log', JSON.stringify({ t: new Date().toISOString(), event: 'created', options: standardOpts || null, creationStack: creationStack }) + '\n') } catch (e) {}
+  } catch (e) {}
+
   // defensive: prevent unhandled 'error' events from bubbling up
   // ioredis will emit 'error' if it cannot connect (e.g., ECONNREFUSED)
   client.on('error', err => {
     try {
-      console.error('[redis-wrapper] ioredis error:', err && err.stack ? err.stack : err)
+      const errStack = (err && err.stack) ? err.stack : String(err)
+      const logObj = { t: new Date().toISOString(), event: 'error', options: client.options || null, err: errStack, creationStack: client._creationStack || null }
+      try { fs.appendFileSync('/tmp/redis_clients.log', JSON.stringify(logObj) + '\n') } catch (e) {}
+      console.error('[redis-wrapper] ioredis error:', errStack, 'client.options=', client.options || null, 'creationStack=', client._creationStack || null)
     } catch (e) {
       // swallow any logging errors to avoid cascading failures
     }

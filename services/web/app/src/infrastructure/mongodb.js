@@ -22,10 +22,55 @@ const READ_PREFERENCE_SECONDARY = Settings.mongo.hasSecondaries
   ? ReadPreference.secondary.mode
   : ReadPreference.secondaryPreferred.mode
 
+// Defensive: normalize host in the Mongo URL to prefer the docker 'mongo' service
+// when running tests or when MONGO_HOST is set. This helps avoid immediate
+// connection attempts to 127.0.0.1 when modules are imported before test
+// bootstrap can set env vars.
+let mongoUrl = Settings.mongo.url
+let mongoClientCreationStack = null
+try {
+  // capture creation stack so we can trace who created the client
+  mongoClientCreationStack = new Error().stack
+  try {
+    const parsed = new URL(mongoUrl)
+    if (parsed.hostname === '127.0.0.1') {
+      if (process.env.MONGO_HOST) {
+        parsed.hostname = process.env.MONGO_HOST
+      } else if (process.env.NODE_ENV === 'test') {
+        parsed.hostname = 'mongo'
+      }
+      mongoUrl = parsed.toString()
+    }
+  } catch (e) {
+    // url parsing failed; fallback to string replace for quick fix
+    if (String(mongoUrl).includes('127.0.0.1')) {
+      if (process.env.MONGO_HOST) mongoUrl = String(mongoUrl).replace('127.0.0.1', process.env.MONGO_HOST)
+      else if (process.env.NODE_ENV === 'test') mongoUrl = String(mongoUrl).replace('127.0.0.1', 'mongo')
+    }
+  }
+} catch (e) {}
+// Persist creation info for triage
+try { fs.appendFileSync('/tmp/mongo_clients.log', JSON.stringify({ t: new Date().toISOString(), event: 'created', mongoUrl, creationStack: mongoClientCreationStack }) + '\n') } catch (e) {}
+
 const mongoClient = new mongodb.MongoClient(
-  Settings.mongo.url,
+  mongoUrl,
   Settings.mongo.options
 )
+
+// Log errors on the underlying driver and capture connection failures with
+// stack traces so we can find the importer or module that triggered the
+// connection attempt.
+try {
+  mongoClient.on && mongoClient.on('error', err => {
+    try { fs.appendFileSync('/tmp/mongo_connect_errors.log', JSON.stringify({ t: new Date().toISOString(), event: 'driver_error', err: (err && err.stack) ? err.stack : String(err), mongoUrl, envHost: process.env.MONGO_HOST || null, creationStack: mongoClientCreationStack }) + '\n') } catch (e) {}
+  })
+} catch (e) {}
+
+const connectionPromise = mongoClient.connect().catch(err => {
+  try { fs.appendFileSync('/tmp/mongo_connect_errors.log', JSON.stringify({ t: new Date().toISOString(), event: 'connect_reject', err: (err && err.stack) ? err.stack : String(err), mongoUrl, envHost: process.env.MONGO_HOST || null, creationStack: mongoClientCreationStack }) + '\n') } catch (e) {}
+  // rethrow to allow callers to observe the rejection
+  throw err
+})
 
 addConnectionDrainer('mongodb', async () => {
   await mongoClient.close()

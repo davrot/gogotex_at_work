@@ -90,11 +90,28 @@ try {
     console.debug('[bootstrap] Settings.httpAuthUsers:', Object.keys(Settings.httpAuthUsers))
   } catch (e) {}
 
-  // Debug: show which Redis host envs are configured for tests
+  // Ensure tests running inside the docker/dev environment default to the
+  // Redis service name used by docker-compose when REDIS_HOST isn't set.
+  if (!process.env.REDIS_HOST) {
+    process.env.REDIS_HOST = 'redis'
+    // eslint-disable-next-line no-console
+    console.debug('[bootstrap] defaulted REDIS_HOST to redis')
+  }
+
+  // Ensure tests running inside the docker/dev environment default to the
+  // Mongo service name used by docker-compose when MONGO_HOST isn't set.
+  if (!process.env.MONGO_HOST) {
+    process.env.MONGO_HOST = 'mongo'
+    // eslint-disable-next-line no-console
+    console.debug('[bootstrap] defaulted MONGO_HOST to mongo')
+  }
+
+  // Debug: show which Redis/Mongo host envs are configured for tests
   try {
     // eslint-disable-next-line no-console
-    console.debug('[bootstrap] REDIS_HOSTs:', {
+    console.debug('[bootstrap] REDIS/MONGO HOSTs:', {
       REDIS_HOST: process.env.REDIS_HOST || undefined,
+      MONGO_HOST: process.env.MONGO_HOST || undefined,
       RATELIMITER_REDIS_HOST: process.env.RATELIMITER_REDIS_HOST || undefined,
       QUEUES_REDIS_HOST: process.env.QUEUES_REDIS_HOST || undefined,
     })
