@@ -12,9 +12,9 @@ import { fileURLToPath } from 'node:url'
 import { Cookie } from 'tough-cookie'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
-const COOKIE_DOMAIN = (settings.cookieDomain || 'web').toString()
+const COOKIE_DOMAIN = (settings?.cookieDomain || 'web').toString()
 // The cookie domain has a leading '.' but the cookie jar stores it without.
-const DEFAULT_COOKIE_URL = `https://${(COOKIE_DOMAIN || 'web').replace(/^\./, '')}/`
+const DEFAULT_COOKIE_URL = `https://${String(COOKIE_DOMAIN || 'web').replace(/^\./, '')}/`
 
 let count = settings.test?.counterInit ?? 0
 
