@@ -17,6 +17,12 @@ Then start the services:
 bin/up
 ```
 
+To make sure test runs use rebuilt images when necessary, run the helper before running a test suite (the helper runs `bin/build` and recreates any services whose images changed):
+
+```shell
+bin/ensure_rebuilt_before_tests
+```
+
 Once the services are running, open <http://localhost/launchpad> to create the first admin account.
 
 ## TeX Live
