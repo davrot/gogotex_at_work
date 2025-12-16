@@ -11,6 +11,7 @@ import uk.ac.ic.wlgitbridge.snapshot.base.ForbiddenException;
 import uk.ac.ic.wlgitbridge.snapshot.base.MissingRepositoryException;
 import uk.ac.ic.wlgitbridge.snapshot.exception.FailedConnectionException;
 import uk.ac.ic.wlgitbridge.snapshot.getdoc.GetDocResult;
+import uk.ac.ic.wlgitbridge.util.Log;
 import uk.ac.ic.wlgitbridge.snapshot.getforversion.GetForVersionResult;
 import uk.ac.ic.wlgitbridge.snapshot.getforversion.SnapshotData;
 import uk.ac.ic.wlgitbridge.snapshot.getsavedvers.GetSavedVersResult;
@@ -44,6 +45,7 @@ public class SnapshotApiFacade {
     try {
       GetDocResult doc = SnapshotApi.getResult(api.getDoc(oauth2, projectName));
       doc.getVersionID();
+      Log.info("SnapshotApiFacade.getDoc: project={}, version={}", projectName, doc.getVersionID());
       return Optional.of(doc);
     } catch (InvalidProjectException e) {
       return Optional.empty();

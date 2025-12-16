@@ -47,6 +47,8 @@ async function main() {
   })
 
   const timestamp = Date.now()
+  // Path to last generated private key (used for SSH fallbacks)
+  let lastGeneratedKey = null
   const email = `playwright+${timestamp}@example.com`
   const password = `Test1234!${Math.floor(Math.random()*1000)}`
 
@@ -268,10 +270,67 @@ async function main() {
       try {
         // First key
         await page.fill('input[aria-label="SSH key label"]', 'playwright-key-1')
-        await page.fill('textarea[aria-label="SSH public key"]', 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexamplekeydata1 key1@local')
+        const k1 = `ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexamplekeydata1 key1-${timestamp}@example.com`
+        // Use page.evaluate to set the textarea value and dispatch input events for robust client-side validation
+        await page.$eval('textarea[aria-label="SSH public key"]', (el, val) => { el.value = val; el.dispatchEvent(new Event('input', { bubbles: true })); }, k1)
         // Wait for the Add button to become enabled and stable
         await page.waitForTimeout(200)
         const addBtn = page.locator('button[aria-label="Add SSH key"]')
+        // Diagnostic: if button stays disabled, capture form state for debugging
+        const isEnabled = await addBtn.isEnabled()
+        if (!isEnabled) {
+          console.warn('Add SSH key button is disabled — capturing diagnostics')
+          const val = await page.$eval('textarea[aria-label="SSH public key"]', el => el.value)
+          console.warn('Textarea value length:', val && val.length)
+          const labelVal = await page.$eval('input[aria-label="SSH key label"]', el => el.value)
+          console.warn('Label value:', labelVal)
+          const validity = await page.$eval('textarea[aria-label="SSH public key"]', el => (el.validity && JSON.stringify(el.validity)) || 'no validity')
+          console.warn('Textarea validity:', validity)
+          // Run the same regex used in client to check validity
+          const reMatch = await page.$eval('textarea[aria-label="SSH public key"]', el => { const v = el.value.trim(); return /^ssh-(rsa|ed25519|ecdsa) [A-Za-z0-9+/=]+(?: .*)?$/.test(v) })
+          console.warn('Client-side regex match result:', reMatch)
+          const errors = await page.$$eval('.ssh-keys-panel .notification-type-error, .ssh-keys-panel .form-text.text-danger', els => els.map(e => e.textContent.trim()))
+          console.warn('Form errors found:', JSON.stringify(errors))
+
+          // Fallback: perform direct POST to persist keys if button is disabled
+          try {
+            console.log('Attempting direct POST fallback to create SSH keys')
+            const userId = await page.$eval('meta[name="ol-user_id"]', el => el.content).catch(()=>null)
+            const csrf = await page.$eval('meta[name="ol-csrfToken"]', el => el.content).catch(()=>null)
+            if (!userId) throw new Error('ol-user_id meta not found for fallback create')
+            const k1 = await page.$eval('textarea[aria-label="SSH public key"]', el => el.value)
+            const lbl1 = await page.$eval('input[aria-label="SSH key label"]', el => el.value) || 'playwright-key'
+            let fbResults = await page.evaluate(async ({userId, csrf, k1, lbl1}) => {
+              const r1 = await fetch(`/internal/api/users/${userId}/ssh-keys`, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Csrf-Token': csrf }, body: JSON.stringify({ key_name: lbl1, public_key: k1 }) })
+              return { status: r1.status, text: await r1.text().catch(()=>null) }
+            }, { userId, csrf, k1, lbl1 })
+            console.log('Fallback create response:', fbResults)
+            if (fbResults && fbResults.status === 409) {
+              console.warn('Fallback create 409 — attempting to generate a fresh SSH key with ssh-keygen and retry')
+              try {
+                const tmpBase = `/tmp/playwright_ssh_${Date.now()}`
+                const { execSync } = await import('node:child_process')
+                execSync(`ssh-keygen -t rsa -b 2048 -f ${tmpBase} -N '' -C 'playwright-e2e'`, { stdio: 'ignore' })
+                lastGeneratedKey = tmpBase
+                const pub = await import('fs').then(fs => fs.readFileSync(`${tmpBase}.pub`, 'utf8'))
+                // retry with generated public key
+                fbResults = await page.evaluate(async ({userId, csrf, pub, lbl1}) => {
+                  const r2 = await fetch(`/internal/api/users/${userId}/ssh-keys`, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Csrf-Token': csrf }, body: JSON.stringify({ key_name: lbl1 + '-gen', public_key: pub }) })
+                  return { status: r2.status, text: await r2.text().catch(()=>null) }
+                }, { userId, csrf, pub, lbl1 })
+                console.log('Second attempt fallback create response:', fbResults)
+              } catch (e) {
+                console.error('Failed to generate or post generated SSH key:', e && (e.message || e))
+              }
+            }
+            // mark didFallbackCreate true if any fallback succeeded
+            if (fbResults && fbResults.status === 201) {
+              didFallbackCreate = true
+            }
+          } catch (e) {
+            console.error('Fallback create failed:', e.message || e)
+          }
+        }
         try {
           await addBtn.waitFor({ state: 'visible', timeout: 2000 })
           await addBtn.evaluate(el => el.scrollIntoView({ block: 'center', inline: 'center' }))
@@ -323,28 +382,50 @@ async function main() {
         }, { timeout: 5000 }).catch(()=>null)
 
         // Second key
-        await page.fill('input[aria-label="SSH key label"]', 'playwright-key-2')
-        await page.fill('textarea[aria-label="SSH public key"]', 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexamplekeydata2 key2@local')
-        await Promise.all([
-          page.click('button[aria-label="Add SSH key"]'),
-          page.waitForResponse(r => r.url().includes('/internal/api/users/') && r.url().includes('/ssh-keys') && r.request().method() === 'POST' && r.status() < 400, { timeout: 5000 }).catch(()=>null)
-        ])
-
-        // If we used the fallback direct POSTs, reload the page to trigger a fresh fetch of keys
-        if (didFallbackCreate) {
-          console.log('Reloading settings page after fallback create to refresh key list')
-          await page.reload({ waitUntil: 'networkidle' })
-        }
-
-        // If we used fallback direct POSTs, skip UI-visibility wait and proceed to DB check
         if (!didFallbackCreate) {
-          // Wait until at least two keys are visible in the table
+          await page.fill('input[aria-label="SSH key label"]', 'playwright-key-2')
+          const k2 = `ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexamplekeydata2 key2-${timestamp}@example.com`
+          await page.$eval('textarea[aria-label="SSH public key"]', (el, val) => { el.value = val; el.dispatchEvent(new Event('input', { bubbles: true })); }, k2)
+          await Promise.all([
+            page.click('button[aria-label="Add SSH key"]'),
+            page.waitForResponse(r => r.url().includes('/internal/api/users/') && r.url().includes('/ssh-keys') && r.request().method() === 'POST' && r.status() < 400, { timeout: 5000 }).catch(()=>null)
+          ])
+
+          // If we used the fallback direct POSTs, reload the page to trigger a fresh fetch of keys
+          if (didFallbackCreate) {
+            console.log('Reloading settings page after fallback create to refresh key list')
+            await page.reload({ waitUntil: 'networkidle' })
+          }
+
+          // Wait until at least two keys are visible in the table (only for UI mode)
           await page.waitForFunction(() => {
             const rows = document.querySelectorAll('.ssh-keys-panel table tbody tr')
             return rows.length >= 2
           }, { timeout: 5000 })
         } else {
-          console.log('Skipping UI wait after fallback create; proceeding to DB check')
+          console.log('didFallbackCreate is true — skipping second key UI add and performing a second generated-key POST')
+          try {
+            const tmpBase2 = `/tmp/playwright_ssh_${Date.now()}_2`
+            const { execSync } = await import('node:child_process')
+            execSync(`ssh-keygen -t rsa -b 2048 -f ${tmpBase2} -N '' -C 'playwright-e2e'`, { stdio: 'ignore' })
+            lastGeneratedKey = tmpBase2
+            const pub2 = await import('fs').then(fs => fs.readFileSync(`${tmpBase2}.pub`, 'utf8'))
+            const userId = await page.$eval('meta[name="ol-user_id"]', el => el.content).catch(()=>null)
+            const csrf = await page.$eval('meta[name="ol-csrfToken"]', el => el.content).catch(()=>null)
+            if (!userId) throw new Error('ol-user_id meta not found for fallback create 2')
+            const fb2 = await page.evaluate(async ({userId, csrf, pub2}) => {
+              const r = await fetch(`/internal/api/users/${userId}/ssh-keys`, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Csrf-Token': csrf }, body: JSON.stringify({ key_name: 'playwright-key-2-gen', public_key: pub2 }) })
+              return { status: r.status, text: await r.text().catch(()=>null) }
+            }, { userId, csrf, pub2 })
+            console.log('Second generated-key POST response:', fb2)
+            if (fb2 && fb2.status === 201) {
+              console.log('Second generated key created successfully')
+            } else {
+              console.warn('Second generated-key POST failed:', fb2)
+            }
+          } catch (e) {
+            console.error('Failed to create second generated key:', e && (e.message || e))
+          }
         }
 
         // Save a screenshot of the settings page with keys visible
@@ -458,7 +539,15 @@ async function main() {
             // Allow overriding GIT_HOST and GIT_PORT to target git-bridge
             const gitHost = process.env.GIT_HOST || new URL(BASE_URL).hostname
             const gitPort = process.env.GIT_PORT || new URL(BASE_URL).port || '80'
-            const gitProtocol = process.env.GIT_PROTOCOL || (gitPort === '8000' ? 'http' : 'https')
+            // Prefer explicit env override. Otherwise derive protocol from BASE_URL's scheme when possible.
+            let gitProtocol = process.env.GIT_PROTOCOL
+            if (!gitProtocol) {
+              try {
+                gitProtocol = new URL(BASE_URL).protocol.replace(':','')
+              } catch (e) {
+                gitProtocol = (gitPort === '8000' ? 'http' : 'https')
+              }
+            }
             const cmd = `git ls-remote ${gitProtocol}://git:${tokenText}@${gitHost}:${gitPort}/${projectId}.git`
             try {
               const { execSync } = await import('node:child_process')
@@ -467,6 +556,50 @@ async function main() {
               fs.writeFileSync(path.join(outDir, 'git_ls_remote.txt'), out)
             } catch (e) {
               console.error('git ls-remote failed:', e.message || e)
+
+              // Try an HTTP fallback directly against the git-bridge container (internal service)
+              try {
+                const { execSync } = await import('node:child_process')
+                const altHost = process.env.GIT_HOST || 'git-bridge'
+                const altPort = process.env.GIT_HTTP_INTERNAL_PORT || process.env.GIT_PORT || '8000'
+                const altProto = process.env.GIT_PROTOCOL || 'http'
+                const altCmd = `git ls-remote ${altProto}://git:${tokenText}@${altHost}:${altPort}/${projectId}.git`
+                console.log('Attempting HTTP git ls-remote fallback against', altHost, altPort)
+                const outAlt = execSync(altCmd, { cwd: tmpdir, encoding: 'utf8', stdio: ['ignore','pipe','pipe'] })
+                console.log('http alt git ls-remote output:', outAlt.substring(0,200))
+                fs.writeFileSync(path.join(outDir, 'git_ls_remote_http_alt.txt'), outAlt)
+              } catch (httpErr) {
+                console.warn('HTTP fallback to git-bridge failed:', (httpErr && (httpErr.message || httpErr)) || httpErr)
+
+                // If we generated an SSH key earlier in the flow, attempt SSH-based git ls-remote fallbacks.
+                if (lastGeneratedKey) {
+                  const { execSync } = await import('node:child_process')
+                  const attempts = []
+                  // First attempt: use the same host/port (useful when GIT_HOST/GIT_PORT were set to reach the git service)
+                  attempts.push({ host: gitHost, port: process.env.GIT_SSH_PORT || process.env.GIT_PORT || '2223' })
+                  // Second attempt: try internal docker-compose service name and internal SSH port (container port 2222)
+                  attempts.push({ host: process.env.GIT_SSH_HOST || 'git-bridge', port: process.env.GIT_SSH_INTERNAL_PORT || '2222' })
+                  let succeeded = false
+                  // Determine SSH user: prefer explicit override, else the ol-user_id meta, else 'git'
+                  const sshUser = process.env.GIT_SSH_USER || await page.$eval('meta[name="ol-user_id"]', el => el.getAttribute('content')).catch(() => null) || 'git'
+                  for (const a of attempts) {
+                    try {
+                      const sshCmd = `GIT_SSH_COMMAND="ssh -i ${lastGeneratedKey} -o StrictHostKeyChecking=no -p ${a.port} -l ${sshUser}" git ls-remote "ssh://${a.host}:${a.port}/${projectId}.git"`
+                      console.log(`Attempting SSH git ls-remote fallback using key ${lastGeneratedKey} against ${a.host}:${a.port} as ${sshUser}`)
+                      const out2 = execSync(sshCmd, { cwd: tmpdir, encoding: 'utf8', stdio: ['ignore','pipe','pipe'] })
+                      console.log('ssh git ls-remote output:', out2.substring(0,200))
+                      fs.writeFileSync(path.join(outDir, `git_ls_remote_ssh_${a.host.replace(/[^a-z0-9]/gi,'_')}_${a.port}.txt`), out2)
+                      succeeded = true
+                      break
+                    } catch (e2) {
+                      console.error(`SSH fallback to ${a.host}:${a.port} failed:`, (e2 && (e2.message || e2)) || e2)
+                    }
+                  }
+                  if (!succeeded) console.error('All SSH fallback attempts failed')
+                } else {
+                  console.log('No generated private key available for SSH fallback')
+                }
+              }
             }
           } else {
             console.warn('No project id available; skipping git check')

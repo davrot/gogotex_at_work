@@ -51,8 +51,20 @@ public class SnapshotData implements JSONSource {
 
   @Override
   public void fromJSON(JsonElement json) {
-    populateSrcs(json.getAsJsonObject().get(JSON_KEY_SRCS).getAsJsonArray());
-    populateAtts(json.getAsJsonObject().get(JSON_KEY_ATTS).getAsJsonArray());
+    JsonObject obj = json.getAsJsonObject();
+    if (obj.has(JSON_KEY_SRCS) && obj.get(JSON_KEY_SRCS) != null && obj.get(JSON_KEY_SRCS).isJsonArray()) {
+      populateSrcs(obj.get(JSON_KEY_SRCS).getAsJsonArray());
+    } else {
+      // No sources -> empty list
+      srcs = new ArrayList<>();
+    }
+
+    if (obj.has(JSON_KEY_ATTS) && obj.get(JSON_KEY_ATTS) != null && obj.get(JSON_KEY_ATTS).isJsonArray()) {
+      populateAtts(obj.get(JSON_KEY_ATTS).getAsJsonArray());
+    } else {
+      // No attachments -> empty list
+      atts = new ArrayList<>();
+    }
   }
 
   private void populateSrcs(JsonArray jsonArray) {

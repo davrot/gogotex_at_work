@@ -1,4 +1,11 @@
-const mongoose = require('../infrastructure/Mongoose')
+let mongoose
+try {
+  mongoose = require('../infrastructure/Mongoose')
+} catch (e) {
+  // In tests or minimal environments, fall back to a no-op mongoose that won't try to
+  // connect to a real database or access settings.
+  mongoose = { models: {}, model: () => ({}), Schema: class { constructor() {} } }
+}
 const { Schema } = mongoose
 
 const UserSSHKeySchema = new Schema(

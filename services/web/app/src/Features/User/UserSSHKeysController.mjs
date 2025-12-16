@@ -10,6 +10,10 @@ import fs from 'node:fs'
 import logger from '@overleaf/logger'
 // Fallback no-op cache when app/lib/lookupCache.mjs is not present in this runtime
 const lookupCache = { get: () => undefined, set: () => {}, invalidate: () => {} }
+// Testing hook: allow tests to inject a mocked lookupCache directly
+let _testLookupCache = null
+export function __setLookupCacheForTest(mock) { _testLookupCache = mock }
+export function __resetLookupCacheForTest() { _testLookupCache = null }
 import SessionManager from '../Authentication/SessionManager.mjs'
 import AdminAuthorizationHelper from '../Helpers/AdminAuthorizationHelper.mjs'
 
@@ -263,8 +267,17 @@ export async function create(req, res) {
       // ignore and continue without user metadata
     }
 
-    // set cache
-    try { lookupCache.set(doc.fingerprint, { userId: doc.userId }, Number(process.env.CACHE_LOOKUP_TTL_SECONDS || 60)) } catch (e) {}
+    // set cache (dynamically import so tests can mock the module)
+    try {
+      try {
+        const lcModule = await import(new URL('../../../lib/lookupCache.mjs', import.meta.url).href)
+        const lc = (lcModule && lcModule.default) || lcModule
+        const effectiveLc = _testLookupCache || lc
+        effectiveLc && effectiveLc.set && effectiveLc.set(doc.fingerprint, { userId: doc.userId }, Number(process.env.CACHE_LOOKUP_TTL_SECONDS || 60))
+      } catch (e) {
+        // fall back to no-op if module not available
+      }
+    } catch (e) {}
 
     try { logger.info({ type: 'sshkey.added', userId, keyId: String(doc._id), fingerprint: doc.fingerprint, timestamp: new Date().toISOString() }) } catch (e) {}
     return res.status(201).json({
@@ -353,10 +366,19 @@ export async function remove(req, res) {
       return res.sendStatus(404)
     }
 
-    // invalidate cache for fingerprint/reference
+    // invalidate cache for fingerprint/reference (dynamically import cache so tests can mock it)
     try {
       console.error('DEBUG invalidating cache for fingerprint', r && r.fingerprint)
-      try { lookupCache.invalidate(r.fingerprint || r.fingerprint) } catch (e) { console.error('DEBUG cache invalidate error', e && e.stack ? e.stack : e) }
+      try {
+        try {
+          const lcModule = await import(new URL('../../../lib/lookupCache.mjs', import.meta.url).href)
+          const lc = (lcModule && lcModule.default) || lcModule
+          const effectiveLc = _testLookupCache || lc
+          effectiveLc && effectiveLc.invalidate && effectiveLc.invalidate(r.fingerprint || '')
+        } catch (e) {
+          // if the module isn't available, swallow the error
+        }
+      } catch (e) { console.error('DEBUG cache invalidate error', e && e.stack ? e.stack : e) }
       console.error('DEBUG invalidated cache')
     } catch (e) {
       console.error('DEBUG cache invalidate error', e && e.stack ? e.stack : e)

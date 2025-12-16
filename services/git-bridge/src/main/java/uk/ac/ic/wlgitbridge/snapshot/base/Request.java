@@ -11,6 +11,7 @@ import java.util.concurrent.*;
 import javax.servlet.http.HttpServletResponse;
 import org.asynchttpclient.AsyncHttpClient;
 import uk.ac.ic.wlgitbridge.snapshot.exception.FailedConnectionException;
+import uk.ac.ic.wlgitbridge.snapshot.getdoc.exception.InvalidProjectException;
 import uk.ac.ic.wlgitbridge.util.Instance;
 import uk.ac.ic.wlgitbridge.util.Log;
 
@@ -63,8 +64,19 @@ public abstract class Request<T extends Result> {
           response.getStatusCode(),
           response.getStatusMessage(),
           response.getHeaders().getContentLength());
-      JsonElement json = Instance.gson.fromJson(response.parseAsString(), JsonElement.class);
-      return parseResponse(json);
+      String body = response.parseAsString();
+      try {
+        JsonElement json = Instance.gson.fromJson(body, JsonElement.class);
+        try {
+          return parseResponse(json);
+        } catch (com.google.gson.JsonSyntaxException jse) {
+          Log.warn("Failed to parse JSON response body for {}: body={}", url, body);
+          throw jse;
+        }
+      } catch (com.google.gson.JsonSyntaxException jse) {
+        Log.warn("Failed to parse JSON from {}: body={}", url, body);
+        throw jse;
+      }
     } catch (InterruptedException e) {
       throw new FailedConnectionException();
     } catch (ExecutionException e) {
@@ -102,7 +114,8 @@ public abstract class Request<T extends Result> {
             }
           } catch (IllegalStateException
               | ClassCastException
-              | NullPointerException _e) { // json parse errors
+              | NullPointerException
+              | com.google.gson.JsonSyntaxException _e) { // json parse errors
             throw new MissingRepositoryException(Arrays.asList("Conflict: 409"));
           }
         } else if (sc == HttpServletResponse.SC_NOT_FOUND) { // 404
@@ -129,11 +142,13 @@ public abstract class Request<T extends Result> {
               throw new MissingRepositoryException(
                   MissingRepositoryException.buildDeprecatedMessage(newUrl));
             }
-          } catch (IllegalStateException | ClassCastException | NullPointerException ex) {
+          } catch (IllegalStateException | ClassCastException | NullPointerException | com.google.gson.JsonSyntaxException ex) {
             // disregard any errors that arose while handling the JSON
           }
 
-          throw new MissingRepositoryException();
+          JsonObject fake = new JsonObject();
+          fake.addProperty("status", HttpServletResponse.SC_NOT_FOUND);
+          return parseResponse(fake);
         } else if (sc >= 400 && sc < 500) {
           throw new MissingRepositoryException(MissingRepositoryException.GENERIC_REASON);
         }

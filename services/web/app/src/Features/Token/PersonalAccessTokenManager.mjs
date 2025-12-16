@@ -174,7 +174,8 @@ export default {
       lookupCache = { default: { get: () => undefined, set: () => {}, invalidate: () => {} } }
     }
     const cacheKey = `introspect:${computeHashPrefixFromPlain(tokenPlain)}`
-    const cached = lookupCache.default.get(cacheKey)
+    const _lc = (lookupCache && lookupCache.default) || lookupCache
+    const cached = _lc && _lc.get && _lc.get(cacheKey)
     if (typeof cached !== 'undefined') {
       return cached
     }
@@ -185,7 +186,7 @@ export default {
       const ok = await verifyTokenAgainstHash(tokenPlain, c.hash)
       if (ok) {
         const now = new Date()
-        if (c.expiresAt && new Date(c.expiresAt) < now) { lookupCache.default.set(cacheKey, { active: false }, Number(process.env.CACHE_NEGATIVE_TTL_SECONDS || 5)); return { active: false } }
+        if (c.expiresAt && new Date(c.expiresAt) < now) { _lc && _lc.set && _lc.set(cacheKey, { active: false }, Number(process.env.CACHE_NEGATIVE_TTL_SECONDS || 5)); return { active: false } }
         const info = {
           active: true,
           userId: c.userId.toString(),
@@ -193,12 +194,12 @@ export default {
           expiresAt: c.expiresAt || null,
           hashPrefix: c.hashPrefix,
         }
-        lookupCache.default.set(cacheKey, info, Number(process.env.CACHE_LOOKUP_TTL_SECONDS || 60))
+        _lc && _lc.set && _lc.set(cacheKey, info, Number(process.env.CACHE_LOOKUP_TTL_SECONDS || 60))
         return info
       }
     }
     const missInfo = { active: false }
-    lookupCache.default.set(cacheKey, missInfo, Number(process.env.CACHE_NEGATIVE_TTL_SECONDS || 5))
+    _lc && _lc.set && _lc.set(cacheKey, missInfo, Number(process.env.CACHE_NEGATIVE_TTL_SECONDS || 5))
     return missInfo
   },
 }

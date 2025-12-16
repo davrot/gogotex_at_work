@@ -31,7 +31,7 @@
 	            ],
 	            "atts": [
 	            	{
-	            		"url": "http://127.0.0.1:3863/base/000000000000000000000000/overleaf-white-410.png",
+	            		"url": "http://localhost:3863/base/000000000000000000000000/overleaf-white-410.png",
 	            		"path": "overleaf-white-410.png"
 	            	}
 	            ]

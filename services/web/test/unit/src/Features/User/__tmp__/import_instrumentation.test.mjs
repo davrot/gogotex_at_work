@@ -20,9 +20,9 @@ vi.mock('@overleaf/logger', () => ({ default: { debug: vi.fn(), info: vi.fn(), e
 
 describe('Import instrumentation', () => {
   it('should import Controller and show model is mocked', async () => {
-    const Controller = await import('../../../../../app/src/Features/User/UserSSHKeysController.mjs')
+    const Controller = await import('../../../../../../app/src/Features/User/UserSSHKeysController.mjs')
     console.error('Controller loaded, Model mocked? ', (Controller && Controller.create) ? 'YES' : 'NO')
-    const modelModule = await import('../../../../../app/src/models/UserSSHKey.js')
+    const modelModule = await import('../../../../../../app/src/models/UserSSHKey.js')
     console.error('modelModule keys:', Object.keys(modelModule))
     console.error('Mock mongoose.models keys', Object.keys(mockMongoose.models))
     const mongoose = await import('mongoose')

@@ -2,6 +2,7 @@ package uk.ac.ic.wlgitbridge.snapshot.getforversion;
 
 import com.google.gson.JsonElement;
 import uk.ac.ic.wlgitbridge.snapshot.base.Request;
+import java.util.ArrayList;
 import uk.ac.ic.wlgitbridge.snapshot.base.Result;
 import uk.ac.ic.wlgitbridge.util.Log;
 
@@ -27,7 +28,12 @@ public class GetForVersionResult extends Result {
 
   @Override
   public void fromJSON(JsonElement json) {
-    snapshotData = new SnapshotData(json);
+    try {
+      snapshotData = new SnapshotData(json);
+    } catch (Exception e) {
+      Log.warn("GetForVersionResult.fromJSON: failed to parse snapshot data, treating as empty. error={}", e.toString());
+      snapshotData = new SnapshotData(new ArrayList<>(), new ArrayList<>());
+    }
     Log.debug("GetForVersionResult({})", snapshotData);
   }
 

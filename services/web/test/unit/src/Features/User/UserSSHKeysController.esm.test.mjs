@@ -73,7 +73,7 @@ describe('UserSSHKeysController (ESM)', async () => {
   })
 
   it('create returns 201 with fingerprint and caches', async () => {
-    const req = { params: { userId: '000000000000000000000001' }, body: { key_name: 'test', public_key: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexample fixture' }, session: {} }
+    const req = { params: { userId: '000000000000000000000001' }, body: { key_name: 'test', public_key: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexample fixture' }, session: {}, headers: {} }
     const res = new MockResponse()
     console.error('TEST REQ PARAMS', req.params)
     try { console.error('MOCK MONGOOSE MODELS', Object.keys(mockMongoose.models)) } catch(e) {}
@@ -85,7 +85,7 @@ describe('UserSSHKeysController (ESM)', async () => {
 
   it('create is idempotent for same user (returns 200)', async () => {
     // First call returns 201
-    const req1 = { params: { userId: '000000000000000000000002' }, body: { key_name: 'test', public_key: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexample2 fixture' }, session: {} }
+    const req1 = { params: { userId: '000000000000000000000002' }, body: { key_name: 'test', public_key: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexample2 fixture' }, session: {}, headers: {} }
     const res1 = new MockResponse()
     await Controller.create(req1, res1)
     expect(res1.statusCode).to.equal(201)
@@ -97,7 +97,7 @@ describe('UserSSHKeysController (ESM)', async () => {
     UserSSHKey.findOneAndDelete.mockReset()
     UserSSHKey.findOne = vi.fn().mockReturnValue({ lean: () => ({ exec: async () => fakeExisting }) })
 
-    const req2 = { params: { userId: '000000000000000000000002' }, body: { key_name: 'test', public_key: req1.body.public_key }, session: {} }
+    const req2 = { params: { userId: '000000000000000000000002' }, body: { key_name: 'test', public_key: req1.body.public_key }, session: {}, headers: {} }
     const res2 = new MockResponse()
     await Controller.create(req2, res2)
     expect(res2.statusCode).to.equal(200)
@@ -110,7 +110,7 @@ describe('UserSSHKeysController (ESM)', async () => {
     const fakeExisting = { _id: 'existing-k2', fingerprint: 'SHA256:EX', userId: '000000000000000000000009', keyName: 'other', publicKey: 'ssh-ed25519 AAAAOthEr fixture', createdAt: new Date().toISOString() }
     UserSSHKey.findOne = vi.fn().mockReturnValue({ lean: () => ({ exec: async () => fakeExisting }) })
 
-    const req = { params: { userId: '000000000000000000000008' }, body: { key_name: 'dup', public_key: fakeExisting.publicKey }, session: {} }
+    const req = { params: { userId: '000000000000000000000008' }, body: { key_name: 'dup', public_key: fakeExisting.publicKey }, session: {}, headers: {} }
     const res = new MockResponse()
     await Controller.create(req, res)
     expect(res.statusCode).to.equal(409)

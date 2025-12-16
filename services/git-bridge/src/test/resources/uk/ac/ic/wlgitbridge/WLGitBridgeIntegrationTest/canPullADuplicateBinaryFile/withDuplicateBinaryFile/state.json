@@ -38,11 +38,11 @@
 	            ],
 				"atts": [
 					{
-						"url": "http://127.0.0.1:4001/withDuplicateBinaryFile/000000000000000000000000/overleaf-white-410.png",
+						"url": "http://localhost:4001/withDuplicateBinaryFile/000000000000000000000000/overleaf-white-410.png",
 						"path": "overleaf-white-410.png"
 					},
 					{
-						"url": "http://127.0.0.1:4001/withDuplicateBinaryFile/000000000000000000000000/overleaf-white-410.png",
+						"url": "http://localhost:4001/withDuplicateBinaryFile/000000000000000000000000/overleaf-white-410.png",
 						"path": "overleaf-white-410-copy.png"
 					}
 				]
@@ -61,7 +61,7 @@
 	            ],
 				"atts": [
 					{
-						"url": "http://127.0.0.1:4001/withDuplicateBinaryFile/000000000000000000000000/overleaf-white-410.png",
+						"url": "http://localhost:4001/withDuplicateBinaryFile/000000000000000000000000/overleaf-white-410.png",
 						"path": "overleaf-white-410.png"
 					}
 				]

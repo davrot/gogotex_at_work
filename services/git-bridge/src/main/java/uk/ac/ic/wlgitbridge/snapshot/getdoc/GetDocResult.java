@@ -81,23 +81,36 @@ public class GetDocResult extends Result {
           throw new IllegalArgumentException("unknown get doc error code");
       }
     } else {
-      versionID = jsonObject.get("latestVerId").getAsInt();
-      // Handle edge-case for projects with no changes, that were imported
-      // to v2. In which case `latestVerAt` will not be present.
-      // See: https://github.com/overleaf/writelatex-git-bridge/pull/50
-      if (jsonObject.has("latestVerAt")) {
-        createdAt = jsonObject.get("latestVerAt").getAsString();
-      } else {
+      // Defensive parsing: ensure expected fields exist before dereferencing.
+      if (!jsonObject.has("latestVerId")) {
+        // Some project responses (new or just-created projects) may not include
+        // `latestVerId`. Treat these as existing projects with no versions yet
+        // by setting versionID to 0 rather than failing.
+        Log.warn("GetDocResult.fromJSON: no 'latestVerId' - treating as empty project: {}", jsonObject);
+        versionID = 0;
         createdAt = null;
+        user = new WLUser(null, null);
+      } else {
+        versionID = jsonObject.get("latestVerId").getAsInt();
+
+        // Handle edge-case for projects with no changes, that were imported
+        // to v2. In which case `latestVerAt` will not be present.
+        // See: https://github.com/overleaf/writelatex-git-bridge/pull/50
+        if (jsonObject.has("latestVerAt")) {
+          createdAt = jsonObject.get("latestVerAt").getAsString();
+        } else {
+          createdAt = null;
+        }
       }
+
       String name = null;
       String email = null;
-      JsonElement latestVerBy = jsonObject.get("latestVerBy");
+      JsonElement latestVerBy = jsonObject.has("latestVerBy") ? jsonObject.get("latestVerBy") : null;
 
-      if (latestVerBy.isJsonObject()) {
+      if (latestVerBy != null && latestVerBy.isJsonObject()) {
         JsonObject userObject = latestVerBy.getAsJsonObject();
-        name = userObject.get("name").getAsString();
-        email = userObject.get("email").getAsString();
+        if (userObject.has("name")) name = userObject.get("name").getAsString();
+        if (userObject.has("email")) email = userObject.get("email").getAsString();
       }
 
       user = new WLUser(name, email);

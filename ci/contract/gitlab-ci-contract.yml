@@ -20,6 +20,17 @@ web_contract_tests:
     - npm ci --silent
     - npm run test:contract --silent
 
+web_accessibility:
+  stage: contract
+  variables:
+    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+  script:
+    - cd services/web
+    - npm ci --silent
+    - npm run e2e:playwright
+  allow_failure: false
+  timeout: 30m
+
 gitbridge_maven_tests:
   stage: test
   script:

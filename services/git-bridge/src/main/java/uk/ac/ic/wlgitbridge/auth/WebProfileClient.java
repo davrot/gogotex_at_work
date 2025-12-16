@@ -56,7 +56,8 @@ public class WebProfileClient {
     }
 
     public List<SSHKey> getUserSSHKeys(String userId) throws IOException {
-        String url = String.format("%s/internal/api/users/%s/ssh-keys", baseUrl, userId);
+        // Call the internal users endpoint for SSH keys (contract expects /internal/api/users/...)
+        String url = String.format("%s/internal/api/users/%s/ssh-keys", baseUrl.replaceAll("/$",""), userId);
         try (CloseableHttpClient http = HttpClients.createDefault()) {
             HttpGet get = new HttpGet(url);
             if (apiToken != null && !apiToken.isEmpty()) {

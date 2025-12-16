@@ -174,12 +174,11 @@ public class GitBridgeServer {
       throws ServletException {
     final ServletContextHandler servletContextHandler =
         new ServletContextHandler(ServletContextHandler.SESSIONS);
-    if (config.getOauth2Server() != null) {
-      Filter filter =
-          new Oauth2Filter(snapshotApi, config.getOauth2Server(), config.isUserPasswordEnabled());
-      servletContextHandler.addFilter(
-          new FilterHolder(filter), "/*", EnumSet.of(DispatcherType.REQUEST));
-    }
+    // Always install the OAuth2 filter, but the filter now uses local introspect
+    // or permissive acceptance when no local introspect is configured.
+    Filter filter = new Oauth2Filter(snapshotApi, config.isUserPasswordEnabled());
+    servletContextHandler.addFilter(
+        new FilterHolder(filter), "/*", EnumSet.of(DispatcherType.REQUEST));
     servletContextHandler.setContextPath("/");
     servletContextHandler.addServlet(
         new ServletHolder(new WLGitServlet(servletContextHandler, repoStore, bridge)), "/*");

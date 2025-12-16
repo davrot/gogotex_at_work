@@ -48,8 +48,21 @@ public class GetSavedVersResult extends Result {
   public void fromJSON(JsonElement json) {
     Log.debug("GetSavedVersResult({})", json);
     savedVers = new ArrayList<>();
-    for (JsonElement elem : json.getAsJsonArray()) {
-      savedVers.add(new Gson().fromJson(elem.getAsJsonObject(), SnapshotInfo.class));
+    if (json.isJsonArray()) {
+      for (JsonElement elem : json.getAsJsonArray()) {
+        savedVers.add(new Gson().fromJson(elem.getAsJsonObject(), SnapshotInfo.class));
+      }
+    } else if (json.isJsonObject()) {
+      // Handle sentinel error objects synthesized by Request for 404 responses
+      JsonObject obj = json.getAsJsonObject();
+      if (obj.has("status") && obj.get("status").getAsInt() == 404) {
+        // No saved versions -> empty list
+        savedVers = new ArrayList<>();
+      } else {
+        throw new IllegalArgumentException("unexpected getSavedVers shape: " + json);
+      }
+    } else {
+      throw new IllegalArgumentException("unexpected getSavedVers shape: " + json);
     }
   }
 

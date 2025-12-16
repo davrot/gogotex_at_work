@@ -109,7 +109,7 @@ async function _syncTeX(req, res, direction, validatedOptions) {
   try {
     const body = await CompileManager.promises.syncTeX(projectId, userId, {
       direction,
-      compileFromClsiCache: Features.hasFeature('saas'),
+      compileFromClsiCache: (Features.hasFeature('saas') || (Settings && Settings.overleaf)),
       validatedOptions: {
         ...validatedOptions,
         editorId,
@@ -182,7 +182,7 @@ const _CompileController = {
 
     let { enablePdfCaching, pdfCachingMinChunkSize, pdfDownloadDomain } =
       await _getSplitTestOptions(req, res)
-    if (Features.hasFeature('saas')) {
+    if (Features.hasFeature('saas') || (Settings && Settings.overleaf)) {
       options.compileFromClsiCache = true
       options.populateClsiCache = true
     }

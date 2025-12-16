@@ -26,25 +26,30 @@ function sanitizeMongoUrl(url) {
   return mongoUrl
 }
 
-const mongooseConnectUrl = sanitizeMongoUrl(Settings.mongo.url)
+const mongooseConnectUrl = Settings && Settings.mongo && Settings.mongo.url ? sanitizeMongoUrl(Settings.mongo.url) : null
 try { require('fs').appendFileSync('/tmp/mongo_clients.log', JSON.stringify({ t: new Date().toISOString(), event: 'mongoose_connect', url: mongooseConnectUrl, stack: new Error().stack }) + '\n') } catch (e) {}
 
-const connectionPromise = mongoose.connect(
-  mongooseConnectUrl,
-  Settings.mongo.options
-)
+let connectionPromise
+if (mongooseConnectUrl) {
+  connectionPromise = mongoose.connect(
+    mongooseConnectUrl,
+    Settings.mongo.options
+  )
 
-connectionPromise
-  .then(mongooseInstance => {
-    Metrics.mongodb.monitor(mongooseInstance.connection.client)
-  })
-  .catch(error => {
-    logger.error(
-      { error },
-      'Failed to connect to MongoDB - cannot set up monitoring'
-    )
-    try { require('fs').appendFileSync('/tmp/mongo_connect_errors.log', JSON.stringify({ t: new Date().toISOString(), event: 'mongoose_connect_reject', err: (error && error.stack) ? error.stack : String(error), mongoUrl: Settings.mongo.url, envHost: process.env.MONGO_HOST || null, stack: new Error().stack }) + '\n') } catch (e) {}
-  })
+  connectionPromise
+    .then(mongooseInstance => {
+      Metrics.mongodb.monitor(mongooseInstance.connection.client)
+    })
+    .catch(error => {
+      logger.error(
+        { error },
+        'Failed to connect to MongoDB - cannot set up monitoring'
+      )
+      try { require('fs').appendFileSync('/tmp/mongo_connect_errors.log', JSON.stringify({ t: new Date().toISOString(), event: 'mongoose_connect_reject', err: (error && error.stack) ? error.stack : String(error), mongoUrl: Settings && Settings.mongo && Settings.mongo.url, envHost: process.env.MONGO_HOST || null, stack: new Error().stack }) + '\n') } catch (e) {}
+    })
+} else {
+  connectionPromise = Promise.resolve()
+}
 
 addConnectionDrainer('mongoose', async () => {
   await connectionPromise

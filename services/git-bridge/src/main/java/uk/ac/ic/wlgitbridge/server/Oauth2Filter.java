@@ -27,13 +27,10 @@ public class Oauth2Filter implements Filter {
 
   private final SnapshotApi snapshotApi;
 
-  private final String oauth2Server;
-
   private final boolean isUserPasswordEnabled;
 
-  public Oauth2Filter(SnapshotApi snapshotApi, String oauth2Server, boolean isUserPasswordEnabled) {
+  public Oauth2Filter(SnapshotApi snapshotApi, boolean isUserPasswordEnabled) {
     this.snapshotApi = snapshotApi;
-    this.oauth2Server = oauth2Server;
     this.isUserPasswordEnabled = isUserPasswordEnabled;
   }
 
@@ -90,73 +87,56 @@ public class Oauth2Filter implements Filter {
       return;
     }
 
+    // Feature flag: when AUTH_DISABLE_OAUTH or system property auth.disable_oauth
+    // is true, skip external OAuth checks and accept the Basic auth password as a
+    // Git auth token for username 'git'. Check both environment variable and
+    // system property to make testing easier.
+    String oauthDisabled = System.getenv("AUTH_DISABLE_OAUTH");
+    if (oauthDisabled == null) {
+      oauthDisabled = System.getProperty("auth.disable_oauth");
+    }
     final Credential cred =
         new Credential.Builder(BearerToken.authorizationHeaderAccessMethod()).build();
 
-    if (username.equals("git")) {
-      Log.debug("[{}] username is 'git', skipping password grant flow", projectId);
-
-      // Check that the access token is valid. In principle, we could
-      // wait until we make the actual request to the web api, but the
-      // JGit API doesn't make it easy to reply with a 401 and a custom
-      // error message. This is something we can do in this filter, so as
-      // a workaround, we use the /oauth/token/info endpoint to verify
-      // the access token.
-      //
-      // It's still theoretically possible for the web api request to
-      // fail later (for example, in the unlikely event that the token
-      // expired between the two requests). In that case, JGit will
-      // return a 401 without a custom error message.
-      int statusCode = checkAccessToken(this.oauth2Server, password, getClientIp(request));
-      if (statusCode == 429) {
-        // rate limited
-        Log.info(String.format("{\"service\":\"git-bridge\",\"project\":\"%s\",\"event\":\"auth.http_attempt\",\"outcome\":\"rate_limited\"}", projectId));
-        handleRateLimit(projectId, username, request, response);
+    if (oauthDisabled != null && oauthDisabled.equalsIgnoreCase("true")) {
+      Log.info("[{}] OAuth disabled via AUTH_DISABLE_OAUTH, skipping oauth checks", projectId);
+      if (username.equals("git")) {
+        cred.setAccessToken(password);
+        servletRequest.setAttribute(ATTRIBUTE_KEY, cred);
+        filterChain.doFilter(servletRequest, servletResponse);
         return;
-      } else if (statusCode == 401) {
-        // Try local introspection fallback if configured
-        String localIntrospect = System.getenv("AUTH_LOCAL_INTROSPECT_URL");
-        if (localIntrospect != null && !localIntrospect.isEmpty()) {
-          boolean active = false;
-          try {
-            active = checkLocalIntrospect(localIntrospect, password);
-          } catch (Exception e) {
-            Log.warn("Local introspect check failed: {}", e.getMessage());
-          }
-          if (!active) {
-            Log.info(String.format("{\"service\":\"git-bridge\",\"project\":\"%s\",\"event\":\"auth.http_attempt\",\"outcome\":\"denied\"}", projectId));
-            handleBadAccessToken(projectId, request, response);
-            return;
-          } else {
-            Log.info(String.format("{\"service\":\"git-bridge\",\"project\":\"%s\",\"event\":\"auth.http_attempt\",\"outcome\":\"success\",\"method\":\"local-introspect\"}", projectId));
-          }
-        } else {
+      } else if (this.isUserPasswordEnabled) {
+        handlePasswordAuthenticationDeprecation(projectId, username, request, response);
+        return;
+      } else {
+        handleNeedAuthorization(projectId, username, request, response);
+        return;
+      }
+    }
+
+    if (username.equals("git")) {
+      Log.debug("[{}] username is 'git', proceeding with token validation", projectId);
+
+      // External OAuth server usage removed. Validation of Git tokens is
+      // done via local introspection when configured. If local introspect
+      // is not configured, the token will be accepted (legacy/dev mode).
+      String localIntrospect = System.getenv("AUTH_LOCAL_INTROSPECT_URL");
+      if (localIntrospect != null && !localIntrospect.isEmpty()) {
+        boolean active = false;
+        try {
+          active = checkLocalIntrospect(localIntrospect, password);
+        } catch (Exception e) {
+          Log.warn("Local introspect check failed: {}", e.getMessage());
+        }
+        if (!active) {
           Log.info(String.format("{\"service\":\"git-bridge\",\"project\":\"%s\",\"event\":\"auth.http_attempt\",\"outcome\":\"denied\"}", projectId));
           handleBadAccessToken(projectId, request, response);
           return;
-        }
-      } else if (statusCode >= 400) {
-        // For other OAuth server errors attempt local introspection before failing
-        String localIntrospect = System.getenv("AUTH_LOCAL_INTROSPECT_URL");
-        if (localIntrospect != null && !localIntrospect.isEmpty()) {
-          boolean active = false;
-          try {
-            active = checkLocalIntrospect(localIntrospect, password);
-          } catch (Exception e) {
-            Log.warn("Local introspect check failed: {}", e.getMessage());
-          }
-          if (!active) {
-            Log.info(String.format("{\"service\":\"git-bridge\",\"project\":\"%s\",\"event\":\"auth.http_attempt\",\"outcome\":\"denied\",\"status\":%d}", projectId, statusCode));
-            handleUnknownOauthServerError(projectId, statusCode, request, response);
-            return;
-          } else {
-            Log.info(String.format("{\"service\":\"git-bridge\",\"project\":\"%s\",\"event\":\"auth.http_attempt\",\"outcome\":\"success\",\"method\":\"local-introspect\"}", projectId));
-          }
         } else {
-          Log.info(String.format("{\"service\":\"git-bridge\",\"project\":\"%s\",\"event\":\"auth.http_attempt\",\"outcome\":\"unknown_oauth_error\",\"status\":%d}", projectId, statusCode));
-          handleUnknownOauthServerError(projectId, statusCode, request, response);
-          return;
+          Log.info(String.format("{\"service\":\"git-bridge\",\"project\":\"%s\",\"event\":\"auth.http_attempt\",\"outcome\":\"success\",\"method\":\"local-introspect\"}", projectId));
         }
+      } else {
+        Log.warn("[{}] No local introspect configured: accepting token without validation", projectId);
       }
       cred.setAccessToken(password);
     } else if (this.isUserPasswordEnabled) {
@@ -277,20 +257,6 @@ public class Oauth2Filter implements Filter {
             "your Overleaf Account Settings."));
   }
 
-  private int checkAccessToken(String oauth2Server, String accessToken, String clientIp)
-      throws IOException {
-    GenericUrl url = new GenericUrl(oauth2Server + "/oauth/token/info?client_ip=" + clientIp);
-    HttpRequest request = Instance.httpRequestFactory.buildGetRequest(url);
-    HttpHeaders headers = new HttpHeaders();
-    headers.setAuthorization("Bearer " + accessToken);
-    request.setHeaders(headers);
-    request.setThrowExceptionOnExecuteError(false);
-    HttpResponse response = request.execute();
-    int statusCode = response.getStatusCode();
-    response.disconnect();
-    return statusCode;
-  }
-
   private boolean checkLocalIntrospect(String introspectUrl, String token) throws IOException {
     GenericUrl url = new GenericUrl(introspectUrl);
     HttpRequest request = Instance.httpRequestFactory.buildPostRequest(url, null);
@@ -312,17 +278,6 @@ public class Oauth2Filter implements Filter {
       return json.contains("\"active\":true");
     }
     return false;
-  }
-
-  private void handleUnknownOauthServerError(
-      String projectId, int statusCode, HttpServletRequest request, HttpServletResponse response)
-      throws IOException {
-    Log.info(
-        "[{}] OAuth server error, statusCode={}, ip={}",
-        projectId,
-        statusCode,
-        getClientIp(request));
-    sendResponse(response, 500, Arrays.asList("Unexpected server error. Please try again later."));
   }
 
   private void handlePasswordAuthenticationDeprecation(

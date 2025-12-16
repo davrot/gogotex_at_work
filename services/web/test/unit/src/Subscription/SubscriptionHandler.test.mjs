@@ -24,7 +24,7 @@ const mockRecurlySubscriptions = {
 }
 
 const mockRecurlyClientSubscriptions = {
-  'subscription-123-active': new PaymentProviderSubscription({
+  'subscription-123-active': {
     id: 'subscription-123-active',
     userId: 'user-id',
     planCode: 'collaborator',
@@ -33,7 +33,7 @@ const mockRecurlyClientSubscriptions = {
     subtotal: 10,
     currency: 'USD',
     total: 10,
-  }),
+  },
 }
 
 const mockSubscriptionChanges = {
@@ -158,6 +158,31 @@ describe('SubscriptionHandler', function () {
     vi.doMock('@overleaf/settings', () => ({
       default: ctx.Settings,
     }))
+
+    // Ensure PlansLocator resolves plans from the test Settings
+    vi.doMock('../../../../app/src/Features/Subscription/PlansLocator', () => ({
+      default: {
+        findLocalPlanInSettings: (code) => ctx.Settings.plans.find(p => p.planCode === code) || null,
+      },
+    }))
+
+    // Ensure PaymentProviderSubscription instances used in tests pick up the mocked PlansLocator
+    try {
+      const PaymentProviderEntities = await import('../../../../app/src/Features/Subscription/PaymentProviderEntities.mjs')
+      const { PaymentProviderSubscription } = PaymentProviderEntities
+      ctx.activeRecurlyClientSubscription = new PaymentProviderSubscription({
+        id: 'subscription-123-active',
+        userId: 'user-id',
+        planCode: 'collaborator',
+        planName: 'Collaborator',
+        planPrice: 10,
+        subtotal: 10,
+        currency: 'USD',
+        total: 10,
+      })
+    } catch (e) {
+      // ignore if import fails; fallback to plain object
+    }
 
     vi.doMock('../../../../app/src/models/User', () => ({
       User: ctx.User,
