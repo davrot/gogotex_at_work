@@ -12,7 +12,7 @@ describe('Manual repro SSH key', function () {
 
     // Fetch the DB user doc and print hashedPassword metadata to assist triage
     try {
-      const { User } = await import('../../../../app/src/models/User.js')
+      const { User } = await import('../../../app/src/models/User.js')
       const dbUser = await User.findById(user.id).lean().exec()
       // eslint-disable-next-line no-console
       console.debug('[ManualReproSSH] dbUser hashedPassword info', { id: user.id, hasHashedPassword: !!dbUser?.hashedPassword, hashedPasswordLength: dbUser?.hashedPassword?.length, hashedPasswordPrefix: typeof dbUser?.hashedPassword === 'string' ? dbUser.hashedPassword.slice(0,8) : undefined })
@@ -43,8 +43,8 @@ describe('Manual repro SSH key', function () {
     const knownEmail = `manual.known.${Date.now()}@example.com`
     const knownPassword = `known-pass-${Date.now()}`
 
-    const AuthenticationManager = (await import('/overleaf/services/web/app/src/Features/Authentication/AuthenticationManager.mjs')).default
-    const UserCreator = (await import('/overleaf/services/web/app/src/Features/User/UserCreator.mjs')).default
+    const AuthenticationManager = (await import('../../../app/src/Features/Authentication/AuthenticationManager.mjs')).default
+    const UserCreator = (await import('../../../app/src/Features/User/UserCreator.mjs')).default
 
     const hashed = await AuthenticationManager.promises.hashPassword(knownPassword)
     const created = await UserCreator.promises.createNewUser({ email: knownEmail, first_name: 'manual', hashedPassword: hashed }, { confirmedAt: new Date() })

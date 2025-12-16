@@ -12,7 +12,7 @@ describe('DiscoveryRouter', function () {
     ctx.requirePrivateApiAuth = sinon.stub().returns('requirePrivate')
     ctx.rateLimit = sinon.stub().returns('rateLimiter')
     ctx.lookup = () => 'lookup'
-    vi.doMock('../../../../../app/src/Features/Authentication/AuthenticationController.mjs', () => ({ requirePrivateApiAuth: ctx.requirePrivateApiAuth }))
+    vi.doMock('../../../../../app/src/Features/Authentication/AuthenticationController.mjs', () => ({ default: { requirePrivateApiAuth: ctx.requirePrivateApiAuth } }))
     vi.doMock('../../../../../app/src/Features/Security/RateLimiterMiddleware.mjs', () => ({ rateLimit: ctx.rateLimit }))
     vi.doMock('../../../../../app/src/Features/Discovery/SSHKeyLookupController.mjs', () => ({ lookup: ctx.lookup }))
     ctx.Router = (await import(modulePath)).default

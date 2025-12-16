@@ -426,14 +426,30 @@ class User {
             // Debug: print failed login response for triage
             // eslint-disable-next-line no-console
             console.debug('[User.loginWithEmailPassword] failed login:', { status: response.statusCode, body })
-            return callback(
-              new OError(
-                `login failed: status=${
-                  response.statusCode
-                } body=${JSON.stringify(body)}`,
-                { response, body }
-              )
-            )
+            // Additional triage: run direct check via AuthenticationManager to see if bcrypt.compare matches
+            AuthenticationManager.promises._checkUserPassword({ email }, password)
+              .then(checkRes => {
+                try {
+                  console.debug('[User.loginWithEmailPassword] direct check after failed login', { userId: checkRes.user && checkRes.user._id ? String(checkRes.user._id) : null, match: checkRes.match, hashInfo: checkRes.user && checkRes.user.hashedPassword ? { length: checkRes.user.hashedPassword.length, prefix: checkRes.user.hashedPassword.slice(0,8) } : null })
+                } catch (e) {}
+                return callback(
+                  new OError(
+                    `login failed: status=${response.statusCode} body=${JSON.stringify(body)}`,
+                    { response, body }
+                  )
+                )
+              })
+              .catch(err => {
+                // eslint-disable-next-line no-console
+                console.error('[User.loginWithEmailPassword] error while doing direct check', err && err.stack ? err.stack : err)
+                return callback(
+                  new OError(
+                    `login failed: status=${response.statusCode} body=${JSON.stringify(body)}`,
+                    { response, body }
+                  )
+                )
+              })
+            return
           }
           // get new csrf token, then return result of login
           this.getCsrfToken(err => {
@@ -461,20 +477,46 @@ class User {
           return callback(error)
         }
 
-        UserModel.findOneAndUpdate(
-          filter,
-          {
-            $set: {
-              hashedPassword,
-              emails: this.emails,
-              signUpDate: this.signUpDate,
-              labsProgram: this.labsProgram,
-            },
-          },
-          options
-        )
+        // Debug: see if a user exists before the upsert (helps detect duplicates or pre-existing users)
+        UserModel.findOne(filter)
+          .then(existing => {
+            try { console.debug('[User.ensureUserExists] pre-upsert existing user', { id: existing?._id?.toString(), hasHashedPassword: !!existing?.hashedPassword, hashedPasswordLength: existing?.hashedPassword?.length }) } catch (e) {}
+            return UserModel.findOneAndUpdate(
+              filter,
+              {
+                $set: {
+                  hashedPassword,
+                  emails: this.emails,
+                  signUpDate: this.signUpDate,
+                  labsProgram: this.labsProgram,
+                },
+              },
+              options
+            )
+          })
           .then(user => {
             this.setExtraAttributes(user)
+            try { console.debug('[User.ensureUserExists] upserted user', { id: user._id?.toString(), hasHashedPassword: !!user.hashedPassword, hashedPasswordLength: user.hashedPassword?.length, hashedPasswordPrefix: typeof user.hashedPassword === 'string' ? user.hashedPassword.slice(0,8) : undefined }) } catch (e) {}
+            // Debug: list all users with this email to detect duplicates
+            try {
+              db.users.find({ email: this.email }).toArray((err, docs) => {
+                if (err) {
+                  console.error('[User.ensureUserExists] error listing users by email', err && err.stack ? err.stack : err)
+                } else {
+                  try { console.debug('[User.ensureUserExists] users with this email', { email: this.email, count: docs.length, ids: docs.map(d => d._id.toString()) }) } catch (e) {}
+                }
+              })
+            } catch (e) {}
+            // Remove any duplicate users with same email but different _id so future logins are deterministic
+            try {
+              db.users.deleteMany({ email: this.email, _id: { $ne: user._id } }, (err, result) => {
+                if (err) {
+                  console.error('[User.ensureUserExists] error removing duplicate users', err && err.stack ? err.stack : err)
+                } else {
+                  try { console.debug('[User.ensureUserExists] removed duplicate users', { email: this.email, deletedCount: result?.deletedCount }) } catch (e) {}
+                }
+              })
+            } catch (e) {}
             callback(null, this.password)
           })
           .catch(callback)

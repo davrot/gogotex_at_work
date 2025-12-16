@@ -20,11 +20,15 @@ export async function create(req, res) {
 
 export async function list(req, res) {
   const userId = req.params.userId
+  try { console.error('[TokenController.list] incoming', { userId, reqIp: req.ip, headers: { 'x-service-origin': req.headers && req.headers['x-service-origin'], cookie: req.headers && req.headers.cookie }, sessionExists: !!req.session, sessionUser: req.session && req.session.user ? { _id: req.session.user._id, email: req.session.user.email } : null }) } catch (e) {}
   // rate-limit per service-origin
   try {
     const originKey = ServiceOrigin.originRateKey(req)
     await tokenIntrospectRateLimiter.consume(originKey, 1, { method: 'service-origin' })
   } catch (err) {
+    // Debug: log origin key and error to help diagnose unexpected 429s in tests
+    try { logger.warn({ origin: ServiceOrigin.originRateKey(req), err: err && (err.message || err) }, 'token.list rate limited') } catch (e) {}
+    try { console.error('[TokenController.list] rate-limited originKey=', ServiceOrigin.originRateKey(req), 'err=', err && err instanceof Error ? err.message : err) } catch (e) {}
     try { metrics.inc('token.list.rate_limited', 1) } catch (e) {}
     return res.sendStatus(429)
   }
@@ -33,6 +37,8 @@ export async function list(req, res) {
     return res.status(200).json(tokens)
   } catch (err) {
     logger.err({ err, userId }, 'error listing personal access tokens')
+    // Ensure error visible in test logs
+    try { console.error('[TokenController.list] error listing tokens', err && (err.stack || err)) } catch (e) {}
     return res.sendStatus(500)
   }
 }
@@ -65,12 +71,6 @@ export async function introspect(req, res) {
   // Debug: log token received for introspection
   try { console.log('[TokenController.introspect] token=', token) } catch (e) {}
 
-  // Reject obviously malformed tokens (tokens are hex strings)
-  if (!/^[0-9a-f]+$/i.test(token)) {
-    timer.done()
-    return res.status(400).json({ message: 'invalid token format' })
-  }
-
   // rate-limit per service-origin
   try {
     const originKey = ServiceOrigin.originRateKey(req)
@@ -80,6 +80,12 @@ export async function introspect(req, res) {
     try { metrics.inc('token.introspect.rate_limited', 1) } catch (e) {}
     timer.done()
     return res.sendStatus(429)
+  }
+
+  // Reject obviously malformed tokens (tokens are hex strings)
+  if (!/^[0-9a-f]+$/i.test(token)) {
+    timer.done()
+    return res.status(400).json({ message: 'invalid token format' })
   }
 
   try {

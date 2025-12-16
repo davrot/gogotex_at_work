@@ -118,6 +118,8 @@ async function handleError(error, req, res, next) {
 }
 
 function handleApiError(err, req, res, next) {
+  // Debug: always surface API-level errors to console to aid test triage
+  try { console.error('[ErrorController.handleApiError] err=', err && (err.stack || err)) } catch (e) {}
   req.logger.addFields({ err })
   if (err instanceof Errors.NotFoundError) {
     req.logger.setLevel('warn')

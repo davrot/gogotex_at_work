@@ -128,6 +128,22 @@ app.use((req, res, next) => {
             socketWritable: !!(res.socket && res.socket.writable && !res.socket.destroyed),
           }
           try { fs.appendFileSync('/tmp/user_sshkey_wire_debug.log', JSON.stringify(info) + '\n') } catch (e) {}
+          // If a non-buffer object was written directly to res.write, log a stack trace so we can find the origin
+          try {
+            if (typeof chunk === 'object' && !Buffer.isBuffer(chunk)) {
+              const stack = new Error('write-called-with-non-string').stack
+              const nonStringInfo = {
+                t: new Date().toISOString(),
+                event: 'write-non-string',
+                method: req.method,
+                url: req.originalUrl || req.url,
+                chunkType: chunk && chunk.constructor ? chunk.constructor.name : typeof chunk,
+                chunkPreview: (chunkStr || '').slice(0,200),
+                stack,
+              }
+              try { fs.appendFileSync('/tmp/user_sshkey_wire_debug.log', JSON.stringify(nonStringInfo) + '\n') } catch (e) {}
+            }
+          } catch (e) {}
         } catch (e) {}
         try { res.setHeader('Content-Type', 'application/json; charset=utf-8') } catch (e) {}
       }
@@ -148,7 +164,25 @@ app.use((req, res, next) => {
       try {
         if (process.env.NODE_ENV === 'test' && (req.originalUrl || req.url) && (req.originalUrl || req.url).includes('/internal/api/users/') && (req.originalUrl || req.url).includes('/ssh-keys')) {
           try {
-            if (args && args[0]) req._outChunks = req._outChunks || [], req._outChunks.push(Buffer.isBuffer(args[0]) ? args[0] : Buffer.from(String(args[0])))
+            if (args && args[0]) {
+              req._outChunks = req._outChunks || []
+              req._outChunks.push(Buffer.isBuffer(args[0]) ? args[0] : Buffer.from(String(args[0])))
+              if (typeof args[0] === 'object' && !Buffer.isBuffer(args[0])) {
+                try {
+                  const stack = new Error('end-called-with-non-string').stack
+                  const nonStringInfo = {
+                    t: new Date().toISOString(),
+                    event: 'end-non-string',
+                    method: req.method,
+                    url: req.originalUrl || req.url,
+                    argType: args[0] && args[0].constructor ? args[0].constructor.name : typeof args[0],
+                    argPreview: (String(args[0]) || '').slice(0,200),
+                    stack,
+                  }
+                  try { fs.appendFileSync('/tmp/user_sshkey_wire_debug.log', JSON.stringify(nonStringInfo) + '\n') } catch (e) {}
+                } catch (e) {}
+              }
+            }
           } catch (e) {}
           try {
             const bodyBuf = req._outChunks ? Buffer.concat(req._outChunks) : Buffer.from('')

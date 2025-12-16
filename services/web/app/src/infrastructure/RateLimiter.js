@@ -73,6 +73,13 @@ class RateLimiter {
       }
     }
 
+    if (process.env.TRACE_RATE_LIMITS === 'true') {
+      try {
+        const st = new Error().stack.split('\n').slice(2, 6).join(' | ')
+        console.error(`[RateLimiter:${this.name}] consume called key=${key} method=${options.method || ''} stack=${st}`)
+      } catch (e) {}
+    }
+
     const res = await this.consumeForRateLimiter(this._rateLimiter, key, options, points)
     try { const logger = require('@overleaf/logger'); logger.debug({ name: this.name, key, res }, 'rate-limiter consume result') } catch (e) {}
     return res

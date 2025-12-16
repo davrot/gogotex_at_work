@@ -119,6 +119,16 @@ export default {
   },
 
   async listTokens (userId) {
+    // Defensive: if the userId isn't a valid Mongo ObjectId, return empty list
+    // instead of letting Mongoose throw a CastError which results in a 500.
+    try {
+      const mongoose = require('mongoose')
+      if (!mongoose.Types.ObjectId.isValid(userId)) return []
+    } catch (e) {
+      // If mongoose isn't available for some reason, fall through and let the
+      // query behave as before.
+    }
+
     const tokens = await PersonalAccessToken.find({ userId }).sort({ createdAt: -1 }).lean()
     return tokens.map(t => ({
       id: t._id.toString(),

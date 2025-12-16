@@ -7,7 +7,7 @@ const modulePath = path.join(import.meta.dirname, '../../../../../app/src/Featur
 
 describe('TokenController', function () {
   beforeEach(async function (ctx) {
-    vi.resetModules()
+
     ctx.req = { params: { userId: 'u1', tokenId: 't1' }, body: {} }
     ctx.res = new MockResponse()
     // Mock PersonalAccessTokenManager
@@ -18,8 +18,15 @@ describe('TokenController', function () {
       introspect: sinon.stub().resolves({ active: true, userId: 'u1', scopes: [] }),
     }
 
+    // Ensure the actual modules are loaded and then patch/override their
+    // exported members with our stubs so the controller uses them.
+    vi.resetModules()
     vi.doMock('../../../../../app/src/Features/Token/PersonalAccessTokenManager.mjs', () => ({ default: ctx.PATM }))
-    vi.doMock('@overleaf/logger', () => ({ info: () => {}, err: () => {} }))
+
+    // Provide a sinon-stubbed logger so tests can assert logging behavior
+    ctx.logger = { info: sinon.stub(), err: sinon.stub() }
+    vi.doMock('@overleaf/logger', () => ({ default: ctx.logger }))
+
     vi.doMock('@overleaf/metrics', () => ({ default: { Timer: function () { this.done = () => {} }, inc: () => {} } }))
     vi.doMock('../../../../../app/src/infrastructure/RateLimiter.js', () => ({ tokenIntrospectRateLimiter: { consume: async () => {} } }))
 
@@ -36,6 +43,15 @@ describe('TokenController', function () {
     expect(ctx.PATM.createToken.called).to.equal(true)
   })
 
+  it('create logs a token.created audit event', async function (ctx) {
+    ctx.req.params.userId = 'u1'
+    ctx.req.body = { label: 'l' }
+    await ctx.Controller.create(ctx.req, ctx.res)
+    expect(ctx.logger.info.calledOnce).to.equal(true)
+    const logged = ctx.logger.info.getCall(0).args[0]
+    expect(logged).to.include({ type: 'token.created', userId: 'u1', tokenId: 'tid', hashPrefix: 'deadbeef' })
+  })
+
   it('list returns 200', async function (ctx) {
     await ctx.Controller.list(ctx.req, ctx.res)
     expect(ctx.res.statusCode).to.equal(200)
@@ -48,10 +64,11 @@ describe('TokenController', function () {
   })
 
   it('introspect returns 200 and active true', async function (ctx) {
-    ctx.req.body = { token: 'x' }
+    ctx.req.body = { token: 'abcd' }
     await ctx.Controller.introspect(ctx.req, ctx.res)
     expect(ctx.res.statusCode).to.equal(200)
-    expect(JSON.parse(ctx.res.body)).to.have.property('active')
+    const introspectBody = ctx.res.body ? JSON.parse(ctx.res.body) : null
+    expect(introspectBody).to.have.property('active')
   })
 
   it('create with expiresAt returns created token and introspect shows expired', async function (ctx) {
@@ -64,10 +81,11 @@ describe('TokenController', function () {
 
     // introspect expired token should be inactive
     ctx.PATM.introspect.resolves({ active: false })
-    ctx.req.body = { token: 'plain-exp' }
+    ctx.req.body = { token: 'abcdef01' }
     await ctx.Controller.introspect(ctx.req, ctx.res)
     expect(ctx.res.statusCode).to.equal(200)
-    expect(JSON.parse(ctx.res.body).active).to.be.false
+    const expiredBody = ctx.res.body ? JSON.parse(ctx.res.body) : null
+    expect(expiredBody.active).to.be.false
   })
 
   it('list returns tokens and does not include plaintext', async function (ctx) {
@@ -75,7 +93,7 @@ describe('TokenController', function () {
     ctx.PATM.listTokens.resolves([{ id: 't1', label: 'l1', active: true, hashPrefix: 'abcd' }])
     await ctx.Controller.list(ctx.req, ctx.res)
     expect(ctx.res.statusCode).to.equal(200)
-    const listBody = JSON.parse(ctx.res.body)
+    const listBody = ctx.res.body ? JSON.parse(ctx.res.body) : null
     expect(listBody[0]).to.have.property('id')
     expect(listBody[0]).to.not.have.property('token')
   })

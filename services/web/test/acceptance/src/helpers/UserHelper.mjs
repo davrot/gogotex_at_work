@@ -333,6 +333,7 @@ class UserHelper {
       console.debug('[UserHelper.createUser] logging in to obtain session for', user.email)
       user.loginWithEmailPassword(user.email, password, (err, response, body) => {
         if (err) return reject(err)
+        try { console.debug('[UserHelper.createUser] login response', { status: response && response.statusCode, body }) } catch (e) {}
         user.getCsrfToken(err2 => (err2 ? reject(err2) : resolve()))
       })
     })
@@ -517,8 +518,11 @@ class UserHelper {
 
   async login(userData, expectedRedirect) {
     if (!userData) {
+      // If helper has not been registered, create a new user automatically so
+      // tests that call `await (new UserHelper()).login()` will work as a
+      // convenience (many contract tests assume this behaviour).
       if (!this.user || !this._password) {
-        throw new Error('email and password required')
+        await this.register()
       }
       userData = { email: this.user.email, password: this._password }
     }

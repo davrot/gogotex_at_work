@@ -9,7 +9,7 @@ const settings = {
   redis: {
     pubsub: {
       host:
-        process.env.PUBSUB_REDIS_HOST || process.env.REDIS_HOST || '127.0.0.1',
+        process.env.PUBSUB_REDIS_HOST || process.env.REDIS_HOST || (process.env.NODE_ENV === 'test' ? 'redis' : '127.0.0.1'),
       port: process.env.PUBSUB_REDIS_PORT || process.env.REDIS_PORT || '6379',
       password:
         process.env.PUBSUB_REDIS_PASSWORD || process.env.REDIS_PASSWORD || '',

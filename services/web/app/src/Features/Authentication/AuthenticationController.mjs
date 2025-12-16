@@ -368,6 +368,7 @@ const AuthenticationController = {
 
   requireLogin() {
     const doRequest = function (req, res, next) {
+      try { console.error('[requireLogin] invoked', { url: req.url, method: req.method, headers: { cookie: req.headers && req.headers.cookie, 'x-service-origin': req.headers && req.headers['x-service-origin'] }, sessionExists: !!req.session }) } catch (e) {}
       if (next == null) {
         next = function () {}
       }

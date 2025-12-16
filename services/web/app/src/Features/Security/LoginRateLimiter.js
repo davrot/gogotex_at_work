@@ -10,9 +10,15 @@ const rateLimiterLoginEmail = new RateLimiter(
   }
 )
 
+function normalizeEmail (email) {
+  if (typeof email !== 'string') return email
+  return String(email).trim().toLowerCase()
+}
+
 async function processLoginRequest(email) {
+  const key = normalizeEmail(email)
   try {
-    await rateLimiterLoginEmail.consume(email.trim().toLowerCase(), 1, {
+    await rateLimiterLoginEmail.consume(key, 1, {
       method: 'email',
     })
     return true
@@ -26,7 +32,8 @@ async function processLoginRequest(email) {
 }
 
 async function recordSuccessfulLogin(email) {
-  await rateLimiterLoginEmail.delete(email)
+  const key = normalizeEmail(email)
+  await rateLimiterLoginEmail.delete(key)
 }
 
 const LoginRateLimiter = {

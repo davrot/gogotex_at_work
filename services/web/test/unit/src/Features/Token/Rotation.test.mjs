@@ -10,7 +10,7 @@ describe('PersonalAccessToken rotation behavior', function () {
   it('revokes previous token when replace=true', async function () {
     // Ensure we use bcrypt to avoid argon2 availability issues in CI/dev images
     process.env.AUTH_TOKEN_HASH_ALGO = 'bcrypt'
-    const userId = 'u-rot-1'
+    const userId = '507f1f77bcf86cd799439011'
     const res1 = await PersonalAccessTokenManager.createToken(userId, { label: 'rot-label' })
     expect(res1).to.have.property('token')
     const res2 = await PersonalAccessTokenManager.createToken(userId, { label: 'rot-label', replace: true })

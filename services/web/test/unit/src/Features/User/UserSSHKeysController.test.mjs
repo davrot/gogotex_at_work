@@ -6,7 +6,7 @@ const modulePath = new URL('../../../../../app/src/Features/User/UserSSHKeysCont
 describe('UserSSHKeysController', function () {
   beforeEach(async function (ctx) {
     vi.resetModules()
-    ctx.req = { params: { userId: 'u1' }, body: {} }
+    ctx.req = { params: { userId: 'u1' }, body: {}, headers: {} }
     ctx.res = new MockResponse()
     // Mock a constructor-like UserSSHKey model
     function MockUserSSHKey(doc) {
@@ -52,7 +52,7 @@ describe('UserSSHKeysController', function () {
     // re-import controller to pick up overridden mock
     const Controller = (await import(modulePath))
 
-    ctx.req = { params: {}, body: { key_name: 's', public_key: 'ssh-ed25519 AAAAB3Nza' } }
+    ctx.req = { params: {}, body: { key_name: 's', public_key: 'ssh-ed25519 AAAAB3Nza' }, headers: {} }
     ctx.UserSSHKey.find.returns({ lean: () => ({ exec: async () => [] }) })
 
     await Controller.create(ctx.req, ctx.res)
@@ -70,7 +70,7 @@ describe('UserSSHKeysController', function () {
     // re-import controller to pick up overridden mock
     const Controller = (await import(modulePath))
 
-    ctx.req = { params: { userId: 'other' }, body: { key_name: 's', public_key: 'ssh-ed25519 AAAAB3Nza' } }
+    ctx.req = { params: { userId: 'other' }, body: { key_name: 's', public_key: 'ssh-ed25519 AAAAB3Nza' }, headers: {} }
     ctx.UserSSHKey.find.returns({ lean: () => ({ exec: async () => [] }) })
     // debug: confirm session id and admin helper at runtime
     const Sess = await import(new URL('../../../../../app/src/Features/Authentication/SessionManager.mjs', import.meta.url).toString())
@@ -87,7 +87,7 @@ describe('UserSSHKeysController', function () {
     vi.doMock(new URL('../../../../../app/src/Features/Helpers/AdminAuthorizationHelper.mjs', import.meta.url).toString(), () => ({ default: { hasAdminAccess: () => true } }), { virtual: false })
     const Controller = (await import(modulePath))
 
-    ctx.req = { params: { userId: 'other' }, body: { key_name: 's', public_key: 'ssh-ed25519 AAAAB3Nza' } }
+    ctx.req = { params: { userId: 'other' }, body: { key_name: 's', public_key: 'ssh-ed25519 AAAAB3Nza' }, headers: {} }
     ctx.UserSSHKey.find.returns({ lean: () => ({ exec: async () => [] }) })
 
     await Controller.create(ctx.req, ctx.res)
@@ -106,7 +106,7 @@ describe('UserSSHKeysController', function () {
     vi.resetModules()
     vi.doMock(new URL('../../../../../app/src/Features/Authentication/SessionManager.mjs', import.meta.url).toString(), () => ({ default: { getLoggedInUserId: () => 'session-l' } }), { virtual: false })
     const Controller = (await import(modulePath))
-    ctx.req = { params: {} }
+    ctx.req = { params: {}, headers: {} }
     ctx.UserSSHKey.find.returns({ lean: () => ({ exec: async () => [{ _id: 'k2', keyName: 'k', publicKey: 'ssh-rsa AAA', fingerprint: 'fp', createdAt: '2025-01-01', userId: 'session-l' } ] }) })
     await Controller.list(ctx.req, ctx.res)
     expect(ctx.res.statusCode).to.equal(200)
@@ -121,7 +121,7 @@ describe('UserSSHKeysController', function () {
     const Controller = (await import(modulePath))
     const fakeDoc = { _id: 'k3', fingerprint: 'SHA256:BBBB', userId: 'session-r' }
     ctx.UserSSHKey.findOneAndDelete.resolves(fakeDoc)
-    ctx.req = { params: { keyId: 'k3' } }
+    ctx.req = { params: { keyId: 'k3' }, headers: {} }
     await Controller.remove(ctx.req, ctx.res)
     expect(ctx.res.statusCode).to.equal(204)
   })

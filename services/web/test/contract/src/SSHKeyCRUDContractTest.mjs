@@ -72,21 +72,24 @@ describe('SSH Key CRUD contract tests', function () {
     console.error('[SSHKeyCRUDContractTest] keys type=', typeof keys, 'ctor=', keys && keys.constructor && keys.constructor.name, 'toString=', Object.prototype.toString.call(keys), 'isBuffer=', Buffer.isBuffer(keys), 'isArray=', Array.isArray(keys))
     let parsedKeys = keys
     try {
-      // Normalize to a string, strip common surrounding quotes, then parse
-      let raw = String(parsedKeys).trim()
-      if ((raw.startsWith("'") && raw.endsWith("'")) || (raw.startsWith('"') && raw.endsWith('"'))) {
-        raw = raw.slice(1, -1)
-      }
-      if (/^[\s]*[\[{]/.test(raw)) {
-        parsedKeys = JSON.parse(raw)
-      }
-      // If resulting value is still a string (double-encoded), try another pass
+      // Only attempt string normalization if the value is actually a string (or boxed String)
       if (typeof parsedKeys === 'string' || parsedKeys instanceof String) {
-        let raw2 = String(parsedKeys).trim()
-        if ((raw2.startsWith("'") && raw2.endsWith("'")) || (raw2.startsWith('"') && raw2.endsWith('"'))) {
-          raw2 = raw2.slice(1, -1)
+        // Normalize to a string, strip common surrounding quotes, then parse
+        let raw = String(parsedKeys).trim()
+        if ((raw.startsWith("'") && raw.endsWith("'")) || (raw.startsWith('"') && raw.endsWith('"'))) {
+          raw = raw.slice(1, -1)
         }
-        parsedKeys = JSON.parse(raw2)
+        if (/^[\s]*[\[{]/.test(raw)) {
+          parsedKeys = JSON.parse(raw)
+        }
+        // If resulting value is still a string (double-encoded), try another pass
+        if (typeof parsedKeys === 'string' || parsedKeys instanceof String) {
+          let raw2 = String(parsedKeys).trim()
+          if ((raw2.startsWith("'") && raw2.endsWith("'")) || (raw2.startsWith('"') && raw2.endsWith('"'))) {
+            raw2 = raw2.slice(1, -1)
+          }
+          parsedKeys = JSON.parse(raw2)
+        }
       }
     } catch (e) {
       // eslint-disable-next-line no-console

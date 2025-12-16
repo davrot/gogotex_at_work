@@ -7,6 +7,108 @@ chai.use(require('chai-exclude'))
 // Do not truncate assertion errors
 chai.config.truncateThreshold = 0
 
+// Early test-only monkey-patch: intercept direct redis/ioredis client creation
+// to apply test-safe defaults (prefer host 'redis' and avoid eager connects)
+try {
+  const fs = require('fs')
+  try {
+    const nodeRedis = require('redis')
+    if (nodeRedis && typeof nodeRedis.createClient === 'function') {
+      const origCreateClient = nodeRedis.createClient
+      nodeRedis.createClient = function (opts) {
+        try {
+          const options = Object.assign({}, opts || {})
+          // Normalize host in legacy and new socket options
+          let host = options.host || (options.socket && options.socket.host)
+          if (!host) host = process.env.REDIS_HOST || (process.env.NODE_ENV === 'test' ? 'redis' : '127.0.0.1')
+          const hostIsLocal = (host === '127.0.0.1' || host === 'localhost')
+          if (process.env.NODE_ENV === 'test' && hostIsLocal) {
+            if (options.socket) options.socket.host = 'redis'
+            else options.host = 'redis'
+            try { fs.appendFileSync('/tmp/redis_clients.log', JSON.stringify({ t: new Date().toISOString(), event: 'override_node_redis_host_to_redis', originalHost: host, overriddenHost: 'redis' }) + '\n') } catch (e) {}
+          }
+          const creationStack = (new Error('node-redis-client-created')).stack
+          try { fs.appendFileSync('/tmp/redis_clients.log', JSON.stringify({ t: new Date().toISOString(), event: 'created_node_redis', options, creationStack }) + '\n') } catch (e) {}
+        } catch (e) {}
+        return origCreateClient.apply(this, arguments)
+      }
+    }
+  } catch (e) {}
+
+  try {
+    const IORedis = require('ioredis')
+    if (IORedis && typeof IORedis === 'function') {
+      const Orig = IORedis
+      function WrappedIORedis(opts) {
+        try {
+          const standardOpts = Object.assign({}, opts || {})
+          if (!standardOpts.host) standardOpts.host = process.env.REDIS_HOST || (process.env.NODE_ENV === 'test' ? 'redis' : '127.0.0.1')
+          const hostIsLocal = (standardOpts.host === '127.0.0.1' || standardOpts.host === 'localhost')
+          if (process.env.NODE_ENV === 'test' && hostIsLocal) {
+            standardOpts.host = 'redis'
+            try { fs.appendFileSync('/tmp/redis_clients.log', JSON.stringify({ t: new Date().toISOString(), event: 'override_ioredis_host_to_redis', originalHost: opts && opts.host, overriddenHost: 'redis' }) + '\n') } catch (e) {}
+          }
+          if (standardOpts.lazyConnect == null) standardOpts.lazyConnect = true
+          const creationStack = (new Error('ioredis-client-created')).stack
+          try { fs.appendFileSync('/tmp/redis_clients.log', JSON.stringify({ t: new Date().toISOString(), event: 'created_ioredis', options: standardOpts, creationStack }) + '\n') } catch (e) {}
+          return new Orig(standardOpts)
+        } catch (e) {
+          return new Orig(opts)
+        }
+      }
+      // copy static properties and prototype
+      Object.setPrototypeOf(WrappedIORedis, Orig)
+      Object.keys(Orig).forEach(k => { try { WrappedIORedis[k] = Orig[k] } catch (e) {} })
+      try { require.cache[require.resolve('ioredis')].exports = WrappedIORedis } catch (e) {}
+    }
+  } catch (e) {}
+  try { fs.appendFileSync('/tmp/redis_clients.log', JSON.stringify({ t: new Date().toISOString(), event: 'bootstrap_monkeypatch_added' }) + '\n') } catch (e) {}
+  // Connection instrumentation: log socket and mongoose connect attempts for diagnostics
+  try {
+    const fs = require('fs')
+    const net = require('net')
+    try {
+      const origSocketConnect = net.Socket.prototype.connect
+      net.Socket.prototype.connect = function () {
+        try {
+          const args = Array.from(arguments)
+          let opts = {}
+          if (typeof args[0] === 'object') opts = args[0]
+          else if (typeof args[0] === 'number') { opts.port = args[0]; if (typeof args[1] === 'string') opts.host = args[1] }
+          const stack = (new Error('socket-connect-called')).stack
+          try { fs.appendFileSync('/tmp/conn_creation_stacks.log', JSON.stringify({ t: new Date().toISOString(), event: 'socket_connect', options: opts, stack }) + '\n') } catch (e) {}
+        } catch (e) {}
+        return origSocketConnect.apply(this, arguments)
+      }
+    } catch (e) {}
+
+    try {
+      const mongoose = require('mongoose')
+      const origMConnect = mongoose.connect
+      mongoose.connect = function () {
+        try {
+          const args = Array.from(arguments)
+          const uri = args[0]
+          const opts = args[1]
+          const stack = (new Error('mongoose-connect-called')).stack
+          try { fs.appendFileSync('/tmp/conn_creation_stacks.log', JSON.stringify({ t: new Date().toISOString(), event: 'mongoose_connect', uri, options: opts, stack }) + '\n') } catch (e) {}
+        } catch (e) {}
+        return origMConnect.apply(this, arguments)
+      }
+      const origCreateConnection = mongoose.createConnection
+      mongoose.createConnection = function () {
+        try {
+          const args = Array.from(arguments)
+          const uri = args[0]
+          const opts = args[1]
+          const stack = (new Error('mongoose-createConnection-called')).stack
+          try { fs.appendFileSync('/tmp/conn_creation_stacks.log', JSON.stringify({ t: new Date().toISOString(), event: 'mongoose_createConnection', uri, options: opts, stack }) + '\n') } catch (e) {}
+        } catch (e) {}
+        return origCreateConnection.apply(this, arguments)
+      }
+    } catch (e) {}
+  } catch (e) {}} catch (e) {}
+
 // ensure every ObjectId has the id string as a property for correct comparisons
 require('mongodb-legacy').ObjectId.cacheHexString = true
 
@@ -121,7 +223,8 @@ try {
   try {
     const { overleafLoginRateLimiter } = require('../../../../app/src/infrastructure/RateLimiter.js')
     if (Settings.smokeTest && Settings.smokeTest.rateLimitSubject) {
-      overleafLoginRateLimiter.delete(Settings.smokeTest.rateLimitSubject).catch(() => {})
+      const rlKey = String(Settings.smokeTest.rateLimitSubject).trim().toLowerCase()
+      overleafLoginRateLimiter.delete(rlKey).catch(() => {})
     }
   } catch (e) {}
 
@@ -194,6 +297,25 @@ async function _bootstrapCleanup() {
     // eslint-disable-next-line no-console
     console.debug('[bootstrap] redis cleanup failed', e && e.message ? e.message : e)
   }
+
+  // Attempt to disconnect any tracked redis clients from the libraries wrapper
+  try {
+    try {
+      const RedisLib = require('../../../../libraries/redis-wrapper')
+      if (RedisLib && typeof RedisLib.disconnectAllClients === 'function') {
+        await RedisLib.disconnectAllClients().catch(() => {})
+        // eslint-disable-next-line no-console
+        console.debug('[bootstrap] disconnected tracked redis clients')
+      }
+    } catch (e) {}
+  } catch (e) {}
+
+  // Force-close any remaining active handles after graceful disconnect attempts
+  try { await forceCloseActiveHandles() } catch (e) {}
+  // Also destroy global HTTP(S) agents to close any keep-alive sockets
+  try { require('http').globalAgent && typeof require('http').globalAgent.destroy === 'function' && require('http').globalAgent.destroy() } catch (e) {}
+  try { require('https').globalAgent && typeof require('https').globalAgent.destroy === 'function' && require('https').globalAgent.destroy() } catch (e) {}
+
 }
 
 // Register cleanup hooks so DB and Redis are closed when the test runner finishes
@@ -206,10 +328,66 @@ if (typeof globalThis.after === 'function') {
 
 // Some test runners leave open handles that prevent process termination.
 // After attempting graceful cleanup, force exit in test environments to avoid hanging forever.
+async function forceCloseActiveHandles() {
+  try {
+    const fs = require('fs')
+    if (typeof process._getActiveHandles !== 'function') return
+    const handles = process._getActiveHandles()
+    const actions = []
+    for (const h of handles) {
+      try {
+        const type = (h && h.constructor && h.constructor.name) || typeof h
+        const info = { type }
+        if (type === 'Timeout' || type === 'Immediate') {
+          try { clearTimeout(h); clearInterval(h) } catch (e) {}
+          info.action = 'cleared timer'
+        } else if (type === 'Socket' || type === 'Server' || type === 'TLSSocket') {
+          try { h.destroy && h.destroy(); h.close && h.close() } catch (e) {}
+          info.action = 'destroyed/closed socket/server'
+        } else if (typeof h.close === 'function') {
+          try { h.close() } catch (e) {}
+          info.action = 'closed via close()'
+        } else {
+          info.action = 'no-op'
+        }
+        actions.push(info)
+      } catch (e) {}
+    }
+    try { fs.appendFileSync('/tmp/node_active_handles.log', JSON.stringify({ t: new Date().toISOString(), forced: actions }) + '\n') } catch (e) {}
+  } catch (e) {}
+}
+
 async function _bootstrapCleanupWithForce() {
   try { await _bootstrapCleanup() } catch (e) {}
   if ((process.env.NODE_ENV === 'test') || (process.env.TEST_FORCE_EXIT === 'true')) {
     try { console.debug('[bootstrap] forcing process.exit(0) after cleanup') } catch (e) {}
+    // Diagnostic: if the process is still alive after cleanup, dump active handles so we can find what is keeping the event loop busy
+    try {
+      const fs = require('fs')
+      const dumpHandles = (handles) => handles.map(h => {
+        const info = { type: (h && h.constructor && h.constructor.name) || typeof h }
+        try {
+          if (h && h.remoteAddress) info.remoteAddress = h.remoteAddress
+          if (h && h.remotePort) info.remotePort = h.remotePort
+          if (h && h.localPort) info.localPort = h.localPort
+          if (h && h.path) info.path = h.path
+          if (h && h.pid) info.pid = h.pid
+          if (h && h._onTimeout) info.onTimeout = !!h._onTimeout
+          if (h && h._repeat) info.repeat = h._repeat
+        } catch (e) {}
+        return info
+      })
+      try {
+        const handles = (typeof process._getActiveHandles === 'function') ? process._getActiveHandles() : []
+        const requests = (typeof process._getActiveRequests === 'function') ? process._getActiveRequests() : []
+        const report = { t: new Date().toISOString(), handles: dumpHandles(handles), requests: dumpHandles(requests) }
+        try { fs.appendFileSync('/tmp/node_active_handles.log', JSON.stringify(report) + '\n') } catch (e) {}
+        try { console.debug('[bootstrap] dumped active handles to /tmp/node_active_handles.log', report.handles.length, 'handles', report.requests.length, 'requests') } catch (e) {}
+        // After dumping, attempt to forcibly close any remaining handles to allow process to exit
+        try { await forceCloseActiveHandles() } catch (e) {}
+      } catch (e) {}
+    } catch (e) {}
+
     try { setTimeout(() => { process.exit(0) }, 100) } catch (e) {}
   }
 }
@@ -222,12 +400,65 @@ process.on('exit', _bootstrapCleanupWithForce)
 if (typeof globalThis.after === 'function') {
   try { globalThis.after(_bootstrapCleanupWithForce) } catch (e) {}
 }
-process.on('SIGTERM', () => {
+process.on('SIGTERM', async () => {
   // eslint-disable-next-line no-console
-  console.debug('[bootstrap] SIGTERM received, exiting')
+  console.debug('[bootstrap] SIGTERM received, attempting graceful shutdown')
+  try {
+    try {
+      const RedisLib = require('../../../../libraries/redis-wrapper')
+      if (RedisLib && typeof RedisLib.disconnectAllClients === 'function') {
+        await RedisLib.disconnectAllClients().catch(() => {})
+        // eslint-disable-next-line no-console
+        console.debug('[bootstrap] disconnected tracked redis clients on SIGTERM')
+      }
+    } catch (e) {}
+    // Destroy global HTTP(S) agents to close keep-alive sockets
+    try { require('http').globalAgent && typeof require('http').globalAgent.destroy === 'function' && require('http').globalAgent.destroy() } catch (e) {}
+    try { require('https').globalAgent && typeof require('https').globalAgent.destroy === 'function' && require('https').globalAgent.destroy() } catch (e) {}
+    try { await forceCloseActiveHandles() } catch (e) {}
+  } catch (e) {}
   try { process.exit(0) } catch (e) {}
 })
 
 process.on('unhandledRejection', (reason) => {
   try { console.error('[bootstrap] unhandledRejection', reason) } catch (e) {}
 })
+
+// Diagnostic watchdog: schedule a delayed check to dump active handles if the test run appears to have finished but the process remains alive.
+if (process.env.NODE_ENV === 'test') {
+  const fs = require('fs')
+  const dumpHandles = async () => {
+    try {
+      if (typeof process._getActiveHandles !== 'function') return
+      const handles = process._getActiveHandles()
+      if (!handles || handles.length === 0) return
+      const dump = handles.map(h => ({ type: (h && h.constructor && h.constructor.name) || typeof h, info: { remoteAddress: h && h.remoteAddress, remotePort: h && h.remotePort, localPort: h && h.localPort, path: h && h.path, pid: h && h.pid, onTimeout: !!(h && h._onTimeout), repeat: h && h._repeat } }))
+      try { fs.appendFileSync('/tmp/node_active_handles.log', JSON.stringify({ t: new Date().toISOString(), handles: dump }) + '\n') } catch (e) {}
+      try { console.debug('[bootstrap] watchdog dumped active handles to /tmp/node_active_handles.log', dump.length) } catch (e) {}
+      // If there are still active handles, attempt to forcibly close them so the process can exit
+      try { await forceCloseActiveHandles() } catch (e) {}
+    } catch (e) {
+      try { console.debug('[bootstrap] watchdog dump failed', e && e.message ? e.message : e) } catch (e2) {}
+    }
+  }
+  // Schedule a couple of checks to capture handles after tests complete
+  setTimeout(dumpHandles, 2000)
+  setTimeout(dumpHandles, 5000)
+  // Also call 'why-is-node-running' if available to get a deep diagnositc for lingering handles,
+  // and write its output to `/tmp/why_node_running.log`.
+  try {
+    setTimeout(() => {
+      try {
+        const fs = require('fs')
+        const why = require('why-is-node-running')
+        const oldError = console.error
+        console.error = (...args) => { try { fs.appendFileSync('/tmp/why_node_running.log', args.map(a => (typeof a === 'string' ? a : String(a))).join(' ') + '\n') } catch (e) {} ; oldError.apply(console, args) }
+        // This call will append diagnostic lines both to console and to /tmp/why_node_running.log
+        try { why() } catch (e) {}
+        console.error = oldError
+      } catch (e) {}
+    }, 3000)
+  } catch (e) {}
+  // Allow ad-hoc manual dump trigger from the test runner if needed
+  try { globalThis.dumpActiveHandles = dumpHandles } catch (e) {}
+}

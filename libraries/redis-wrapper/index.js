@@ -4,7 +4,45 @@ const crypto = require('node:crypto')
 const os = require('node:os')
 const { promisify } = require('node:util')
 
+const fs = require('fs')
 const Redis = require('ioredis')
+
+// Attempt to patch the node-redis client (redis@4+) so that any direct calls
+// to `redis.createClient` also get recorded and have the same test-time
+// defensive overrides (host -> 'redis' and lazyConnect:true). Some modules
+// in the codebase call `redis.createClient(...)` directly; patching here
+// lets us capture creation stacks and avoid accidental eager connects to
+// 127.0.0.1 during test runs.
+try {
+  const nodeRedis = require('redis')
+  if (nodeRedis && typeof nodeRedis.createClient === 'function') {
+    const origCreateClient = nodeRedis.createClient
+    nodeRedis.createClient = function (opts) {
+      try {
+        const options = Object.assign({}, opts || {})
+        // apply same test-time host override and lazyConnect defaults
+        if (!options.host) {
+          options.host = process.env.REDIS_HOST || (process.env.NODE_ENV === 'test' ? 'redis' : '127.0.0.1')
+        }
+        if (process.env.NODE_ENV === 'test') {
+          const hostIsLocal = (options.host === '127.0.0.1' || options.host === 'localhost')
+          if (hostIsLocal) {
+            options.host = 'redis'
+            try { fs.appendFileSync('/tmp/redis_clients.log', JSON.stringify({ t: new Date().toISOString(), event: 'override_node_redis_host_to_redis', originalHost: opts && opts.host, overriddenHost: 'redis' }) + '\n') } catch (e) {}
+          }
+          if (options.lazyConnect == null) options.lazyConnect = true
+        }
+        const creationStack = (new Error('node-redis-client-created')).stack
+        try { fs.appendFileSync('/tmp/redis_clients.log', JSON.stringify({ t: new Date().toISOString(), event: 'created_node_redis', options, creationStack }) + '\n') } catch (e) {}
+      } catch (e) {
+        // swallow
+      }
+      return origCreateClient.apply(this, arguments)
+    }
+  }
+} catch (e) {
+  // not installed or couldn't patch - ignore
+}
 
 const {
   RedisHealthCheckTimedOut,
@@ -30,12 +68,18 @@ function createClient(opts) {
     standardOpts.host = process.env.REDIS_HOST || (process.env.NODE_ENV === 'test' ? 'redis' : '127.0.0.1')
   }
 
-  // Defensive override: if a caller explicitly provided '127.0.0.1' via settings
-  // but REDIS_HOST was not set, and we're running in a dockerized test environment,
-  // prefer connecting to the 'redis' service name so tests connect to containerized
-  // Redis instead of local host. This helps when module imports happen before
-  // test bootstrap sets env vars.
-  if (!process.env.REDIS_HOST && standardOpts.host === '127.0.0.1') {
+  // Defensive override: prefer the docker 'redis' service when running tests.
+  // This prevents accidental connects to localhost when modules are imported
+  // before test bootstrap sets env vars or when Settings specify '127.0.0.1'.
+  if (process.env.NODE_ENV === 'test') {
+    try {
+      const hostIsLocal = (standardOpts.host === '127.0.0.1' || standardOpts.host === 'localhost')
+      if (hostIsLocal) {
+        try { fs.appendFileSync('/tmp/redis_clients.log', JSON.stringify({ t: new Date().toISOString(), event: 'override_host_to_redis', originalHost: standardOpts.host, overriddenHost: 'redis' }) + '\n') } catch (e) {}
+        standardOpts.host = 'redis'
+      }
+    } catch (e) {}
+  } else if (!process.env.REDIS_HOST && standardOpts.host === '127.0.0.1') {
     try { standardOpts.host = 'redis' } catch (e) {}
   }
 
@@ -48,6 +92,16 @@ function createClient(opts) {
   // producing ECONNREFUSED) before test bootstrap/env vars are applied. Callers can
   // override by explicitly passing lazyConnect:false if they need immediate connection.
   if (standardOpts.lazyConnect == null) {
+    standardOpts.lazyConnect = true
+  }
+
+  // Defensive: if we're running tests, override any explicit request to eagerly connect
+  // (lazyConnect:false) to avoid producing ECONNREFUSED during test bootstrap where the
+  // environment may still be initializing (docker service names not yet available).
+  if (process.env.NODE_ENV === 'test' && standardOpts.lazyConnect === false) {
+    try {
+      try { fs.appendFileSync('/tmp/redis_clients.log', JSON.stringify({ t: new Date().toISOString(), event: 'override_lazyConnect', originalOptions: opts || null, overriddenOptions: Object.assign({}, standardOpts, { lazyConnect: true }) }) + '\n') } catch (e) {}
+    } catch (e) {}
     standardOpts.lazyConnect = true
   }
 
@@ -69,7 +123,27 @@ function createClient(opts) {
   try {
     const creationStack = (new Error('redis-client-created')).stack
     client._creationStack = creationStack
-    try { fs.appendFileSync('/tmp/redis_clients.log', JSON.stringify({ t: new Date().toISOString(), event: 'created', options: standardOpts || null, creationStack: creationStack }) + '\n') } catch (e) {}
+    // Always attempt to record the creation stack so we can later find the culprit
+    try { fs.appendFileSync('/tmp/redis_clients.log', JSON.stringify({ t: new Date().toISOString(), event: 'created', options: standardOpts || null, creationStack: creationStack }) + '\n') } catch (e) {
+      // If logging fails, still attach the stack to the client so error handlers can use it
+      try { client._creationStack = creationStack } catch (e2) {}
+    }
+  } catch (e) {}
+
+  // Log lifecycle events for better traceability (connect/ready/close)
+  try {
+    client.on && client.on('connect', () => {
+      try { fs.appendFileSync('/tmp/redis_clients.log', JSON.stringify({ t: new Date().toISOString(), event: 'connect', options: client.options || null, creationStack: client._creationStack || null }) + '\n') } catch (e) {}
+    })
+    client.on && client.on('ready', () => {
+      try { fs.appendFileSync('/tmp/redis_clients.log', JSON.stringify({ t: new Date().toISOString(), event: 'ready', options: client.options || null, creationStack: client._creationStack || null }) + '\n') } catch (e) {}
+    })
+    client.on && client.on('end', () => {
+      try { fs.appendFileSync('/tmp/redis_clients.log', JSON.stringify({ t: new Date().toISOString(), event: 'end', options: client.options || null, creationStack: client._creationStack || null }) + '\n') } catch (e) {}
+    })
+    client.on && client.on('close', () => {
+      try { fs.appendFileSync('/tmp/redis_clients.log', JSON.stringify({ t: new Date().toISOString(), event: 'close', options: client.options || null, creationStack: client._creationStack || null }) + '\n') } catch (e) {}
+    })
   } catch (e) {}
 
   // defensive: prevent unhandled 'error' events from bubbling up
@@ -77,9 +151,31 @@ function createClient(opts) {
   client.on('error', err => {
     try {
       const errStack = (err && err.stack) ? err.stack : String(err)
-      const logObj = { t: new Date().toISOString(), event: 'error', options: client.options || null, err: errStack, creationStack: client._creationStack || null }
+      // If we don't have a recorded creation stack (client created before our instrumentation), capture
+      // a current stack so we have a clue where this instance originated.
+      const creationStack = client._creationStack || (new Error('redis-error-no-creation-stack')).stack
+      if (!client._creationStack) {
+        // record it back on the instance to avoid repeating this work for subsequent errors
+        try { client._creationStack = creationStack } catch (e) {}
+      }
+
+      const hostIsLocalhost = client.options && (client.options.host === '127.0.0.1' || client.options.host === 'localhost')
+      const logObj = {
+        t: new Date().toISOString(),
+        event: 'error',
+        options: client.options || null,
+        err: errStack,
+        creationStack: creationStack || null,
+        hostIsLocalhost: !!hostIsLocalhost,
+        pid: process.pid,
+        nodeEnv: process.env.NODE_ENV || null,
+      }
       try { fs.appendFileSync('/tmp/redis_clients.log', JSON.stringify(logObj) + '\n') } catch (e) {}
-      console.error('[redis-wrapper] ioredis error:', errStack, 'client.options=', client.options || null, 'creationStack=', client._creationStack || null)
+      if (hostIsLocalhost) {
+        console.error('[redis-wrapper] ioredis error (host=127.0.0.1 detected):', errStack, 'client.options=', client.options || null, 'creationStack=', creationStack || null)
+      } else {
+        console.error('[redis-wrapper] ioredis error:', errStack, 'client.options=', client.options || null, 'creationStack=', creationStack || null)
+      }
     } catch (e) {
       // swallow any logging errors to avoid cascading failures
     }
@@ -235,7 +331,21 @@ function ensureTestRedis(rclient) {
   }
 }
 
+async function disconnectAllClients() {
+  try {
+    const clients = global.__redis_wrapper_known_clients ? Array.from(global.__redis_wrapper_known_clients) : []
+    for (const c of clients) {
+      try {
+        if (c && typeof c.disconnect === 'function') {
+          try { await c.disconnect() } catch (e) {}
+        }
+      } catch (e) {}
+    }
+  } catch (e) {}
+}
+
 module.exports = {
   createClient,
   cleanupTestRedis,
+  disconnectAllClients,
 }

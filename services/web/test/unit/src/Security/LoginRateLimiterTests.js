@@ -30,6 +30,11 @@ describe('LoginRateLimiter', function () {
       expect(this.rateLimiter.consume).to.have.been.calledWith(this.email)
     })
 
+    it('should normalize email before consuming', async function () {
+      await this.LoginRateLimiter.promises.processLoginRequest('  BoB@BoB.COM  ')
+      expect(this.rateLimiter.consume).to.have.been.calledWith('bob@bob.com')
+    })
+
     describe('when login is allowed', function () {
       it('should call pass allow=true', async function () {
         const allow = await this.LoginRateLimiter.promises.processLoginRequest(
@@ -75,6 +80,11 @@ describe('LoginRateLimiter', function () {
     it('should clear the rate limit', async function () {
       await this.LoginRateLimiter.promises.recordSuccessfulLogin(this.email)
       expect(this.rateLimiter.delete).to.have.been.calledWith(this.email)
+    })
+
+    it('should normalize email before deleting', async function () {
+      await this.LoginRateLimiter.promises.recordSuccessfulLogin('  BoB@BoB.COM  ')
+      expect(this.rateLimiter.delete).to.have.been.calledWith('bob@bob.com')
     })
   })
 })

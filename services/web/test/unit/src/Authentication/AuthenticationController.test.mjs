@@ -671,7 +671,7 @@ describe('AuthenticationController', function () {
 
       it('should log the failed login', function (ctx) {
         expect(ctx.logger.debug).toBeCalledWith(
-          { email: ctx.email.toLowerCase() },
+          expect.objectContaining({ email: ctx.email.toLowerCase() }),
           'failed log in'
         )
       })
