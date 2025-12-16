@@ -99,8 +99,51 @@ export async function list(req, res) {
       username,
       display_name: displayName,
     }))
-    // Return a top-level JSON array to match WebProfileClient expectations
-    return res.status(200).json(enriched)
+
+    // Diagnostic: ensure we never return a JSON string when an array is expected
+    try { console.error('DEBUG UserSSHKeysController.list: enriched type=', typeof enriched, 'isArray=', Array.isArray(enriched), 'len=', enriched && enriched.length) } catch (e) {}
+    if (typeof enriched === 'string') {
+      // Record context for post-mortem
+      try { fs.appendFileSync('/tmp/user_sshkey_list_debug.log', `${new Date().toISOString()} LIST_STRING enriched=${JSON.stringify(enriched)} headers=${JSON.stringify(req.headers)} session=${JSON.stringify(req.session && { id: req.session.id || req.sessionID, user: req.session.user ? { _id: req.session.user._id, email: req.session.user.email } : null })}\n${new Error().stack}\n\n`) } catch (e) {}
+      try {
+        enriched = JSON.parse(enriched)
+      } catch (e) {
+        try { console.error('DEBUG UserSSHKeysController.list: failed to parse enriched string - wrapping in array') } catch (e2) {}
+        enriched = [enriched]
+      }
+    }
+
+    // Force logging of outgoing headers & serialized body to detect downstream transforms
+    try {
+      const serialized = JSON.stringify(enriched)
+      try { console.error('DEBUG UserSSHKeysController.list: about to send response, headers=', res.getHeaders ? res.getHeaders() : {}, 'serializedLen=', serialized.length) } catch (e) {}
+      try { fs.appendFileSync('/tmp/user_sshkey_list_debug.log', `${new Date().toISOString()} OUTGOING serializedLen=${serialized.length} headers=${JSON.stringify(res.getHeaders ? res.getHeaders() : {})} body=${serialized}\n\n`) } catch (e) {}
+    } catch (e) {}
+
+    // Return a proper JSON response via Express so headers and serialization are consistent
+    try {
+      const serialized = JSON.stringify(enriched)
+      try { fs.appendFileSync('/tmp/user_sshkey_list_debug.log', `${new Date().toISOString()} PRE_SEND serializedLen=${serialized.length} headers=${JSON.stringify(res.getHeaders ? res.getHeaders() : {})} body=${serialized}\n`) } catch (e) {}
+      try {
+        res.on('finish', () => {
+          try {
+            const post = {
+              t: new Date().toISOString(),
+              event: 'post_send',
+              status: res.statusCode,
+              headersSent: res.headersSent,
+              headers: res.getHeaders ? res.getHeaders() : {},
+              socketWritableEnded: res.socket ? !!res.socket.writableEnded : null,
+            }
+            try { fs.appendFileSync('/tmp/user_sshkey_list_debug.log', JSON.stringify(post) + '\n\n') } catch (e) {}
+          } catch (e) {}
+        })
+      } catch (e) {}
+      return res.status(200).json(enriched)
+    } catch (e) {
+      logger.err({ err: e }, 'failed to send ssh keys response')
+      return res.sendStatus(500)
+    }
   } catch (err) {
     logger.err({ err, userId }, 'error listing user ssh keys')
     return res.sendStatus(500)

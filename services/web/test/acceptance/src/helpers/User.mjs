@@ -1403,7 +1403,25 @@ User.promises.prototype.doRequest = async function (method, params) {
       if (err) {
         reject(err)
       } else {
-        resolve({ response, body })
+        // Diagnostic: log raw response headers and body type to a tmp file for post-mortem
+        try { fs.appendFileSync('/tmp/user_doRequest_debug.log', `${new Date().toISOString()} METHOD=${method} url=${params && params.url} status=${response && response.statusCode} headers=${JSON.stringify(response && response.headers)} bodyType=${typeof body} bodySample=${typeof body === 'string' ? body.slice(0,200) : JSON.stringify(body).slice(0,200)}\n`) } catch (e) {}
+        try { console.error('[User.doRequest CALLBACK] method=', method, 'url=', params && params.url, 'status=', response && response.statusCode, 'headers=', response && response.headers, 'body type=', typeof body, 'sample=', typeof body === 'string' ? body.slice(0,200) : JSON.stringify(body).slice(0,200)) } catch (e) {}
+        let parsedBody = body
+        try {
+          const ct = response && response.headers && response.headers['content-type']
+          if (typeof body === 'string') {
+            // Prefer explicit content-type parsing, but fall back to JSON-like bodies
+            if (ct && ct.toLowerCase().includes('application/json')) {
+              parsedBody = JSON.parse(body)
+            } else if (/^[\s]*[\[{]/.test(body)) {
+              // heuristically parse when body looks like JSON
+              try { parsedBody = JSON.parse(body) } catch (e) { /* ignore */ }
+            }
+          }
+        } catch (e) {
+          // ignore parse errors and fall back to raw body
+        }
+        resolve({ response, body: parsedBody })
       }
     })
   })

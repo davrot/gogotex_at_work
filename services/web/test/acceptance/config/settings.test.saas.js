@@ -110,7 +110,9 @@ const overrides = {
 module.exports = baseApp.mergeWith(baseTest.mergeWith(overrides))
 
 for (const redisKey of Object.keys(module.exports.redis)) {
-  module.exports.redis[redisKey].host = process.env.REDIS_HOST || '127.0.0.1'
+  // Default to the docker-compose service name used in CI/dev compose files when
+  // REDIS_HOST is not explicitly set in the environment for the test runner.
+  module.exports.redis[redisKey].host = process.env.REDIS_HOST || 'redis'
 }
 
 module.exports.mergeWith = function (overrides) {

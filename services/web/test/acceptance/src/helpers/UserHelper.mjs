@@ -343,14 +343,25 @@ class UserHelper {
         user.doRequest = (...args) => user.promises.doRequest(...args)
       } else {
         // Fallback: implement the same doRequest helper used in User.mjs
+        // but auto-parse JSON responses when Content-Type is application/json
         user.doRequest = async function (method, params) {
           return new Promise((resolve, reject) => {
             this.request[method.toLowerCase()](params, (err, response, body) => {
-              if (err) {
-                reject(err)
-              } else {
-                resolve({ response, body })
+              if (err) return reject(err)
+              let parsedBody = body
+              try {
+                const ct = response && response.headers && response.headers['content-type']
+                if (typeof body === 'string') {
+                  if (ct && ct.toLowerCase().includes('application/json')) {
+                    parsedBody = JSON.parse(body)
+                  } else if (/^[\s]*[\[{]/.test(body)) {
+                    try { parsedBody = JSON.parse(body) } catch (e) { /* ignore */ }
+                  }
+                }
+              } catch (e) {
+                // ignore parse errors and fall back to raw body
               }
+              resolve({ response, body: parsedBody })
             })
           })
         }
