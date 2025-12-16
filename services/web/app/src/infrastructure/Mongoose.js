@@ -33,9 +33,10 @@ mongoose.connection.on('connected', () =>
   logger.debug('mongoose default connection open')
 )
 
-mongoose.connection.on('error', err =>
+mongoose.connection.on('error', err => {
   logger.err({ err }, 'mongoose error on default connection')
-)
+  try { require('fs').appendFileSync('/tmp/mongo_connect_errors.log', JSON.stringify({ t: new Date().toISOString(), event: 'mongoose_error', err: (err && err.stack) ? err.stack : String(err), mongoUrl: Settings.mongo.url, envHost: process.env.MONGO_HOST || null, stack: new Error().stack }) + '\n') } catch (e) {}
+})
 
 mongoose.connection.on('disconnected', () =>
   logger.debug('mongoose default connection disconnected')

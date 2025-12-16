@@ -130,8 +130,6 @@ const db = {
   scriptLogs: internalDb.collection('scriptLogs'),
 }
 
-const connectionPromise = mongoClient.connect()
-
 async function getCollectionNames() {
   const internalDb = mongoClient.db()
 
