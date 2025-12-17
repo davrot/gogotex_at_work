@@ -219,6 +219,37 @@ try {
     })
   } catch (e) {}
 
+  // Automatically clear common rate-limiter keys used across contract tests to
+  // reduce cross-test flakiness. This runs by default; set AUTO_CLEAR_RATE_LIMITS=false
+  // to opt out (useful when intentionally testing rate-limit behaviour).
+  if (process.env.AUTO_CLEAR_RATE_LIMITS !== 'false') {
+    try {
+      const RedisWrapper = require('../../../../app/src/infrastructure/RedisWrapper.js')
+      const rclient = RedisWrapper.client('ratelimiter')
+      ;(async () => {
+        try {
+          const keysA = await rclient.keys('rate-limit:overleaf-login:*')
+          const keysB = await rclient.keys('rate-limit:token-introspect:*')
+          const keysC = await rclient.keys('rate-limit:fingerprint-lookup:*')
+          const keysD = await rclient.keys('rate-limit:ssh-fingerprint-lookup:*')
+          const keys = [...(keysA || []), ...(keysB || []), ...(keysC || []), ...(keysD || [])]
+          if (keys && keys.length) {
+            await rclient.del(keys)
+            // eslint-disable-next-line no-console
+            console.debug('[bootstrap] auto-cleared rate-limiter keys:', keys.length)
+          } else {
+            // eslint-disable-next-line no-console
+            console.debug('[bootstrap] no rate-limiter keys to clear')
+          }
+        } catch (e) {
+          // ignore errors clearing rate-limiter keys
+        } finally {
+          try { await rclient.disconnect() } catch (e) {}
+        }
+      })()
+    } catch (e) {}
+  }
+
   // Clear any existing overleaf-login rate limiter entry for the smoke-test subject
   try {
     const { overleafLoginRateLimiter } = require('../../../../app/src/infrastructure/RateLimiter.js')
