@@ -37,6 +37,15 @@ gitbridge_maven_tests:
     - cd services/git-bridge
     - mvn -B -q -DskipTests=false test
 
+# End-to-end SSH tests that exercise WebProfile -> Mongo -> SSH end-to-end behaviour
+gitbridge_ssh_e2e:
+  stage: test
+  script:
+    - cd services/git-bridge
+    - mvn -B -q -DskipTests=false -Dtest=WebProfileSSHServerE2ETest,WebProfileSSHServerMembershipE2ETest test
+  allow_failure: false
+  timeout: 10m
+
 bench_key_lookup:
   stage: bench
   variables:
