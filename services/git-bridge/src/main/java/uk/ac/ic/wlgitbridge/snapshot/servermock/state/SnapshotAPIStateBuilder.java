@@ -32,8 +32,29 @@ public class SnapshotAPIStateBuilder {
   private Map<String, SnapshotPushResult> push = new HashMap<>();
   private Map<String, SnapshotPostbackRequest> postback = new HashMap<>();
 
+  private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(SnapshotAPIStateBuilder.class);
+
   public SnapshotAPIStateBuilder(InputStream stream) {
-    projects = new Gson().fromJson(new InputStreamReader(stream), JsonArray.class);
+    String content;
+    try {
+      content = new String(stream.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+    } catch (java.io.IOException e) {
+      throw new RuntimeException(e);
+    }
+    try {
+      projects = new Gson().fromJson(content, JsonArray.class);
+    } catch (com.google.gson.JsonSyntaxException e) {
+      // Log the failure and include a snippet of the content to aid debugging
+      final int maxLen = 2000;
+      String snippet = content.length() > maxLen ? content.substring(0, maxLen) + "..." : content;
+      LOG.error("Failed to parse Snapshot API state JSON (showing up to {} chars):\n{}", maxLen, snippet, e);
+      throw new com.google.gson.JsonSyntaxException(
+          "Failed to parse Snapshot API state JSON. Snippet (first "
+              + maxLen
+              + " chars):\n"
+              + snippet,
+          e);
+    }
   }
 
   public SnapshotAPIState build() {

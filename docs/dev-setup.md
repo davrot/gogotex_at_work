@@ -97,6 +97,7 @@ docker run --rm -v /absolute/path/to/services/git-bridge:/app -w /app maven:3-am
 ```
 
 This is a convenient fallback for CI-like test runs or temporary verification.
+
 ### Running integration (E2E) tests locally
 
 Integration and end-to-end tests have their own Maven profile named `integration-tests` which uses the Failsafe plugin. To run all integration tests locally:

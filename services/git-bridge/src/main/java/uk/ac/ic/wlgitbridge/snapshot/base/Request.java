@@ -84,6 +84,12 @@ public abstract class Request<T extends Result> {
       if (cause instanceof HttpResponseException) {
         HttpResponseException httpCause = (HttpResponseException) cause;
         int sc = httpCause.getStatusCode();
+        // Log response body for 4xx errors to aid debugging of Forbidden/NotFound
+        try {
+          Log.warn("Snapshot API returned status {} for URL {} with body: {}", sc, url, httpCause.getContent());
+        } catch (Exception ignore) {
+          // best-effort logging
+        }
         if (sc == HttpServletResponse.SC_UNAUTHORIZED
             || sc == HttpServletResponse.SC_FORBIDDEN) { // 401, 403
           throw new ForbiddenException();

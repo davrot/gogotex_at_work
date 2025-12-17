@@ -51,5 +51,35 @@ public class Oauth2FilterTest {
 
     // And that the credential attribute is set on the request
     verify(req, atLeastOnce()).setAttribute(eq(Oauth2Filter.ATTRIBUTE_KEY), any(Credential.class));
+
+  }
+
+  @Test
+  public void whenNoLocalIntrospect_incrementsPermissiveCounter() throws Exception {
+    // Ensure auth disable property not set
+    System.clearProperty("auth.disable_oauth");
+
+    SnapshotApi api = mock(SnapshotApi.class);
+    Oauth2Filter filter = new Oauth2Filter(api, false);
+
+    HttpServletRequest req = mock(HttpServletRequest.class);
+    HttpServletResponse resp = mock(HttpServletResponse.class);
+    FilterChain chain = mock(FilterChain.class);
+
+    when(req.getRequestURI()).thenReturn("/6941daf868135692d26ac68d/info/refs");
+    when(req.getHeader("Authorization")).thenReturn("Basic Z2l0OnRva2Vu"); // git:token base64
+
+    long before = Oauth2Filter.getPermissiveAcceptCount();
+
+    filter.doFilter(req, resp, chain);
+
+    // Verify that chain.doFilter was invoked
+    verify(chain, times(1)).doFilter(any(ServletRequest.class), any(ServletResponse.class));
+
+    // Verify permissive counter incremented by 1
+    assertEquals(before + 1, Oauth2Filter.getPermissiveAcceptCount());
+
+    // Verify header was added to the response to aid observability
+    verify(resp, times(1)).addHeader("X-Git-Bridge-Auth-Mode", "permissive");
   }
 }

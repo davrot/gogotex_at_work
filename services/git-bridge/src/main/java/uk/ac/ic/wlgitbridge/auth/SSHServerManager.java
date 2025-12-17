@@ -117,6 +117,19 @@ public class SSHServerManager {
     }
   }
 
+  /**
+   * Returns the actual listening port of the embedded SSH server. If the
+   * server has not been started, returns the configured port (may be 0).
+   */
+  public int getListeningPort() {
+    if (server == null) return port;
+    try {
+      return server.getPort();
+    } catch (Exception e) {
+      return port;
+    }
+  }
+
   // Simple command wrapper that runs the requested program in a shell
   static class ProcessCommand implements Command, ChannelSessionAware, Runnable {
     private final ChannelSession channel;

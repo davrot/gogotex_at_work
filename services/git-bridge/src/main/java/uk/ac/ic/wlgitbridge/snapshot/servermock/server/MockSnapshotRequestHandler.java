@@ -30,8 +30,19 @@ public class MockSnapshotRequestHandler extends AbstractHandler {
       throws IOException, ServletException {
     boolean handled;
     try {
+      // Support internal project endpoints used by bridge code in addition to
+      // the public /api/v0/docs/ endpoints that our test fixtures provide.
+      String effectiveTarget = target;
+      if (target != null && target.startsWith("/api/v0/internal/project/")) {
+        // rewrite to the docs path so existing test state files work unmodified
+        String[] parts = target.split("/");
+        String projectName = parts.length >= 6 ? parts[5] : ""; // parts: ['', 'api', 'v0', 'internal', 'project', '<id>']
+        effectiveTarget = "/api/v0/docs/" + projectName;
+        Log.warn("Rewriting internal project path {} to {}", target, effectiveTarget);
+      }
+
       final SnapshotResponse snapshotResponse =
-          responseBuilder.buildWithTarget(target, baseRequest.getMethod());
+          responseBuilder.buildWithTarget(effectiveTarget, baseRequest.getMethod());
       response.getWriter().println(snapshotResponse.respond());
       new PostbackThread(baseRequest.getReader(), snapshotResponse.postback()).startIfNotNull();
       handled = true;

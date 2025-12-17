@@ -74,7 +74,7 @@
 - [ ] T024 [US4] Short-lived cache and pubsub invalidation for fingerprint lookup — services/web/app/src/lib/cache.js, services/web/lib/pubsub.js
 - [x] T025 [US4] Wire `git-bridge` to call fingerprint lookup and introspection fallback path — services/git-bridge/src/main/java/**/SSHAuthManager.java, services/git-bridge/test/contract/**
 - [ ] T025a Verify git-bridge E2E observes auth.http_attempt success path when valid tokens are used — scripts/e2e/git-https-acceptance.sh, services/web/test/e2e/playwright
-- [ ] T026a [US4] Membership enforcement tests at RPC handler (integration) — services/git-bridge/test/integration/**
+- [ ] T026a [US4] Membership enforcement tests at RPC handler (integration) — services/git-bridge/test/integration/\*\*
 
 ---
 

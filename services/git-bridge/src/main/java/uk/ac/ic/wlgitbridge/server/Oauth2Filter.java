@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicLong;
 import javax.servlet.*;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -28,6 +29,12 @@ public class Oauth2Filter implements Filter {
   private final SnapshotApi snapshotApi;
 
   private final boolean isUserPasswordEnabled;
+
+  // Telemetry: count permissive token accepts when no local introspect configured
+  private static final AtomicLong permissiveAcceptCount = new AtomicLong(0);
+
+  // Expose metric for tests/monitoring
+  public static long getPermissiveAcceptCount() { return permissiveAcceptCount.get(); }
 
   public Oauth2Filter(SnapshotApi snapshotApi, boolean isUserPasswordEnabled) {
     this.snapshotApi = snapshotApi;
@@ -119,8 +126,22 @@ public class Oauth2Filter implements Filter {
 
       // External OAuth server usage removed. Validation of Git tokens is
       // done via local introspection when configured. If local introspect
-      // is not configured, the token will be accepted (legacy/dev mode).
+      // is not configured, the token will be handled according to the
+      // fail-closed configuration (require introspect in prod) or a
+      // permissive legacy/dev mode.
       String localIntrospect = System.getenv("AUTH_LOCAL_INTROSPECT_URL");
+      // Allow tests and alternate deployment configurations to set via
+      // system property too (useful in unit tests)
+      if (localIntrospect == null || localIntrospect.isEmpty()) {
+        localIntrospect = System.getProperty("auth.local_introspect_url");
+      }
+
+      // Read fail-closed flag (env var preferred, fall back to system property)
+      String failClosed = System.getenv("AUTH_FAIL_CLOSED");
+      if (failClosed == null) {
+        failClosed = System.getProperty("auth.fail_closed");
+      }
+
       if (localIntrospect != null && !localIntrospect.isEmpty()) {
         boolean active = false;
         try {
@@ -136,7 +157,19 @@ public class Oauth2Filter implements Filter {
           Log.info(String.format("{\"service\":\"git-bridge\",\"project\":\"%s\",\"event\":\"auth.http_attempt\",\"outcome\":\"success\",\"method\":\"local-introspect\"}", projectId));
         }
       } else {
-        Log.warn("[{}] No local introspect configured: accepting token without validation", projectId);
+        // No local introspect configured. Decide behavior based on fail-closed.
+        if (failClosed != null && failClosed.equalsIgnoreCase("true")) {
+          Log.warn("[{}] Fail-closed active but no local introspect configured: denying access", projectId);
+          handleBadAccessToken(projectId, request, response);
+          return;
+        }
+        // Telemetry & warning for permissive acceptance (legacy/dev fallback)
+        long count = permissiveAcceptCount.incrementAndGet();
+        if (count % 100 == 1) { // log once per 100 occurrences to avoid flooding
+          Log.warn("[{}] No local introspect configured: accepting token without validation (count={})", projectId, count);
+        }
+        // Emit a warning header in response to aid observability for proxied clients
+        response.addHeader("X-Git-Bridge-Auth-Mode", "permissive");
       }
       cred.setAccessToken(password);
     } else if (this.isUserPasswordEnabled) {
@@ -167,11 +200,30 @@ public class Oauth2Filter implements Filter {
       throws IOException {
     response.setContentType("text/plain");
     response.setStatus(code);
-    PrintWriter w = response.getWriter();
-    for (String line : lines) {
-      w.println(line);
+    PrintWriter w = null;
+    try {
+      w = response.getWriter();
+    } catch (Exception e) {
+      // servlet container mock may not provide a writer in unit tests
+      w = null;
     }
-    w.close();
+    if (w != null) {
+      for (String line : lines) {
+        w.println(line);
+      }
+      w.close();
+    } else {
+      // Fallback to writing raw bytes to output stream when writer unavailable
+      try {
+        javax.servlet.ServletOutputStream os = response.getOutputStream();
+        for (String line : lines) {
+          os.write((line + System.lineSeparator()).getBytes());
+        }
+        os.flush();
+      } catch (Exception ignored) {
+        // Best effort; if this also fails, don't throw during error handling
+      }
+    }
   }
 
   private void handleLinkSharingId(
