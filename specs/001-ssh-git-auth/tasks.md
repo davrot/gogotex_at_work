@@ -8,10 +8,9 @@ description: "Tasks for SSH-only Git authentication feature"
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-- [ ] T001 Create this tasks file at specs/001-ssh-git-auth/tasks.md
-- [ ] T002 Verify and add runtime config keys in services/git-bridge/conf/envsubst_template.json (GIT_BRIDGE_WEB_PROFILE_API_URL, GIT_BRIDGE_WEB_PROFILE_API_TOKEN, GIT_BRIDGE_SSH_ONLY_FLAG)
-- [ ] T003 [P] Add/verify README documentation for git-bridge runtime config in services/git-bridge/README.md
-- [ ] T003a Ensure developers rebuild and restart the development containers (run `develop/bin/build` then `./bin/up`) before running contract tests (critical)
+- [ ] T002 Verify and add runtime config keys in `services/git-bridge/conf/envsubst_template.json` (`GIT_BRIDGE_WEB_PROFILE_API_URL`, `GIT_BRIDGE_WEB_PROFILE_API_TOKEN`, `GIT_BRIDGE_SSH_ONLY_FLAG`)
+- [ ] T003 [P] Add/verify README documentation for git-bridge runtime config in `services/git-bridge/README.md` and include example env var values for dev/staging.
+- [ ] T001 [P] Add developer quickstart step: document and test rebuild/restart steps (run `develop/bin/build` then `./bin/up`) to ensure contract tests run reliably in dev; include a short checklist in `services/git-bridge/README.md`.
 
 ---
 
@@ -94,7 +93,10 @@ description: "Tasks for SSH-only Git authentication feature"
 - [ ] T027 [P] Add performance smoke test for Git clone/push latency in services/git-bridge/test/perf/ (simple harness)
 - [ ] T028 [P] Update developer quickstart and docker-compose dev files to document SSH-only testing and env vars: develop/docker-compose.dev.yml and services/git-bridge/README.md
 - [ ] T029 [P] Security review and documentation updates in docs/security/ssh-git-auth.md
-
+- [ ] **T034 [P] Validate private-key handling**: Add integration and unit tests to assert that private keys are never persisted to MongoDB or application logs. Tests MUST:
+  - verify back-end controller endpoints (web-profile controller and any import APIs) reject or strip private-key submissions,
+  - assert DB documents for SSH keys contain only public key and optional non-reversible metadata (e.g., `private_key_hash`), and
+  - add a CI gate that fails if any test detects private-key storage or leakage.
 ---
 
 ## Dependencies & Execution Order

@@ -74,6 +74,8 @@ As an Overleaf user, I want to manage my SSH keys in the Overleaf web UI so that
 - **FR-009**: Provide UI components in the web UI for adding, listing, and revoking SSH public keys from the user's account settings; these UI changes are part of this feature's scope and must be wired to storage.
 - **FR-010**: Ensure private keys are never stored in full plaintext; only public keys and optional hashed metadata (`private_key_hash`) are stored as described in Assumptions.
 
+**Acceptance**: Add a test that attempts to POST a private key payload to the SSH key API and verifies the API returns 4xx and that no private key material is present in the DB, logs, or artifacts. (See task T034.)
+
 ### Key Entities
 
 - **SSH Key**: Represents a user's public key entry.
@@ -87,7 +89,7 @@ As an Overleaf user, I want to manage my SSH keys in the Overleaf web UI so that
 
 - **SC-001**: 100% of user Git authentication requests in production/staging must use SSH keys; HTTP Basic and OAuth2 authentication requests are rejected and logged.
 - **SC-002**: All legacy OAuth2 endpoints and filters referenced in `git-bridge` are removed from the codebase and configuration (verified by code scan / grep for known identifiers).
-- **SC-003**: Users can add an SSH public key in the UI and successfully perform `git clone`/`git push` within 2 minutes on average (measured in integration tests).
+- **SC-003**: For small test repositories (<= 1MB, <= 10 files), the end-to-end **p95** latency for `git clone` and `git push` must be < **2s**, and **p99** < **10s** under normal load. Integration and performance tests must measure these percentiles and record them to CI artifacts for verification.
 - **SC-004**: Security logging records authentication events with enough detail to identify user_id, key fingerprint, timestamp, and request outcome in ≥95% of cases.
 - **SC-005**: No production logs, responses, or UI elements reveal sensitive material such as private keys or detailed failure modes of deprecated auth methods.
 

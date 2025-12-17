@@ -17,8 +17,8 @@
 **Testing**: Vitest for focused unit tests (ESM), Mocha for legacy suites, Playwright for E2E; contract tests for API interactions; CI runs tests in Docker-based env  
 **Target Platform**: Linux servers (containers); dev and CI run in Docker Compose dev stacks  
 **Project Type**: Web application (backend + frontend assets), with a separate `git-bridge` service (Java) that integrates via internal API  
-**Performance Goals**: NEEDS CLARIFICATION — define target p95 latency for `git clone`/`git push` (suggest baseline: p95 < 2s for small test repo)  
-**Constraints**: Must integrate with existing dev Docker Compose network (services addressable via internal hostnames like `develop-*` or docker network IPs); tests should avoid globally mutating infra (use focused harnesses)  
+**Performance Goals**: For small repositories (<= 1MB and ≤ 10 files), the **p95** latency for `git clone` and `git push` should be < **2s**, and **p99** < **10s** under normal load. Target error rate for these operations should be < **0.5%** over a representative sample. Phase 1 MUST add a performance test harness (task T027) that reports p50/p95/p99, success rate, and error counts and publishes results as CI artifacts for review.  
+**Constraints**: Must integrate with existing dev Docker Compose network (services addressable via internal hostnames like `develop-*`); performance tests must run in an isolated, reproducible environment (CI job or preconfigured local harness) and avoid globally mutating infra.  
 **Scale/Scope**: Initial rollout targeted at single cluster; feature impacts authentication for all Git operations and UI account management
 
 ## Constitution Check
@@ -30,7 +30,7 @@ _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 - **Observability (required)**: Add structured logs for SSH key add/delete events (`sshkey.added`, `sshkey.removed`) and ensure events include user_id and fingerprint (no private key material).
 - **Performance (informative)**: Define p95/p99 SLOs for Git operations in Phase 1.
 
-Status: No unresolved constitution violations detected at Phase 0 entry; will re-evaluate after design artifacts are produced.
+Status: **Pending** — constitution alignment requires measurable SLOs and performance tests. This will be satisfied after implementing the performance test task T027 and validating results in CI.
 
 ## Project Structure
 
