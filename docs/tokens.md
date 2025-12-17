@@ -11,7 +11,7 @@ Overview
 Security & hashing
 
 - Tokens are stored hashed. Preferred algorithm: `argon2id` (config `AUTH_TOKEN_HASH_ALGO`).
-- `hashPrefix` provides 8-hex-character prefix for UI/mask purposes.
+- `hashPrefix` is the first 8 characters of the lowercase hexadecimal representation of the full token hash (no `0x` prefix); used for UI/masking and safe logging.
 - Migration scripts exist under `services/web/migrations/` for backfilling algorithm/expiry and for re-issuance flows.
 
 Rate limits & observability

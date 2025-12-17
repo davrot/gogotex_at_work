@@ -46,6 +46,7 @@
 - [ ] T016 [P] [US2] Integration tests for TokenController create/list/remove endpoints — services/web/test/integration/src/TokenControllerTests.mjs
 - [ ] T017 [US2] [P] Frontend: ensure `GitTokensPanel` lists tokens, shows plaintext on create, supports copy-to-clipboard, and handles network errors gracefully — services/web/frontend/js/features/settings/components/GitTokensPanel.tsx, services/web/test/frontend/features/settings/components/git-tokens.test.tsx
 - [ ] T018 [US2] Add contract & service-origin rate-limit tests for token creation/listing — services/web/test/contract/src/ServiceOriginRateLimitTests.mjs
+  - Contract test: services/web/test/contract/src/HashPrefixFormatContractTest.mjs — assert `hashPrefix` is 8 lowercase hex characters
 - [ ] T019 [US2] Reproduce & fix E2E 404 for GET `/internal/api/users/:userId/git-tokens` seen in Playwright run: inspect TokenRouter, AuthenticationController.requireLogin(), router mounting, and server logs during E2E — services/web/app/src/Features/Token/TokenRouter.mjs, services/web/app/src/Features/Token/TokenController.mjs, services/web/app/src/router.mjs, services/web/test/e2e/playwright/out/console.log
   - Acceptance: Playwright run (RESET_DB=true BASE_URL=...) shows no 404 for token list and UI shows token list or empty state instead of generic error.
 
@@ -73,7 +74,7 @@
 - [ ] T024 [US4] Short-lived cache and pubsub invalidation for fingerprint lookup — services/web/app/src/lib/cache.js, services/web/lib/pubsub.js
 - [x] T025 [US4] Wire `git-bridge` to call fingerprint lookup and introspection fallback path — services/git-bridge/src/main/java/**/SSHAuthManager.java, services/git-bridge/test/contract/**
 - [ ] T025a Verify git-bridge E2E observes auth.http_attempt success path when valid tokens are used — scripts/e2e/git-https-acceptance.sh, services/web/test/e2e/playwright
-- [ ] T026 [US4] Membership enforcement tests at RPC handler (integration) — services/git-bridge/test/integration/\*\*
+- [ ] T026a [US4] Membership enforcement tests at RPC handler (integration) — services/git-bridge/test/integration/**
 
 ---
 
