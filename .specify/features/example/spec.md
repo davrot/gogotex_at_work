@@ -98,8 +98,9 @@ Specify where and how project-membership is enforced and how `projectId` is deri
 
 - Duplicate public keys: adding an exact `public_key` MUST be idempotent for the same `userId`. The API behavior is:
   - If the exact `public_key` already exists for the same `userId`, `POST /internal/api/users/:userId/ssh-keys` MUST return `200 OK` with the existing key resource (idempotent create).
-  - If the exact `public_key` exists but is already associated with a different `userId`, the API MUST return `409 Conflict` with an explanatory message.
-  - Attempts to create a key with the same `key_name` but different `public_key` SHOULD return `400` with validation guidance.
+  - If the exact `public_key` exists but is already associated with a different `userId`, the API MUST return `409 Conflict` with an explanatory message (`"Key {{SHA256:<base64>}} already exists for user {{userId}}"`).
+  - Attempts to create a key with the same `key_name` but different `public_key` SHOULD return `400` with validation guidance (e.g., `"Key name is already in use; use a different name or remove the existing key first"`).
+  - Client must specify `key_name`; if missing, return `400` with clear guidance (e.g., `"key_name is required"`).
 - Revoked token or key: cache invalidation must reflect revocation within TTL or via explicit invalidation hook.
 - Malformed public_key: return 400 with validation errors.
 
@@ -178,6 +179,10 @@ Example:
   - Tokens: keyed by `token:hashprefix:{hashPrefix}` or a hashed lookup; store `{ active, scopes, expiresAt }`.
 - On any `DELETE`/revoke or membership change, services MUST publish an invalidation message.
 
-```
+- Internationalization & Timezone handling
+  - All user-visible error messages MUST be localizable (i18n keys required).
+  - Timestamps in logs and API responses MUST be timezone-aware (prefer ISO8601 with UTC or user's configured timezone).
+  - Recommended libraries: `i18next` for message translation; `date-fns-tz` or similar for timezone handling.
+  - Acceptance: Add frontend tests that assert i18n keys exist for all error messages and timezone conversion works for user events.
 
-```
+---

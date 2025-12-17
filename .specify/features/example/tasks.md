@@ -32,9 +32,9 @@
 
 **Independent Test:** Create a user, POST an SSH key, GET the key list and verify fingerprint format `SHA256:<base64>` and idempotent create behavior.
 
-- [x] T010 [P] [US1] Ensure SSH Keys CRUD controller & private routes exist and enforce auth — services/web/app/src/Features/User/UserSSHKeysController.mjs
+- [x] T010 [P] [US1] Ensure SSH Keys CRUD controller & private routes exist and enforce auth, with accessibility (WCAG AA + ARIA) — services/web/app/src/Features/User/UserSSHKeysController.mjs
 - [x] T011 [P] [US1] Implement server-side fingerprint computation & validation (SHA256 base64) — services/web/app/src/models/UserSSHKey.js
-- [x] T012 [US1] Add contract tests for SSH keys endpoints — services/web/test/contract/src/SSHKeyCRUDContractTest.mjs
+- [x] T012 [US1] Add contract tests for SSH keys endpoints and accessibility checks — services/web/test/contract/src/SSHKeyCRUDContractTest.mjs
 - [ ] T013 [US1] Implement & test frontend UI for SSH keys (inline validation & ARIA) — services/web/frontend/js/features/settings/components/SSHKeysPanel.tsx, services/web/test/frontend/features/settings/components/ssh-keys.test.tsx
   - Acceptance: UI must pass automated accessibility checks (WCAG AA baseline via axe or Lighthouse), include ARIA labels/roles, be keyboard-navigable, and include unit/visual tests that run in CI (`services/web/test/frontend/**`). Add an accessibility test that asserts correct focus management and an axe check as part of `T031` gating.
 
@@ -50,8 +50,8 @@
 - [ ] T015 [P] [US2] Unit tests for token lifecycle & `replace=true` semantics — services/web/test/unit/src/Features/Token/Rotation.test.mjs
   - Acceptance: Unit tests must assert that when `replace=true` is passed on create, the previous token is marked inactive (introspection returns `active: false`), the new token is active, and stored metadata includes `algorithm` and `hashPrefix`. Tests should be deterministically runnable in CI and avoid DB casting issues (use in-memory model mocks or valid ObjectId fixtures). Include negative tests for malformed token input.
 - [ ] T016 [P] [US2] Integration tests for TokenController create/list/remove endpoints — services/web/test/integration/src/TokenControllerTests.mjs
-- [ ] T017 [US2] [P] Frontend: ensure `GitTokensPanel` lists tokens, shows plaintext on create, supports copy-to-clipboard, and handles network errors gracefully — services/web/frontend/js/features/settings/components/GitTokensPanel.tsx, services/web/test/frontend/features/settings/components/git-tokens.test.tsx
-  - Acceptance: Plaintext token material is displayed only once on creation (UI must not store or show full hashes afterwards), copy-to-clipboard is accessible (with an ARIA live region announcing copy success), and automated frontend tests include axe accessibility checks and run in CI. The list view must show `accessTokenPartial` (masked) after creation and when re-fetching the token list.
+- [ ] T017 [US2] [P] Frontend: ensure `GitTokensPanel` lists tokens, shows plaintext on create, supports copy-to-clipboard (with ARIA live region), and handles network errors gracefully — services/web/frontend/js/features/settings/components/GitTokensPanel.tsx, services/web-test/frontend/features/settings/components/git-tokens.test.tsx, services/web/test/e2e/playwright/accessibility-test.ts
+  - Acceptance: Plaintext token material is displayed only once on creation (UI must not store or show full hashes afterwards), copy-to-clipboard is accessible (with an ARIA live region announcing copy success), and automated frontend tests include axe accessibility checks (WCAG AA), keyboard navigation tests, and run in CI. The list view must show `accessTokenPartial` (masked) after creation and when re-fetching the token list. Playwright E2E tests must include accessibility and responsiveness checks.
 - [ ] T018 [US2] Add contract & service-origin rate-limit tests for token creation/listing — services/web/test/contract/src/ServiceOriginRateLimitTests.mjs
   - Contract test: services/web/test/contract/src/HashPrefixFormatContractTest.mjs — assert `hashPrefix` is 8 lowercase hex characters
 - [ ] T019 [US2] Reproduce & fix E2E 404 for GET `/internal/api/users/:userId/git-tokens` seen in Playwright run: inspect TokenRouter, AuthenticationController.requireLogin(), router mounting, and server logs during E2E — services/web/app/src/Features/Token/TokenRouter.mjs, services/web/app/src/Features/Token/TokenController.mjs, services/web/app/src/router.mjs, services/web/test/e2e/playwright/out/console.log
@@ -86,6 +86,8 @@
 - [x] T025 [US4] Wire `git-bridge` to call fingerprint lookup and introspection fallback path — services/git-bridge/src/main/java/**/SSHAuthManager.java, services/git-bridge/test/contract/**
 - [ ] T025a Verify git-bridge E2E observes auth.http_attempt success path when valid tokens are used — scripts/e2e/git-https-acceptance.sh, services/web/test/e2e/playwright
 - [ ] T026a [US4] Membership enforcement tests at RPC handler (integration) — services/git-bridge/test/integration/\*\*
+- [ ] T040 [US4] Validate token expiry in git-bridge before RPC handling — services/git-bridge/src/main/java/\*\*/TokenExpiryValidator.java
+  - Acceptance: git-bridge rejects expired tokens during introspect call OR RPC handler before git subprocess spawn; rejection includes audit log with `reason: "token_expired"` and 401 response to git client. Include unit contract tests for expiry validation logic and failure handling.
 
 ---
 

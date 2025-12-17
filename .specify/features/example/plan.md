@@ -40,16 +40,23 @@ Note: the `V0ReplacementAdapter` (legacy snapshot parity) is a substantial integ
 
 ## Constitution Check
 
-- Code Quality: use linters and follow existing `services/web` conventions; new code must include unit tests.
-- Testing Standards: unit tests for managers, contract tests for endpoints (`/internal/api/tokens/introspect` and `/internal/api/users/:userId/ssh-keys`), and an E2E covering both SSH and HTTPS paths are required.
-- Observability: emit structured logs for create/delete/use events and instrument metrics for token/key creation and introspections.
-- Performance: document SLOs (key lookup p95 ≤ 50ms) and include a short benchmark in CI for the key lookup path.
+This feature explicitly aligns with the following constitution principles:
+
+- Code Quality (NON-NEGOTIABLE): All new code must adhere to the highest standards of code quality. This includes following existing `services/web` conventions, using linters, and including unit tests for all new functionality.
+- Testing Standards (NON-NEGOTIABLE): Comprehensive testing is mandatory, including unit tests for managers, contract tests for endpoints (`/internal/api/tokens/introspect` and `/internal/api/users/:userId/ssh-keys`), and an end-to-end test covering both SSH and HTTPS paths.
+- User Experience Consistency: Adherence to design system and accessibility (WCAG AA) for all user-facing UI components.
+- Performance: Service level objectives (SLOs) must be documented, with a specific focus on ensuring that key lookup p95 latency is ≤ 50ms and token introspection p95 latency is ≤ 100ms. A micro-benchmark test for the key lookup path must be included in the continuous integration (CI) pipeline, and CI jobs MUST gate merges when thresholds are exceeded.
+- Observability & Versioning: The feature must emit structured logs for all create, delete, and use events. Additionally, metrics for token and key creation, as well as introspections, must be instrumented and monitored. Public APIs must follow semantic versioning with backward compatibility where possible. Cross-service requests (e.g., SSH auth → membership checks) MUST include distributed tracing instrumentation (request IDs, trace IDs, serialized in structured logs).
+
+**Gates Verified:**
+
+- Code review required: PRs must include reviewers, migration/rollback plan for large changes.
+- Tests block merges: Unit tests for logic, integration tests for service interactions, E2E tests for journeys.
+- SLO validation: CI benchmarks gate merges when thresholds are exceeded (specific CI jobs: `benchmark-key-lookup-slo` and `benchmark-introspection-slo`).
+- Documentation: README must document chosen token hashing algorithm and parameters (see spec for details).
+- Internationalization: Error messages and timestamps MUST be timezone-aware and localizable; all user-visible text MUST include i18n keys for translation.
 
 ## Risks
 
 - Security risk if tokens are stored or displayed in plaintext. Mitigation: return plaintext only on creation and store hashes only.
 - Operational complexity if per-key allowed-repo lists are used; prefer membership checks at git RPC time or forced-command wrapper.
-
-```
-
-```
