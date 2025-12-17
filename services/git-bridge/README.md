@@ -84,6 +84,7 @@ The configuration file is in `.json` format.
                null or missing if oauth2 shouldn't be used
         "webProfileApiUrl" (string, optional): internal web-profile API base URL for SSH key retrieval (recommended),
         "webProfileApiToken" (string, optional): bearer token for internal web-profile API calls,
+        "sshOnly" (boolean, optional): if true, only SSH-based Git authentication is enabled and legacy HTTP/OAuth2 methods are rejected (default: false),
         },
         "repoStore" (object, optional): { configure the repo store
             "maxFileSize" (long, optional): maximum size of a file, inclusive
@@ -117,6 +118,20 @@ The configuration file is in `.json` format.
     }
 
 You have to restart the server for configuration changes to take effect.
+
+## Developer quickstart: rebuild & restart
+
+When making changes that affect configuration or embedded services, ensure you rebuild and restart the dev environment before running contract or integration tests:
+
+```bash
+cd develop
+./bin/build
+./bin/up
+# or from repo root:
+# develop/bin/build && ./bin/up
+```
+
+This helps ensure that `envsubst` and compose config changes are applied and containers are restarted with the updated config.
 
 ## Creating OAuth app
 
