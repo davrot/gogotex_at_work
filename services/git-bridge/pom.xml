@@ -279,4 +279,46 @@
             <version>2.10.0</version>
         </dependency>
     </dependencies>
+
+    <!-- Profiles -->
+    <profiles>
+      <profile>
+        <id>integration-tests</id>
+        <activation>
+          <activeByDefault>false</activeByDefault>
+        </activation>
+        <build>
+          <plugins>
+            <!-- Run integration tests (Failsafe) when this profile is enabled -->
+            <plugin>
+              <groupId>org.apache.maven.plugins</groupId>
+              <artifactId>maven-failsafe-plugin</artifactId>
+              <version>3.1.2</version>
+              <configuration>
+                <includes>
+                  <include>**/*E2ETest.java</include>
+                  <include>**/*IT.java</include>
+                  <include>**/*IntegrationTest.java</include>
+                </includes>
+                <skipTests>false</skipTests>
+              </configuration>
+              <executions>
+                <execution>
+                  <id>integration-test</id>
+                  <goals>
+                    <goal>integration-test</goal>
+                  </goals>
+                </execution>
+                <execution>
+                  <id>verify</id>
+                  <goals>
+                    <goal>verify</goal>
+                  </goals>
+                </execution>
+              </executions>
+            </plugin>
+          </plugins>
+        </build>
+      </profile>
+    </profiles>
 </project>
