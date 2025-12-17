@@ -29,7 +29,7 @@ public class SSHServerManagerLogTest {
     }
 
     MockAuthManager mam = new MockAuthManager();
-    SSHServerManager manager = new SSHServerManager(port, mam, null, null);
+    SSHServerManager manager = new SSHServerManager(port, mam, null, null, null);
 
     // Attach test appender to capture logs
     Logger root = (Logger) LoggerFactory.getLogger("uk.ac.ic.wlgitbridge.application.GitBridgeApp");

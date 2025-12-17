@@ -437,18 +437,31 @@ class UserHelper {
     }
     const userHelper = new UserHelper()
     const loginPath = Settings.enableLegacyLogin ? '/login/legacy' : '/login'
-    await userHelper.getCsrfToken()
-    const response = await userHelper.fetch(loginPath, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      body: JSON.stringify({
-        'g-recaptcha-response': 'valid',
-        ...userData,
-      }),
-    })
+    // Attempt login with a few retries if we observe 429 rate-limit responses
+    let response
+    for (let attempt = 1; attempt <= 5; attempt++) {
+      await userHelper.getCsrfToken()
+      response = await userHelper.fetch(loginPath, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({
+          'g-recaptcha-response': 'valid',
+          ...userData,
+        }),
+      })
+      if (response.ok) break
+      if (response.status === 429 && attempt < 5) {
+        // eslint-disable-next-line no-console
+        console.debug('[UserHelper.loginUser] login rate-limited, retrying after delay, attempt=', attempt)
+        await new Promise(r => setTimeout(r, attempt * 250))
+        continue
+      }
+      break
+    }
+
     if (!response.ok) {
       const body = await response.text()
       // Debug: print failed login response body to aid triage

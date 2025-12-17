@@ -180,6 +180,7 @@ services:
       - WEB_PROFILE_API_TOKEN=overleaf:overleaf
       - AUTH_LOCAL_INTROSPECT_URL=http://web:3000/internal/api/tokens/introspect
       - AUTH_DISABLE_OAUTH=true
+      - LOG_LEVEL=DEBUG
     ports:
       - "2223:2222"
     volumes:

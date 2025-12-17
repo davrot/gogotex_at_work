@@ -28,7 +28,7 @@ public class WebProfileUserKeysAuthContractTest {
         server = HttpServer.create(new InetSocketAddress(0), 0);
         port = server.getAddress().getPort();
 
-        server.createContext("/internal/api/users/user123/ssh-keys", new HttpHandler() {
+        server.createContext("/internal/api/service/users/user123/ssh-keys", new HttpHandler() {
             @Override
             public void handle(HttpExchange exchange) throws IOException {
                 lastAuthHeader.set(exchange.getRequestHeaders().getFirst("Authorization"));

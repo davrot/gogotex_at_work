@@ -26,6 +26,10 @@
 
     <!-- Set log levels for the application (or parts of the application). -->
     <logger name="uk.ac.ic.wlgitbridge" level="${LOG_LEVEL}" />
+    <!-- Diagnostic SSH server logs for auth debugging -->
+    <logger name="uk.ac.ic.wlgitbridge.auth" level="DEBUG" />
+    <!-- Apache MINA SSHD / Apache SSHD internals -->
+    <logger name="org.apache.sshd" level="DEBUG" />
 
     <!-- The root log level determines how much our dependencies put in the logs. -->
     <root level="WARN">

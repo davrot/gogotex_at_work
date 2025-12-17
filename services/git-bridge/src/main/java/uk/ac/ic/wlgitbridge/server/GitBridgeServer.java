@@ -102,7 +102,7 @@ public class GitBridgeServer {
           org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(GitBridgeServer.class);
           logger.info("Starting embedded SSH server on port {}", config.getSshPort());
           uk.ac.ic.wlgitbridge.auth.SSHAuthManager authManager = new uk.ac.ic.wlgitbridge.auth.SSHAuthManager(new uk.ac.ic.wlgitbridge.auth.WebProfileClient(config.getAPIBaseURL(), System.getenv("WEB_PROFILE_API_TOKEN")));
-          sshServerManager = new uk.ac.ic.wlgitbridge.auth.SSHServerManager(config.getSshPort(), authManager, this.repoStore, rootGitDirectoryPath);
+          sshServerManager = new uk.ac.ic.wlgitbridge.auth.SSHServerManager(config.getSshPort(), authManager, this.repoStore, bridge, rootGitDirectoryPath);
           sshServerManager.start();
         } catch (Exception e) {
           Log.error("Failed to start embedded SSH server", e);

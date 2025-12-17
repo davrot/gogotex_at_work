@@ -157,7 +157,7 @@ public class WebProfileSSHServerMembershipE2ETest {
     System.setProperty("MEMBERSHIP_API_BASE_URL", "http://localhost:" + membershipPort);
 
     java.nio.file.Path tmp = Files.createTempDirectory("ssh-member-e2e");
-    SSHServerManager ssh = new SSHServerManager(0, auth, null, tmp.toAbsolutePath().toString());
+    SSHServerManager ssh = new SSHServerManager(0, auth, null, null, tmp.toAbsolutePath().toString());
     ssh.start();
     int portUsed = ssh.getListeningPort();
 

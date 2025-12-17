@@ -146,7 +146,7 @@ public class WebProfileSSHServerE2ETest {
 
     // Start SSH server
     java.nio.file.Path tmp = Files.createTempDirectory("ssh-e2e");
-    SSHServerManager ssh = new SSHServerManager(0, auth, null, tmp.toAbsolutePath().toString());
+    SSHServerManager ssh = new SSHServerManager(0, auth, null, null, tmp.toAbsolutePath().toString());
     ssh.start();
     int portUsed = ssh.getListeningPort();
 

@@ -27,14 +27,16 @@ public class SSHServerManager {
   private final SSHAuthManager authManager;
   private final String rootGitDir;
   private final RepoStore repoStore;
+  private final Bridge bridge;
   private SshServer server;
 
   private static final java.util.concurrent.ConcurrentHashMap<ServerSession, String> sessionUserMap = new java.util.concurrent.ConcurrentHashMap<>();
 
-  public SSHServerManager(int port, SSHAuthManager authManager, RepoStore repoStore, String rootGitDir) {
+  public SSHServerManager(int port, SSHAuthManager authManager, RepoStore repoStore, Bridge bridge, String rootGitDir) {
     this.port = port;
     this.authManager = authManager;
     this.repoStore = repoStore;
+    this.bridge = bridge;
     this.rootGitDir = rootGitDir;
   }
 
@@ -56,9 +58,24 @@ public class SSHServerManager {
       public boolean authenticate(String username, PublicKey key, ServerSession session) {
         try {
           String keyType = KeyUtils.getKeyType(key);
-          // Fallback: encode X.509 encoded key bytes to base64 (may differ from OpenSSH wire format for some key types)
-          String b64 = Base64.getEncoder().encodeToString(key.getEncoded());
-          String openssh = keyType + " " + b64;
+          String openssh;
+          try {
+            // Try to construct an OpenSSH-style public key blob so that fingerprint
+            // computation matches keys stored in the WebProfile (which are OpenSSH-format strings).
+            if ("ssh-rsa".equals(keyType) && key instanceof java.security.interfaces.RSAPublicKey) {
+              java.security.interfaces.RSAPublicKey rsa = (java.security.interfaces.RSAPublicKey) key;
+              byte[] blob = buildRsaSshKeyBlob(rsa);
+              String b64 = Base64.getEncoder().encodeToString(blob);
+              openssh = keyType + " " + b64;
+            } else {
+              // Fallback: encode X.509 encoded key bytes to base64 (may differ from OpenSSH wire format for some key types)
+              String b64 = Base64.getEncoder().encodeToString(key.getEncoded());
+              openssh = keyType + " " + b64;
+            }
+          } catch (Exception ex) {
+            String b64 = Base64.getEncoder().encodeToString(key.getEncoded());
+            openssh = keyType + " " + b64;
+          }
           Log.debug("SSH auth attempt for user {} with key {}", username, openssh.substring(0, Math.min(openssh.length(), 80)));
           String fp = SSHAuthManager.fingerprintOpenSSH(openssh);
           String fpCanonical = fp.isEmpty() ? "" : "SHA256:" + fp;
@@ -130,8 +147,31 @@ public class SSHServerManager {
     }
   }
 
+  // Helper: build OpenSSH-format blob for RSA keys (string "ssh-rsa" + mpint e + mpint n)
+  private static byte[] buildRsaSshKeyBlob(java.security.interfaces.RSAPublicKey rsa) throws java.io.IOException {
+    try (java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream()) {
+      writeString(baos, "ssh-rsa".getBytes(java.nio.charset.StandardCharsets.US_ASCII));
+      writeMpint(baos, rsa.getPublicExponent());
+      writeMpint(baos, rsa.getModulus());
+      return baos.toByteArray();
+    }
+  }
+
+  private static void writeString(java.io.ByteArrayOutputStream baos, byte[] data) throws java.io.IOException {
+    int len = data.length;
+    baos.write(new byte[] { (byte)((len >> 24) & 0xff), (byte)((len >> 16) & 0xff), (byte)((len >> 8) & 0xff), (byte)(len & 0xff) });
+    baos.write(data);
+  }
+
+  private static void writeMpint(java.io.ByteArrayOutputStream baos, java.math.BigInteger v) throws java.io.IOException {
+    if (v == null) v = java.math.BigInteger.ZERO;
+    byte[] raw = v.toByteArray();
+    // Keep BigInteger.toByteArray() as-is to preserve sign byte (per RFC4251 mpint rules)
+    writeString(baos, raw);
+  }
+
   // Simple command wrapper that runs the requested program in a shell
-  static class ProcessCommand implements Command, ChannelSessionAware, Runnable {
+  class ProcessCommand implements Command, ChannelSessionAware, Runnable {
     private final ChannelSession channel;
     private final String command;
     private final String root;
@@ -204,6 +244,16 @@ public class SSHServerManager {
           }
         }
 
+        // Ensure repo exists and is synced before allowing Git RPCs (if bridge provided)
+        if (allowed && bridge != null) {
+          try {
+            bridge.getUpdatedRepo(java.util.Optional.empty(), project);
+          } catch (Exception e) {
+            Log.warn("Failed to ensure repo for project {}: {}", project, e.getMessage());
+            allowed = false;
+          }
+        }
+
         // Emit structured log for RPC auth outcome
         java.util.Map<String,Object> evt = new java.util.HashMap<>();
         evt.put("event", "auth.ssh_attempt");
@@ -226,12 +276,36 @@ public class SSHServerManager {
         }
       }
 
-      ProcessBuilder pb = new ProcessBuilder("/bin/sh", "-lc", command);
+      // For git RPCs, the client passes a path like '/<project>.git'. Our repo layout uses
+      // a project directory containing a .git subdirectory, so rewrite the command to point
+      // at the project directory rather than the trailing '.git' path to ensure git-upload-pack
+      // and git-receive-pack operate on the expected repository on disk.
+      String execCommand = command;
+      if (cmd != null && (lower.startsWith("git-upload-pack") || lower.startsWith("git-receive-pack"))) {
+        String[] cmdParts = cmd.split(" ", 2);
+        String cmdName = cmdParts.length > 0 ? cmdParts[0] : cmd;
+        String repoArg = cmdParts.length > 1 ? cmdParts[1].trim() : "";
+        if ((repoArg.startsWith("'") && repoArg.endsWith("'")) || (repoArg.startsWith("\"") && repoArg.endsWith("\""))) {
+          repoArg = repoArg.substring(1, repoArg.length()-1);
+        }
+        if (repoArg.startsWith("/")) repoArg = repoArg.substring(1);
+        if (repoArg.endsWith(".git")) repoArg = repoArg.substring(0, repoArg.length()-4);
+        String repoPath = (root != null && !root.isEmpty()) ? (root + "/" + repoArg + "/.git") : (repoArg + "/.git");
+        // Wrap with tee to capture server-side stdout/stderr for debugging hangs
+        String outFile = "/tmp/git-upload-pack-" + repoArg + ".out";
+        String errFile = "/tmp/git-upload-pack-" + repoArg + ".err";
+        execCommand = cmdName + " '" + repoPath + "' 2>" + errFile + " | tee " + outFile;
+      }
+
+      Log.debug("ProcessCommand: executing shell command: {}", execCommand);
+      ProcessBuilder pb = new ProcessBuilder("/bin/sh", "-lc", execCommand);
       if (root != null && !root.isEmpty()) {
         pb.directory(new File(root));
       }
+      Log.debug("ProcessCommand: working directory: {}", pb.directory());
       pb.redirectErrorStream(false);
       process = pb.start();
+      Log.debug("ProcessCommand: started process pid={} cmd={}", process.pid(), execCommand);
       Thread ioThread = new Thread(this);
       ioThread.setDaemon(true);
       ioThread.start();
@@ -264,42 +338,77 @@ public class SSHServerManager {
 
     @Override
     public void run() {
+      Log.debug("ProcessCommand: run() starting for pid={}", process == null ? -1 : process.pid());
       try (java.io.InputStream procOut = process.getInputStream();
           java.io.InputStream procErr = process.getErrorStream();
           java.io.OutputStream procIn = process.getOutputStream()) {
         // Pump input -> process stdin
         Thread tIn = new Thread(() -> {
           try {
+            Log.debug("ProcessCommand: stdin pump started");
             if (in != null) {
-              in.transferTo(procIn);
+              byte[] buf = new byte[8192];
+              int n;
+              while ((n = in.read(buf)) != -1) {
+                procIn.write(buf, 0, n);
+                procIn.flush();
+                Log.debug("ProcessCommand: stdin pump forwarded {} bytes", n);
+              }
             }
             procIn.close();
-          } catch (IOException ignored) {}
+            Log.debug("ProcessCommand: stdin pump finished");
+          } catch (IOException e) {
+            Log.warn("ProcessCommand: stdin pump error: {}", e.getMessage());
+          }
         });
         tIn.setDaemon(true);
         tIn.start();
 
-        // Pump process stdout -> ssh out
+        // Pump process stdout -> ssh out (use small reads + flush to avoid NIO2 non-blocking issues)
         Thread tOut = new Thread(() -> {
           try {
-            if (out != null) procOut.transferTo(out);
-          } catch (IOException ignored) {}
+            Log.debug("ProcessCommand: stdout pump started");
+            if (out != null) {
+              byte[] buf = new byte[8192];
+              int n;
+              while ((n = procOut.read(buf)) != -1) {
+                out.write(buf, 0, n);
+                out.flush();
+              }
+            }
+            Log.debug("ProcessCommand: stdout pump finished");
+          } catch (IOException e) {
+            Log.warn("ProcessCommand: stdout pump error: {}", e.getMessage());
+          }
         });
         tOut.setDaemon(true);
         tOut.start();
 
-        // Pump process stderr -> ssh err
+        // Pump process stderr -> ssh err (small reads + flush)
         Thread tErr = new Thread(() -> {
           try {
-            if (err != null) procErr.transferTo(err);
-          } catch (IOException ignored) {}
+            Log.debug("ProcessCommand: stderr pump started");
+            if (err != null) {
+              byte[] buf = new byte[8192];
+              int n;
+              while ((n = procErr.read(buf)) != -1) {
+                err.write(buf, 0, n);
+                err.flush();
+              }
+            }
+            Log.debug("ProcessCommand: stderr pump finished");
+          } catch (IOException e) {
+            Log.warn("ProcessCommand: stderr pump error: {}", e.getMessage());
+          }
         });
         tErr.setDaemon(true);
         tErr.start();
 
         int code = process.waitFor();
+        Log.debug("ProcessCommand: process exited with code={}", code);
         if (callback != null) callback.onExit(code);
       } catch (Exception e) {
+        Log.warn("ProcessCommand: exception while running command: {}", e.getMessage());
         if (callback != null) callback.onExit(1, e.getMessage());
       }
     }

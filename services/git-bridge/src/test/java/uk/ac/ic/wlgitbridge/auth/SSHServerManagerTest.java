@@ -27,7 +27,7 @@ public class SSHServerManagerTest {
     }
 
     MockAuthManager mam = new MockAuthManager();
-    SSHServerManager manager = new SSHServerManager(port, mam, null, null);
+    SSHServerManager manager = new SSHServerManager(port, mam, null, null, null);
     manager.start();
 
     SshClient client = SshClient.setUpDefaultClient();

@@ -54,7 +54,7 @@ public class SSHServerManagerMembershipTest {
     // ensure SERVER uses env var not property; also set environment via process builder is not possible here in test
 
     MockAuthManager mam = new MockAuthManager();
-    SSHServerManager manager = new SSHServerManager(port, mam, null, null);
+    SSHServerManager manager = new SSHServerManager(port, mam, null, null, null);
 
     // Capture logs
     Logger root = (Logger) LoggerFactory.getLogger("uk.ac.ic.wlgitbridge.application.GitBridgeApp");
