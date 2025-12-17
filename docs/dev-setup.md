@@ -97,6 +97,22 @@ docker run --rm -v /absolute/path/to/services/git-bridge:/app -w /app maven:3-am
 ```
 
 This is a convenient fallback for CI-like test runs or temporary verification.
+### Running integration (E2E) tests locally
+
+Integration and end-to-end tests have their own Maven profile named `integration-tests` which uses the Failsafe plugin. To run all integration tests locally:
+
+```bash
+# Run all integration tests (may take longer)
+mvn -Pintegration-tests -DskipTests=false verify
+```
+
+To run a single integration test class:
+
+```bash
+mvn -Pintegration-tests -DskipTests=false -Dit.test=WebProfileSSHServerE2ETest verify
+```
+
+Note: The CI configuration already runs the SSH E2E tests in the `gitbridge_ssh_e2e` job defined in `ci/contract/gitlab-ci-contract.yml`.
 
 ## Build & Start Services
 
