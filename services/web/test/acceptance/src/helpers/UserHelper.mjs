@@ -326,6 +326,17 @@ class UserHelper {
     const user = new UserClass({ email: created.email })
     user.setExtraAttributes(created)
     user.password = password
+    // Clear any existing login rate-limiter keys to reduce flakiness for immediate login
+    try {
+      const RedisWrapper = require('../../../../app/src/infrastructure/RedisWrapper.js')
+      const rclient = RedisWrapper.client('ratelimiter')
+      const loginKeys = await rclient.keys('rate-limit:overleaf-login:*')
+      if (loginKeys && loginKeys.length) await rclient.del(loginKeys)
+      try { await rclient.disconnect() } catch (e) {}
+      // eslint-disable-next-line no-console
+      console.debug('[UserHelper.createUser] cleared overleaf-login keys before initial login:', loginKeys && loginKeys.length)
+    } catch (e) {}
+
     // Login to obtain session cookies and CSRF token
     await new Promise((resolve, reject) => {
       // Debug: show we're about to do loginWithEmailPassword

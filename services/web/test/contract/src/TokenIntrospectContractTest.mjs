@@ -5,6 +5,19 @@ import Settings from '@overleaf/settings'
 describe('Token introspection contract tests', function () {
   this.timeout(60 * 1000)
 
+  // Clear login rate-limiter keys before each test to avoid test interference
+  beforeEach(async function () {
+    try {
+      const RedisWrapper = require('../../../../app/src/infrastructure/RedisWrapper.js')
+      const rclient = RedisWrapper.client('ratelimiter')
+      const loginKeys = await rclient.keys('rate-limit:overleaf-login:*')
+      if (loginKeys && loginKeys.length) await rclient.del(loginKeys)
+      try { await rclient.disconnect() } catch (e) {}
+      // eslint-disable-next-line no-console
+      console.debug('[TokenIntrospectContractTest] cleared overleaf-login keys before test:', loginKeys && loginKeys.length)
+    } catch (e) {}
+  })
+
   it('introspects a valid token and returns shape', async function () {
     const password = 'Password-123!'
     const user = await UserHelper.createUser({ password })

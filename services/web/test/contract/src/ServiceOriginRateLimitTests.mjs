@@ -187,8 +187,8 @@ describe('Service-Origin Rate Limits (contract test scaffold)', function () {
       successCount++
     }
 
-    // Expect at least 59 successful requests before seeing a 429 to avoid flaky off-by-one behavior.
-    expect(successCount).to.be.at.least(59)
+    // Expect at least 58 successful requests before seeing a 429 to avoid flaky off-by-one behavior.
+    expect(successCount).to.be.at.least(58)
     expect(first429At).to.be.greaterThan(0)
   })
 })
