@@ -33,11 +33,12 @@ public class SSHServerManagerUploadPackTest {
       port = s.getLocalPort();
     }
 
-    // Create a bare repo with an initial commit and master branch
+    // Create a bare repo in the layout expected by the server: project directory with a '.git' subdir
     Path tmp = Files.createTempDirectory("git-bridge-test-repo");
-    Path repoDir = tmp.resolve("repo.git");
-    Files.createDirectory(repoDir);
-    // Initialize bare repo
+    Path projectDir = tmp.resolve("repo");
+    Files.createDirectories(projectDir);
+    Path repoDir = projectDir.resolve(".git");
+    // Initialize bare repo at repo/.git
     ProcessBuilder pb = new ProcessBuilder("git", "init", "--bare", repoDir.toAbsolutePath().toString());
     pb.inheritIO();
     Process p = pb.start();
@@ -69,6 +70,11 @@ public class SSHServerManagerUploadPackTest {
     p5.waitFor();
 
     // Start SSH server pointing root git dir at tmp
+    // Ensure any external membership API config is disabled for this unit test to avoid
+    // cross-test interference in CI (tests run in same JVM process sometimes).
+    System.setProperty("MEMBERSHIP_API_BASE_URL", "");
+    System.setProperty("MEMBERSHIP_API_TOKEN", "");
+
     MockAuthManager mam = new MockAuthManager();
     SSHServerManager manager = new SSHServerManager(port, mam, null, null, tmp.toAbsolutePath().toString());
     manager.start();
@@ -89,8 +95,9 @@ public class SSHServerManagerUploadPackTest {
         // wait for channel to close or timeout
         ch.waitFor(java.util.EnumSet.of(ClientChannelEvent.CLOSED), 5000);
         String output = baos.toString("UTF-8");
-        // Expect output to include refs/heads/master or HEAD
-        assertTrue("Expected git-upload-pack advertisement to contain refs/heads/master or HEAD", output.contains("refs/heads/master") || output.contains("HEAD"));
+        // Expect output to include refs/heads/master, refs/heads/main, or HEAD
+        assertTrue("Expected git-upload-pack advertisement to contain refs/heads/master, refs/heads/main, or HEAD; got:\n" + output,
+            output.contains("refs/heads/master") || output.contains("refs/heads/main") || output.contains("HEAD"));
       }
     }
 

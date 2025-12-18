@@ -128,9 +128,9 @@ public class WebProfileSSHServerE2ETest {
     KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
     kpg.initialize(2048);
     KeyPair kp = kpg.generateKeyPair();
-    byte[] enc = kp.getPublic().getEncoded();
-    String b64 = Base64.getEncoder().encodeToString(enc);
-    String publicKey = "ssh-rsa " + b64 + " e2e@example.com";
+    // Use the OpenSSH wire-format for RSA keys so fingerprint computation matches server-side auth
+    java.security.interfaces.RSAPublicKey rsa = (java.security.interfaces.RSAPublicKey) kp.getPublic();
+    String publicKey = opensshRsaString(rsa, "e2e@example.com");
 
     // register key via POST
     java.net.URL url = new java.net.URL(baseUrl + "/internal/api/users/" + userId + "/ssh-keys");
@@ -150,6 +150,9 @@ public class WebProfileSSHServerE2ETest {
     ssh.start();
     int portUsed = ssh.getListeningPort();
 
+    String oldHome = System.getProperty("user.home");
+    java.nio.file.Path tmpHome = Files.createTempDirectory("ssh-e2e-home");
+    System.setProperty("user.home", tmpHome.toAbsolutePath().toString());
     try (SshClient clientSsh = SshClient.setUpDefaultClient()) {
       clientSsh.start();
       try (ClientSession session = clientSsh.connect(userId, "localhost", portUsed).verify(5000).getSession()) {
@@ -159,8 +162,33 @@ public class WebProfileSSHServerE2ETest {
       }
       clientSsh.stop();
     } finally {
+      if (oldHome != null) System.setProperty("user.home", oldHome); else System.clearProperty("user.home");
+      try { Files.walk(tmpHome).sorted(Comparator.reverseOrder()).forEach(p -> { try { Files.deleteIfExists(p); } catch (IOException ignored) {} }); } catch (IOException ignored) {}
       ssh.stop();
       Files.walk(tmp).sorted(Comparator.reverseOrder()).forEach(p -> { try { Files.deleteIfExists(p); } catch (IOException ignored) {} });
     }
   }
+
+  private static String opensshRsaString(java.security.interfaces.RSAPublicKey rsa, String comment) throws java.io.IOException {
+    try (java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream()) {
+      writeString(baos, "ssh-rsa".getBytes(java.nio.charset.StandardCharsets.US_ASCII));
+      writeMpint(baos, rsa.getPublicExponent());
+      writeMpint(baos, rsa.getModulus());
+      String b64 = Base64.getEncoder().encodeToString(baos.toByteArray());
+      return "ssh-rsa " + b64 + " " + comment;
+    }
+  }
+
+  private static void writeString(java.io.ByteArrayOutputStream baos, byte[] data) throws java.io.IOException {
+    int len = data.length;
+    baos.write(new byte[] { (byte)((len >> 24) & 0xff), (byte)((len >> 16) & 0xff), (byte)((len >> 8) & 0xff), (byte)(len & 0xff) });
+    baos.write(data);
+  }
+
+  private static void writeMpint(java.io.ByteArrayOutputStream baos, java.math.BigInteger v) throws java.io.IOException {
+    if (v == null) v = java.math.BigInteger.ZERO;
+    byte[] raw = v.toByteArray();
+    writeString(baos, raw);
+  }
+
 }
