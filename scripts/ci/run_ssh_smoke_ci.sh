@@ -13,12 +13,12 @@ echo "Using COMPOSE_FILE=$COMPOSE_FILE PROJECT_DIR=$PROJECT_DIR"
 # Bring up minimal services: web and git-bridge
 docker compose -f "$COMPOSE_FILE" --project-directory "$PROJECT_DIR" up -d --build web git-bridge
 
-# Wait for web launchpad HTTP to be ready. Prefer provided BASE_URL; fall back to http://127.0.0.1:3000 if necessary
-BASE_URL=${BASE_URL:-http://127.0.0.1:3000}
+# Wait for web launchpad HTTP to be ready. Prefer provided BASE_URL; fall back to the compose service host if necessary
+BASE_URL=${BASE_URL:-http://web:3000}
 MAX_WAIT=120
 S=0
 # try provided BASE_URL first
-until curl -sSf "$BASE_URL/launchpad" >/dev/null 2>&1 || curl -sSf "http://127.0.0.1:3000/launchpad" >/dev/null 2>&1 || [ $S -ge $MAX_WAIT ]; do
+until curl -sSf "$BASE_URL/launchpad" >/dev/null 2>&1 || curl -sSf "http://web:3000/launchpad" >/dev/null 2>&1 || [ $S -ge $MAX_WAIT ]; do
   printf "."
   sleep 1
   S=$((S+1))
