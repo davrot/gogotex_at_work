@@ -30,9 +30,27 @@ if [ $S -ge $MAX_WAIT ]; then
   exit 2
 fi
 
+# Wait for main JS asset to be available (frontend build/dev server readiness)
+MAX_ASSET_WAIT=${MAX_ASSET_WAIT:-60}
+A=0
+until curl -sSf "$BASE_URL/js/runtime.js" >/dev/null 2>&1 || [ $A -ge $MAX_ASSET_WAIT ]; do
+  printf "."
+  sleep 1
+  A=$((A+1))
+done
+if [ $A -ge $MAX_ASSET_WAIT ]; then
+  echo "runtime.js not available after ${MAX_ASSET_WAIT}s" >&2
+  docker compose -f "$COMPOSE_FILE" --project-directory "$PROJECT_DIR" logs web || true
+  docker compose -f "$COMPOSE_FILE" --project-directory "$PROJECT_DIR" logs git-bridge || true
+  exit 2
+fi
+
 # Ensure out dir exists and is empty
 mkdir -p "$OUT_DIR"
 rm -rf "$OUT_DIR"/* || true
+
+# Ensure host key entry for git bridge doesn't block SSH operations (remove stale entry if present)
+ssh-keygen -f "$HOME/.ssh/known_hosts" -R '[develop-git-bridge-1]:2222' >/dev/null 2>&1 || true
 
 # Run the focused Playwright SSH roundtrip test in non-interactive mode
 CONFIRM_DEV_SETUP=true CONFIRM_BASE_URL=true BASE_URL=$BASE_URL COMPOSE_FILE="$COMPOSE_FILE" PROJECT_DIR="$PROJECT_DIR" node services/web/test/e2e/playwright/git_roundtrip_ssh.mjs || {
