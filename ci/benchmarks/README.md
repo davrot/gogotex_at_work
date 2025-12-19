@@ -13,6 +13,7 @@ Runner profile (normative)
 Datasets
 
 Provide a seeded dataset for each benchmark. Recommended sizes:
+
 - key-lookup: 1k–10k keys distributed across ~200 users
 - introspection: synthetic tokens sized to represent expected token store
 
@@ -21,6 +22,7 @@ Place seeds under `ci/benchmarks/{key-lookup-benchmark, introspection-benchmark}
 Warm and cold runs
 
 Benchmarks support both warm and cold runs.
+
 - Cold run: ensure cache is cleared before running; run `BENCH_WARM=0`.
 - Warm run: pre-populate caches and then run with `BENCH_WARM=1`.
 
@@ -35,6 +37,7 @@ Commands
 Artifact format
 
 Bench scripts write a JSON object with at least the following keys:
+
 - p50: number
 - p95: number
 - p99: number

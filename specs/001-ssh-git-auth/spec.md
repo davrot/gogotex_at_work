@@ -9,11 +9,13 @@
 ## Clarifications
 
 ### Session 2025-12-10
+
 - Q: Should `git-bridge` fetch SSH public keys directly from MongoDB or via an internal API to the web-profile service? → A: Internal authenticated API to the web-profile service (preferred). `git-bridge` MUST call the internal API to retrieve user SSH keys; direct DB access is disallowed unless explicitly authorized.
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios & Testing _(mandatory)_
 
 ### User Story 1 - SSH Git access (Priority: P1)
+
 As an Overleaf user, I want to access my Git repositories using SSH keys so that I can securely collaborate without exposing passwords.
 
 **Why this priority**: Critical security enhancement that replaces vulnerable password-based auth.
@@ -21,12 +23,14 @@ As an Overleaf user, I want to access my Git repositories using SSH keys so that
 **Independent Test**: Add a valid public SSH key to the user's account, attempt `git clone`/`git push` over SSH using that key, and verify operations succeed while password-based attempts fail.
 
 **Acceptance Scenarios**:
+
 1. **Given** a user with a registered SSH public key, **When** they connect via SSH to a project repository, **Then** the SSH authentication succeeds and Git operations proceed.
 2. **Given** a user without a registered SSH key, **When** they attempt SSH Git operations, **Then** authentication fails.
 
 ---
 
 ### User Story 2 - Remove legacy API & auth (Priority: P1)
+
 As a system administrator, I want legacy API components and HTTP/OAuth2 authentication mechanisms removed so that known security vulnerabilities are eliminated.
 
 **Why this priority**: Eliminates critical attack surface from deprecated and insecure components.
@@ -34,12 +38,14 @@ As a system administrator, I want legacy API components and HTTP/OAuth2 authenti
 **Independent Test**: Deploy git-bridge with legacy endpoints removed; exercise previously supported HTTP Basic / OAuth2 authentication flows and verify they are rejected (and produce no informative error that betrays the previous functionality).
 
 **Acceptance Scenarios**:
+
 1. **Given** a request using HTTP Basic Auth, **When** it targets git-bridge, **Then** the request is rejected and the response gives no indication that HTTP Basic was ever supported.
 2. **Given** a request using OAuth2 tokens, **When** it targets git-bridge, **Then** the request is rejected in the same opaque manner.
 
 ---
 
 ### User Story 3 - SSH key management UI (Priority: P2)
+
 As an Overleaf user, I want to manage my SSH keys in the Overleaf web UI so that I can control my Git access credentials from a central place.
 
 **Why this priority**: Improves UX and reduces support overhead; however SSH-only auth must be implemented before full UI rollout.
@@ -47,6 +53,7 @@ As an Overleaf user, I want to manage my SSH keys in the Overleaf web UI so that
 **Independent Test**: From the account settings page, add a valid SSH public key; verify it is persisted in MongoDB, visible in the UI list, and usable for SSH authentication.
 
 **Acceptance Scenarios**:
+
 1. **Given** a logged-in user, **When** they add a valid SSH public key via the UI, **Then** the key is saved and available for SSH authentication.
 2. **Given** a logged-in user, **When** they delete/revoke a key in the UI, **Then** subsequent SSH attempts using that key fail.
 
@@ -59,7 +66,7 @@ As an Overleaf user, I want to manage my SSH keys in the Overleaf web UI so that
 - Key rotation: user uploads replacement key and revokes old key; simultaneous sessions should be handled.
 - Exported/archived projects: ensure recorded authorized_keys mapping persists for archived repos.
 
-## Requirements *(mandatory)*
+## Requirements _(mandatory)_
 
 ### Functional Requirements
 
@@ -83,7 +90,7 @@ As an Overleaf user, I want to manage my SSH keys in the Overleaf web UI so that
 - **Git Repository Access**: Mapping for project-level access.
   - Attributes: `project_id`, `user_id`, `access_type` (`SSH`), `authorized_keys` (list of SSH Key IDs or fingerprints).
 
-## Success Criteria *(mandatory)*
+## Success Criteria _(mandatory)_
 
 ### Measurable Outcomes
 
@@ -121,5 +128,4 @@ As an Overleaf user, I want to manage my SSH keys in the Overleaf web UI so that
 
 - Follow the constitution gates: include a "Constitution Check" section in the plan documenting how code quality, testing, UX consistency, performance, and observability are addressed.
 - Ensure all code changes include unit/integration tests and CI configuration updates to run the new tests.
-
 ```

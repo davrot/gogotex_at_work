@@ -1,7 +1,7 @@
 module.exports = {
   mongo: {
-    url: 'mongodb://127.0.0.1:27017/test',
+    url: 'mongodb://mongo:27017/test',
     options: {},
   },
   cache: {},
-}
+} 

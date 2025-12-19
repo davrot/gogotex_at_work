@@ -23,15 +23,26 @@ public class WebProfileClient {
     private final String baseUrl;
     private final String apiToken;
     private final Gson gson = new Gson();
+    private final org.apache.http.impl.client.CloseableHttpClient injectedClient;
 
     public WebProfileClient(String baseUrl, String apiToken) {
+        this(baseUrl, apiToken, null);
+    }
+
+    /**
+     * Test-friendly constructor allowing a CloseableHttpClient to be injected (e.g., Mockito mock).
+     */
+    public WebProfileClient(String baseUrl, String apiToken, org.apache.http.impl.client.CloseableHttpClient httpClient) {
         this.baseUrl = baseUrl;
         this.apiToken = apiToken;
+        this.injectedClient = httpClient;
     }
 
     public Optional<String> getUserIdForFingerprint(String fingerprint) throws IOException {
         String url = String.format("%s/internal/api/ssh-keys/%s", baseUrl, URLEncoder.encode(fingerprint, StandardCharsets.UTF_8));
-        try (CloseableHttpClient http = HttpClients.createDefault()) {
+        final boolean useInjected = injectedClient != null;
+        final org.apache.http.impl.client.CloseableHttpClient http = useInjected ? injectedClient : HttpClients.createDefault();
+        try {
             HttpGet get = new HttpGet(url);
             if (apiToken != null && !apiToken.isEmpty()) {
                 if (apiToken.contains(":")) {
@@ -52,6 +63,10 @@ public class WebProfileClient {
                 }
                 return Optional.empty();
             }
+        } finally {
+            if (!useInjected) {
+                try { http.close(); } catch (IOException ignored) {}
+            }
         }
     }
 
@@ -63,7 +78,9 @@ public class WebProfileClient {
             } else {
                 url = String.format("%s/internal/api/users/%s/ssh-keys", baseUrl.replaceAll("/$",""), userId);
             }
-        try (CloseableHttpClient http = HttpClients.createDefault()) {
+        final boolean useInjected = injectedClient != null;
+        final org.apache.http.impl.client.CloseableHttpClient http = useInjected ? injectedClient : HttpClients.createDefault();
+        try {
             HttpGet get = new HttpGet(url);
             if (apiToken != null && !apiToken.isEmpty()) {
                 if (apiToken.contains(":")) {
@@ -95,6 +112,10 @@ public class WebProfileClient {
                     return out;
                 }
                 return Collections.emptyList();
+            }
+        } finally {
+            if (!useInjected) {
+                try { http.close(); } catch (IOException ignored) {}
             }
         }
     }

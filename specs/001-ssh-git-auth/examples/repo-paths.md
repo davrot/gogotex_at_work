@@ -3,6 +3,7 @@
 This file documents canonical examples and edge cases the `git-bridge` repo-path parser must handle. Add unit tests to `services/git-bridge` that verify these transformations.
 
 Examples:
+
 - `/repo/acme/hello-world.git` → slug `acme/hello-world`
 - `/repo/acme/hello-world` → slug `acme/hello-world` (missing `.git` suffix tolerated)
 - `/repo/acme/space%20name.git` → slug `acme/space name` (URL-decoded segments)

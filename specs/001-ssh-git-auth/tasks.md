@@ -97,6 +97,7 @@ description: "Tasks for SSH-only Git authentication feature"
   - verify back-end controller endpoints (web-profile controller and any import APIs) reject or strip private-key submissions,
   - assert DB documents for SSH keys contain only public key and optional non-reversible metadata (e.g., `private_key_hash`), and
   - add a CI gate that fails if any test detects private-key storage or leakage.
+
 ---
 
 ## Dependencies & Execution Order

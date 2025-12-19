@@ -77,7 +77,7 @@ Specify where and how project-membership is enforced and how `projectId` is deri
   - `/repo/acme/space%20name.git` → slug `acme/space name` (URL-decoded segments)
   - `/repo/acme/nested/inner.git` → slug `acme/nested/inner` (multiple segments allowed)
   - `repo/owner/.git` → malformed; API should return 400 for clearly invalid paths.
-Implementers MUST document exact mapping and edge-case handling in the implementation ticket and add unit tests that assert behavior for all canonical examples and malformed inputs.
+    Implementers MUST document exact mapping and edge-case handling in the implementation ticket and add unit tests that assert behavior for all canonical examples and malformed inputs.
 
 ### Optional: private fingerprint lookup API
 

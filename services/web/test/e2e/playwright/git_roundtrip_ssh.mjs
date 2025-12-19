@@ -178,6 +178,8 @@ async function run() {
     const out = execSync(`${createScript} ${userId} "${pname}"`, { encoding: 'utf8', stdio: ['ignore','pipe','pipe'] })
     projectId = out.toString().trim().split('\n').pop()
     console.log('Created project id:', projectId)
+    // write the created project id to out for easier inspection during debug runs
+    try { fs.writeFileSync(path.join(outDir, 'created_project_id.txt'), projectId) } catch (e) { console.warn('Failed to write created_project_id.txt', e && e.message) }
   } catch (e) {
     console.error('Project creation helper failed:', e && (e.message || e))
     if (typeof browser !== 'undefined' && browser) await browser.close();
@@ -256,15 +258,25 @@ async function run() {
     fs.writeFileSync(path.join(work, texFile), '% Test main\n\\documentclass{article}\\begin{document}Hello\\end{document}\n')
     execSync(`cd ${work} && git add ${texFile} && git commit -m "add ${texFile}"`, { stdio: 'inherit' })
 
-    if (!pushWithRebase()) {
-      // try again with IdentitiesOnly in case of SSH agent issues
-      pushWithRebase('-o IdentitiesOnly=yes')
+    // Optional debug pause to inspect server-side repo before first push
+    if (process.env.PAUSE_BEFORE_PUSH === '1') {
+      console.warn('PAUSE_BEFORE_PUSH enabled — pausing before initial push. ProjectId=' + projectId + '. Create /tmp/continue_e2e to continue')
+      try { fs.writeFileSync(path.join(outDir, 'created_project_id.txt'), projectId) } catch (e) { console.warn('Failed to write created_project_id.txt', e && e.message) }
+      while (!fs.existsSync('/tmp/continue_e2e')) { await new Promise(r => setTimeout(r, 1000)) }
     }
   }
 
   console.log('Modifying tex file', texFile)
   fs.appendFileSync(path.join(work, texFile), `\n% appended by playwright ssh test at ${timestamp}\n`)
   execSync(`cd ${work} && git add ${texFile} && git commit -m "append marker"`, { stdio: 'inherit' })
+
+  // Optional debug pause to inspect server-side repo before append push
+  if (process.env.PAUSE_BEFORE_PUSH === '1') {
+    console.warn('PAUSE_BEFORE_PUSH enabled — pausing before append push. ProjectId=' + projectId + '. Create /tmp/continue_e2e to continue')
+    try { fs.writeFileSync(path.join(outDir, 'created_project_id.txt'), projectId) } catch (e) { console.warn('Failed to write created_project_id.txt', e && e.message) }
+    while (!fs.existsSync('/tmp/continue_e2e')) { await new Promise(r => setTimeout(r, 1000)) }
+  }
+
   if (!pushWithRebase('-o IdentitiesOnly=yes')) { console.error('git push failed after retries'); if (typeof browser !== 'undefined' && browser) await browser.close(); process.exit(7) }
 
   // Verify pushed change exists server-side by checking project files via server helper (download project zip or check repo content on backend)
