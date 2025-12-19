@@ -36,6 +36,7 @@ Testing & verification
 - Validate emitted logs against the JSON schema using `services/web/test/contract/LogSchemaValidationTests.mjs`.
 - Verify `token.introspect` and audit events include `hashPrefix` and do not include plaintext tokens using `services/web/test/contract/LoggingRetentionPIITests.mjs`.
 - Add and run contract tests that assert masking and retention behaviors as part of CI. (There are contract test skeletons in `services/web/test/contract/` — extend them to assert retention behavior for your deployment environment.)
+  - The `LoggingRetentionPIITests` contract test will check for an environment-configured retention value (e.g., `AUDIT_LOG_RETENTION_DAYS` or `Settings.auditLogRetentionDays`) and assert it is at least **90** days; if no such configuration is present the test will skip and act as a scaffold/reminder to configure retention in that environment.
 
 Operational guidance
 

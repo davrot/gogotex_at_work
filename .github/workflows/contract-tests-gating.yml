@@ -1,0 +1,71 @@
+name: Contract tests gating
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  contract-tests:
+    runs-on: ubuntu-latest
+    environment: ci
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: |
+          npm ci --legacy-peer-deps
+
+      - name: Start services (docker-compose)
+        run: |
+          docker compose -f develop/docker-compose.yml up -d --build
+
+      - name: Wait for services
+        run: |
+          ./develop/bin/wait 300
+
+      - name: Run contract tests
+        env:
+          AUDIT_LOG_RETENTION_DAYS: ${{ secrets.AUDIT_LOG_RETENTION_DAYS }}
+        run: |
+          mkdir -p services/web/data/reports
+          npm run --prefix services/web test:contract -- --reporter mocha-junit-reporter || exit 1
+
+      - name: Upload contract test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: contract-test-results
+          path: services/web/data/reports/**
+
+      - name: Check retention configuration
+        run: |
+          # If the contract test skipped the retention test (exit 0 with skip), ensure the env var is set in CI
+          if [ -z "${{ secrets.AUDIT_LOG_RETENTION_DAYS }}" ] && [ -z "${AUDIT_LOG_RETENTION_DAYS}" ]; then
+            echo "ERROR: AUDIT_LOG_RETENTION_DAYS not set in CI environment. Set the secret to an integer >= 90 to satisfy policy" >&2
+            exit 1
+          fi
+          # If set as secret, ensure it's >= 90
+          if [ -n "${{ secrets.AUDIT_LOG_RETENTION_DAYS }}" ]; then
+            val=${{ secrets.AUDIT_LOG_RETENTION_DAYS }}
+          else
+            val=${AUDIT_LOG_RETENTION_DAYS}
+          fi
+          if ! echo "$val" | grep -E '^[0-9]+$' >/dev/null; then
+            echo "ERROR: AUDIT_LOG_RETENTION_DAYS must be an integer" >&2
+            exit 1
+          fi
+          if [ "$val" -lt 90 ]; then
+            echo "ERROR: AUDIT_LOG_RETENTION_DAYS is set to $val which is less than 90" >&2
+            exit 1
+          fi
+          echo "Audit log retention verified: $val days"
