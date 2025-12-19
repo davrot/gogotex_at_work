@@ -33,8 +33,8 @@
 - [x] T006 [P] Verify/implement models: UserSSHKey + PersonalAccessToken — services/web/app/src/models/UserSSHKey.js, services/web/app/src/models/PersonalAccessToken.js (implemented)
 - [x] T007 [P] Verify/implement PersonalAccessToken manager & introspection logic — services/web/app/src/Features/Token/PersonalAccessTokenManager.mjs (implemented)
 - [x] T008 [P] Verify/implement Token controller & router (create/list/remove/introspect) — services/web/app/src/Features/Token/TokenController.mjs, services/web/app/src/Features/Token/TokenRouter.mjs (implemented)
-- [ ] T009 [P] Add structured logging schema & PII retention policy — services/web/lib/log-schemas/auth-events.json (implemented), docs/logging-policy.md (TODO)
-  - Acceptance: Logging schema includes `hashPrefix` fields and a masking policy; unit/contract tests verify that full token hashes are never emitted in logs, `hashPrefix` is present for token events, and retention rules are enforced (tests for retention behavior or a dry-run validation). **Status:** schema exists at `services/web/lib/log-schemas/auth-events.json`; **next:** add `docs/logging-policy.md` documenting retention/masking and add contract tests to verify masking and retention behavior.
+- [x] T009 [P] Add structured logging schema & PII retention policy — services/web/lib/log-schemas/auth-events.json (implemented), docs/logging-policy.md (implemented)
+  - Acceptance: Logging schema includes `hashPrefix` fields and a masking policy; unit/contract tests verify that full token hashes are never emitted in logs, `hashPrefix` is present for token events, and retention rules are enforced (tests for retention behavior or a dry-run validation). **Status:** schema exists at `services/web/lib/log-schemas/auth-events.json`; `docs/logging-policy.md` added; contract test `LoggingRetentionPIITests.mjs` checks retention configuration; unit tests added to ensure plaintext tokens are never logged.
 
 ---
 

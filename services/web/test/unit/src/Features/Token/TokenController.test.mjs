@@ -71,6 +71,33 @@ describe('TokenController', function () {
     expect(introspectBody).to.have.property('active')
   })
 
+  it('does not log plaintext tokens to stdout or stderr', async function (ctx) {
+    const PLAINTEXT = 'abcdef0123456789'
+    ctx.req.body = { token: PLAINTEXT }
+
+    // stub console methods
+    const logStub = sinon.stub(console, 'log')
+    const debugStub = sinon.stub(console, 'debug')
+
+    try {
+      await ctx.Controller.introspect(ctx.req, ctx.res)
+
+      // console.log must not be used to print the full token
+      expect(logStub.called).to.equal(false)
+
+      // console.debug may be used for masked tokens only; ensure it never contains the full plaintext
+      if (debugStub.called) {
+        for (const call of debugStub.getCalls()) {
+          const argsJoined = call.args.join(' ')
+          expect(argsJoined.includes(PLAINTEXT)).to.equal(false)
+        }
+      }
+    } finally {
+      logStub.restore()
+      debugStub.restore()
+    }
+  })
+
   it('create with expiresAt returns created token and introspect shows expired', async function (ctx) {
     // create a token with expiresAt in the past
     const past = new Date(Date.now() - 1000 * 60 * 60).toISOString()

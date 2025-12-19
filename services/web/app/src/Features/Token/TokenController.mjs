@@ -68,8 +68,8 @@ export async function introspect(req, res) {
     return res.status(400).json({ message: 'token required' })
   }
 
-  // Debug: log token received for introspection
-  try { console.log('[TokenController.introspect] token=', token) } catch (e) {}
+  // Debug: mask token received for introspection (never log plaintext)
+  try { console.debug('[TokenController.introspect] tokenMask=', token && (token.slice(0,8) + '...')) } catch (e) {}
 
   // rate-limit per service-origin
   try {
