@@ -13,10 +13,10 @@
   - Acceptance: Migration preserves original algorithm metadata (`algorithm`/`hashPrefix` fields), provides a safe re-hash or re-issue strategy (idempotent, reversible steps documented), and includes tests or a dry-run mode to validate behavior.
   - Depends on: **T004** (config validation & runtime hash availability check). Do not run or merge the migration before T004 is completed and verified in a staging environment.
 
-- [ ] T001a (BLOCKING) Constitution compliance check — .specify/memory/constitution.md, CI pipeline
-  - Acceptance: PRs that implement or change this feature MUST include and pass the constitution checklist: linters, unit & contract tests, and benchmark gating (T033) where applicable. Note: constitution document exists, but automated CI enforcement (gating) is outstanding.
+- [x] T001a (BLOCKING) Constitution compliance check — .specify/memory/constitution.md, CI pipeline (implemented: `scripts/ci/check_constitution.sh` + `.github/workflows/check-constitution.yml`)
+  - Acceptance: PRs that implement or change this feature MUST include and pass the constitution checklist: linters, unit & contract tests, and benchmark gating (T033) where applicable. The new workflow runs the script on pull requests.
 
-- [ ] T0AA (BLOCKING) Formalize benchmark runner profile & harness — ci/benchmarks/README.md, ci/benchmarks/harness-config.json
+- [x] T0AA (BLOCKING) Formalize benchmark runner profile & harness — ci/benchmarks/README.md, ci/benchmarks/harness-config.json (implemented)
   - Acceptance: Provide a reproducible runner profile (recommended 2 vCPU, 4GB RAM), a seeded dataset (documented seed and size), harness command-lines, artifact format (p50/p95/p99), and example invocation for warm/cold runs. The harness must be runnable in local/dev CI and in the CI runner used for gating.
 
 - [x] T0YY Add canonical repo-path → projectId mapping examples & parsing unit tests — specs/001-ssh-git-auth/examples/repo-paths.md, services/git-bridge/test/unit/RepoPathParsingTest.java (examples + tests added)

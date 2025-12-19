@@ -1,0 +1,14 @@
+{
+  "runner_profile": { "vcpus": 2, "memory_gb": 4 },
+  "datasets": {
+    "key_lookup": { "seed_hint": "ci/benchmarks/key-lookup-benchmark/seed.json", "recommended_size": "1000-10000" },
+    "introspection": { "seed_hint": "ci/benchmarks/introspection-benchmark/seed.json", "recommended_size": "200-1000" }
+  },
+  "bench_commands": {
+    "key_lookup": "BENCH_URL=http://localhost:3000/internal/api/ssh-keys/SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA BENCH_ITER=200 BENCH_CONCURRENCY=20 BENCH_OUTPUT=ci/benchmarks/key-lookup-benchmark/out.json node ci/benchmarks/key-lookup-benchmark/bench.js",
+    "introspection": "BENCH_URL=http://localhost:3000/internal/api/tokens/introspect BENCH_ITER=200 BENCH_CONCURRENCY=20 BENCH_TOKEN=invalid-token BENCH_OUTPUT=ci/benchmarks/introspection-benchmark/out.json node ci/benchmarks/introspection-benchmark/bench.js"
+  },
+  "artifact_format": { "json": true, "fields": ["p50", "p95", "p99", "samples", "errors"] },
+  "slo": { "key_lookup_p95_ms": 50, "introspection_p95_ms": 100 },
+  "warm_cold": { "warm_flag": "BENCH_WARM=1", "cold_flag": "BENCH_WARM=0" }
+}
