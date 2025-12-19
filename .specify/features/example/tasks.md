@@ -30,11 +30,11 @@
 ## Phase 2: Foundational
 
 - [x] T005 Setup DB migrations & example fixtures for keys/tokens — services/web/migrations/, services/web/test/fixtures/
-- [ ] T006 [P] Verify/implement models: UserSSHKey + PersonalAccessToken — services/web/app/src/models/UserSSHKey.js, services/web/app/src/models/PersonalAccessToken.js
-- [ ] T007 [P] Verify/implement PersonalAccessToken manager & introspection logic — services/web/app/src/Features/Token/PersonalAccessTokenManager.mjs
-- [ ] T008 [P] Verify/implement Token controller & router (create/list/remove/introspect) — services/web/app/src/Features/Token/TokenController.mjs, services/web/app/src/Features/Token/TokenRouter.mjs
-- [ ] T009 [P] Add structured logging schema & PII retention policy — services/web/lib/log-schemas/auth-events.json, docs/logging-policy.md
-  - Acceptance: Logging schema includes `hashPrefix` fields and a masking policy; unit/contract tests verify that full token hashes are never emitted in logs, `hashPrefix` is present for token events, and retention rules are enforced (tests for retention behavior or a dry-run validation). Add a small contract test to assert log entries conform to schema and masking rules.
+- [x] T006 [P] Verify/implement models: UserSSHKey + PersonalAccessToken — services/web/app/src/models/UserSSHKey.js, services/web/app/src/models/PersonalAccessToken.js (implemented)
+- [x] T007 [P] Verify/implement PersonalAccessToken manager & introspection logic — services/web/app/src/Features/Token/PersonalAccessTokenManager.mjs (implemented)
+- [x] T008 [P] Verify/implement Token controller & router (create/list/remove/introspect) — services/web/app/src/Features/Token/TokenController.mjs, services/web/app/src/Features/Token/TokenRouter.mjs (implemented)
+- [ ] T009 [P] Add structured logging schema & PII retention policy — services/web/lib/log-schemas/auth-events.json (implemented), docs/logging-policy.md (TODO)
+  - Acceptance: Logging schema includes `hashPrefix` fields and a masking policy; unit/contract tests verify that full token hashes are never emitted in logs, `hashPrefix` is present for token events, and retention rules are enforced (tests for retention behavior or a dry-run validation). **Status:** schema exists at `services/web/lib/log-schemas/auth-events.json`; **next:** add `docs/logging-policy.md` documenting retention/masking and add contract tests to verify masking and retention behavior.
 
 ---
 
