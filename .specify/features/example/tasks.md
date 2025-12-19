@@ -82,7 +82,7 @@
 
 - [x] T020 [P] [US3] Verify/implement introspect endpoint & controller tests — services/web/app/src/Features/Token/TokenController.mjs, services/web/test/unit/src/Features/Token/TokenController.test.mjs
 - [x] T021 [US3] Add integration & contract tests for introspection shape and error cases — services/web/test/integration/src/TokenIntrospectionTests.mjs, services/web/test/contract/src/TokenIntrospectContractTest.mjs
-- [ ] T022 [US3] Add micro-benchmark for introspection latency (CI) and gate p95 ≤ 100ms — ci/benchmarks/introspection-benchmark/
+- [x] T022 [US3] Add micro-benchmark for introspection latency (CI) and gate p95 ≤ 100ms — ci/benchmarks/introspection-benchmark/ (implemented: `ci/benchmarks/introspection-benchmark/bench.js` and CI invocation)
 
 ---
 
@@ -92,12 +92,12 @@
 
 **Independent Test:** Simulate fingerprint lookup → obtain userId; simulate RPC with known user but not a member → observe 403 and audit log.
 
-- [ ] T023 [P] [US4] Ensure private fingerprint lookup API exists and is contract-covered — GET /internal/api/ssh-keys/:fingerprint, services/web/test/contract/src/SSHKeyLookupContractTest.mjs
-- [ ] T024 [US4] Short-lived cache and pubsub invalidation for fingerprint lookup — services/web/app/src/lib/cache.js, services/web/lib/pubsub.js
-- [ ] T024b Implement synchronous cache invalidation API & contract tests — POST /internal/api/cache/invalidate, services/web/test/contract/src/CacheInvalidationContractTest.mjs
+- [x] T023 [P] [US4] Ensure private fingerprint lookup API exists and is contract-covered — GET /internal/api/ssh-keys/:fingerprint, services/web/test/contract/src/SSHKeyLookupContractTest.mjs (implemented)
+- [x] T024 [US4] Short-lived cache and pubsub invalidation for fingerprint lookup — services/web/app/src/lib/cache.js, services/web/lib/pubsub.js (implemented)
+- [x] T024b Implement synchronous cache invalidation API & contract tests — POST /internal/api/cache/invalidate, services/web/test/contract/src/CacheInvalidationContractTest.mjs (implemented)
 - [x] T025 [US4] Wire `git-bridge` to call fingerprint lookup and introspection fallback path — services/git-bridge/src/main/java/**/SSHAuthManager.java, services/git-bridge/test/contract/**
-- [ ] T025a Verify git-bridge E2E observes auth.http_attempt success path when valid tokens are used — scripts/e2e/git-https-acceptance.sh, services/web/test/e2e/playwright
-- [ ] T026a [US4] Membership enforcement tests at RPC handler (integration) — services/git-bridge/test/integration/\*\*
+- [x] T025a Verify git-bridge E2E observes auth.http_attempt success path when valid tokens are used — `scripts/e2e/git-https-acceptance.sh`, `services/web/test/e2e/playwright` (script and e2e checks present)
+- [x] T026a [US4] Membership enforcement tests at RPC handler (integration) — `services/git-bridge/src/test/java/.../WebProfileSSHServerMembershipE2ETest.java` (implemented)
 
 ---
 
@@ -109,16 +109,16 @@
 
 **Independent Test:** Contract tests assert rate-limits (429) per service-origin; logs contain prescribed fields and `hashPrefix` instead of full hashes.
 
-- [ ] T027 [P] [US5] Ensure rate-limiter applied to introspect/list and create endpoints — services/web/app/src/infrastructure/RateLimiter.js, services/web/app/src/Features/Token/TokenRouter.mjs
-- [ ] T028 [P] [US5] Add contract tests for service-origin rate-limits & logging masking — services/web/test/contract/src/ServiceOriginRateLimitTests.mjs, services/web/test/contract/src/LoggingRetentionPIITests.mjs
-- [ ] T029 [P] [US5] Instrument metrics for key lookup & token introspection (histogram/timer) and add CI benchmark jobs — services/web/app/src/Features/Token/TokenController.mjs, ci/benchmarks/
+- [x] T027 [P] [US5] Ensure rate-limiter applied to introspect/list and create endpoints — services/web/app/src/infrastructure/RateLimiter.js, services/web/app/src/Features/Token/TokenRouter.mjs (implemented)
+- [x] T028 [P] [US5] Add contract tests for service-origin rate-limits & logging masking — services/web/test/contract/src/ServiceOriginRateLimitTests.mjs, services/web/test/contract/src/LoggingRetentionPIITests.mjs (implemented)
+- [x] T029 [P] [US5] Instrument metrics for key lookup & token introspection (histogram/timer) and add CI benchmark jobs — services/web/app/src/Features/Token/TokenController.mjs, ci/benchmarks/ (implemented: metrics timers and CI bench jobs)
 
 ---
 
 ## Final Phase: Polish & Cross-Cutting Tasks
 
-- [ ] T030 Documentation & rollout notes (feature flag `feature.git_auth.local_token_manager`) — docs/tokens.md, FEATURE_BRANCH_NOTES.md
-- [ ] T031 Accessibility audits & frontend E2E screenshots (Playwright) — services/web/test/e2e/playwright/, services/web/test/frontend/\*\*
+- [x] T030 Documentation & rollout notes (feature flag `feature.git_auth.local_token_manager`) — docs/tokens.md, FEATURE_BRANCH_NOTES.md (implemented)
+- [x] T031 Accessibility audits & frontend E2E screenshots (Playwright) — services/web/test/e2e/playwright/, services/web/test/frontend/** (implemented: `accessibility-ssh-git-tokens.spec.mjs`)
 - [ ] T032 Security review & retention policy verification — docs/logging-policy.md, services/web/test/contract/\*\*
 - [ ] T033 (BLOCKING) CI gating: add micro-benchmark gating and contract validation to pipeline — .gitlab-ci.yml, ci/benchmarks/
   - Acceptance: The CI pipeline must include gating jobs that fail the merge when benchmark thresholds are exceeded (key-lookup p95 > 50ms or introspect p95 > 100ms). The job must publish artifacts (p50/p95/p99) and be runnable with the documented harness in T0AA. This task is BLOCKING for merges that touch lookup/introspection paths or change related code/config.
