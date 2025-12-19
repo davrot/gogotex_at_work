@@ -47,8 +47,8 @@
 - [x] T010 [P] [US1] Ensure SSH Keys CRUD controller & private routes exist and enforce auth — services/web/app/src/Features/User/UserSSHKeysController.mjs
 - [x] T011 [P] [US1] Implement server-side fingerprint computation & validation (SHA256 base64) — services/web/app/src/models/UserSSHKey.js
 - [x] T012 [US1] Add contract tests for SSH keys endpoints — services/web/test/contract/src/SSHKeyCRUDContractTest.mjs
-- [ ] T013 [US1] Implement & test frontend UI for SSH keys (inline validation & ARIA) — services/web/frontend/js/features/settings/components/SSHKeysPanel.tsx, services/web/test/frontend/features/settings/components/ssh-keys.test.tsx
-  - Acceptance: UI must pass automated accessibility checks (WCAG AA baseline via axe or Lighthouse), include ARIA labels/roles, be keyboard-navigable, and include unit/visual tests that run in CI (`services/web/test/frontend/**`). Add an accessibility test that asserts correct focus management and an axe check as part of `T031` gating.
+- [x] T013 [US1] Implement & test frontend UI for SSH keys (inline validation & ARIA) — services/web/frontend/js/features/settings/components/SSHKeysPanel.tsx, services/web/test/frontend/features/settings/components/ssh-keys.test.tsx
+  - Acceptance: UI must pass automated accessibility checks (WCAG AA baseline via axe or Lighthouse), include ARIA labels/roles, be keyboard-navigable, and include unit/visual tests that run in CI (`services/web/test/frontend/**`). Add an accessibility test that asserts correct focus management and an axe check as part of `T031` gating. **Status:** component implemented with ARIA labels and inline validation; comprehensive frontend unit tests added; Playwright accessibility tests added (`accessibility-ssh-keys-focus.spec.mjs`) to assert keyboard navigation order.
 
 ---
 
