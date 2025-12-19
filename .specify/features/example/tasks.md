@@ -13,6 +13,18 @@
   - Acceptance: Migration preserves original algorithm metadata (`algorithm`/`hashPrefix` fields), provides a safe re-hash or re-issue strategy (idempotent, reversible steps documented), and includes tests or a dry-run mode to validate behavior.
   - Depends on: **T004** (config validation & runtime hash availability check). Do not run or merge the migration before T004 is completed and verified in a staging environment.
 
+- [ ] T001a (BLOCKING) Constitution compliance check — .specify/memory/constitution.md, CI pipeline
+  - Acceptance: PRs that implement or change this feature MUST include and pass the constitution checklist: linters, unit & contract tests, and benchmark gating (T033) where applicable. This task must be completed and pass before merging feature branches impacting auth/lookup/introspection.
+
+- [ ] T0AA (BLOCKING) Formalize benchmark runner profile & harness — ci/benchmarks/README.md, ci/benchmarks/harness-config.json
+  - Acceptance: Provide a reproducible runner profile (recommended 2 vCPU, 4GB RAM), a seeded dataset (documented seed and size), harness command-lines, artifact format (p50/p95/p99), and example invocation for warm/cold runs. The harness must be runnable in local/dev CI and in the CI runner used for gating.
+
+- [ ] T0YY Add canonical repo-path → projectId mapping examples & parsing unit tests — specs/001-ssh-git-auth/examples/repo-paths.md, services/git-bridge/test/unit/RepoPathParsingTest.java
+  - Acceptance: Add canonical mapping examples (including `.git` suffix handling, url-encoded paths, namespaces, leading/trailing slashes) and unit tests that assert canonical parsing results and edge case behaviors.
+
+- [ ] T0ZZ Add idempotency concurrency contract test for SSH key POST — services/web/test/contract/src/SSHKeyIdempotencyContractTest.mjs
+  - Acceptance: Concurrent `POST /internal/api/users/:userId/ssh-keys` with the same `public_key` must deterministically return the same resource (200 idempotent response) and avoid duplicate entries (or return 409 with explanatory message if a different user owns the key). Include a deterministic test harness to simulate concurrent requests.
+
 ---
 
 ## Phase 2: Foundational
@@ -108,7 +120,8 @@
 - [ ] T030 Documentation & rollout notes (feature flag `feature.git_auth.local_token_manager`) — docs/tokens.md, FEATURE_BRANCH_NOTES.md
 - [ ] T031 Accessibility audits & frontend E2E screenshots (Playwright) — services/web/test/e2e/playwright/, services/web/test/frontend/\*\*
 - [ ] T032 Security review & retention policy verification — docs/logging-policy.md, services/web/test/contract/\*\*
-- [ ] T033 CI gating: add micro-benchmark gating and contract validation to pipeline — .gitlab-ci.yml, ci/benchmarks/
+- [ ] T033 (BLOCKING) CI gating: add micro-benchmark gating and contract validation to pipeline — .gitlab-ci.yml, ci/benchmarks/
+  - Acceptance: The CI pipeline must include gating jobs that fail the merge when benchmark thresholds are exceeded (key-lookup p95 > 50ms or introspect p95 > 100ms). The job must publish artifacts (p50/p95/p99) and be runnable with the documented harness in T0AA. This task is BLOCKING for merges that touch lookup/introspection paths or change related code/config.
 
 ---
 

@@ -42,7 +42,7 @@ Trust model: to prevent forgery, the `X-Service-Origin` header MUST only be trea
 
 - Fallback & migration semantics: runtime algorithm selection MUST be explicit via `AUTH_TOKEN_HASH_ALGO`. If set to `argon2id` and the runtime environment lacks argon2 support, the service MUST fail to start unless the config explicitly sets `bcrypt` as a fallback; do not silently fall back. Implementations MUST document detection semantics and fail-fast behavior in the feature README. Migration/backfill tasks MUST record original hash algorithm metadata and include a re-hash or re-issue strategy to support algorithm changes (see tasks T002b and T015).
 - Performance: key→user lookup latency <= 50ms p95 in normal conditions; cache TTL for lookups configurable (default 60s).
-  - Measurement harness and "normal conditions": benchmarks/SLOs are measured in CI using a reproducible runner profile (recommended: 2 vCPU, 4GB RAM) and a synthetic dataset representative of production (example: 1k-10k keys spread across 200 users). The measurement harness MUST document cold vs warm cache runs; SLOs are measured with a warm cache where appropriate, and CI MUST include cold-cache regression runs. See CI benchmark tasks T026 (key lookup) and T026b (introspection).
+  - Measurement harness and "normal conditions": benchmarks/SLOs are measured in CI using a reproducible runner profile and a documented harness (normative). **Benchmark harness (normative)**: The project MUST provide a harness and configuration under `ci/benchmarks/` and document its runner profile and dataset: a recommended runner profile is **2 vCPU, 4GB RAM**; a seeded dataset must be provided (example seed and recommended sizes: 1k–10k keys across ~200 users for key-lookup). The harness MUST document and support both **warm** and **cold** runs (commands, flags, and artifact output format). Benchmarks must produce p50/p95/p99 artifacts and be runnable locally using the documented commands. CI jobs that execute the harness MUST use the documented profile and fail the merge if p95 thresholds are exceeded (see T033). See CI benchmark tasks T026 (key lookup) and T026b (introspection).
 - Introspection: token introspection latency p95 ≤ 100ms in normal conditions; introspection endpoints should be instrumented and benchmarked in CI.
   - Measurement harness and "normal conditions": see the general performance harness above. Introspection benchmarks MUST be run for local introspection and OAuth2 fallback paths under representative load; CI MUST publish p50/p95/p99 and fail jobs when thresholds are exceeded. Add task T026b for introspection micro-benchmark coverage.
 - Observability: creation/deletion/usage of keys and tokens must emit structured logs with userId, actor, IP, action, resource_id, timestamp.
@@ -71,7 +71,13 @@ Trust model: to prevent forgery, the `X-Service-Origin` header MUST only be trea
 Specify where and how project-membership is enforced and how `projectId` is derived from repository paths.
 
 - Enforcement point: membership MUST be checked at the git RPC handler (e.g., during `upload-pack` / `receive-pack` handling) inside `git-bridge` after authentication completes. SSH authentication only maps fingerprint → `userId`; repository-level authorization requires the RPC handler to map incoming repository path → `projectId` and then verify membership.
-- Repo-path → projectId mapping: `git-bridge` will parse repository path segments using the repository routing rules used by the product (example canonical mapping: `/repo/{owner}/{slug}.git` → project slug `{owner}/{slug}` → lookup `projectId`). Implementers MUST document exact mapping in the implementation ticket and add unit tests against mapping examples.
+- Repo-path → projectId mapping: `git-bridge` will parse repository path segments using the repository routing rules used by the product. Add canonical mapping examples and edge cases in `spec` and unit tests in `services/git-bridge`. **Examples:**
+  - `/repo/acme/hello-world.git` → slug `acme/hello-world`
+  - `/repo/acme/hello-world` → slug `acme/hello-world` (missing `.git` suffix tolerated)
+  - `/repo/acme/space%20name.git` → slug `acme/space name` (URL-decoded segments)
+  - `/repo/acme/nested/inner.git` → slug `acme/nested/inner` (multiple segments allowed)
+  - `repo/owner/.git` → malformed; API should return 400 for clearly invalid paths.
+Implementers MUST document exact mapping and edge-case handling in the implementation ticket and add unit tests that assert behavior for all canonical examples and malformed inputs.
 
 ### Optional: private fingerprint lookup API
 
@@ -100,6 +106,7 @@ Specify where and how project-membership is enforced and how `projectId` is deri
   - If the exact `public_key` already exists for the same `userId`, `POST /internal/api/users/:userId/ssh-keys` MUST return `200 OK` with the existing key resource (idempotent create).
   - If the exact `public_key` exists but is already associated with a different `userId`, the API MUST return `409 Conflict` with an explanatory message.
   - Attempts to create a key with the same `key_name` but different `public_key` SHOULD return `400` with validation guidance.
+  - **Concurrency acceptance:** the system MUST handle concurrent create attempts deterministically. Implementations MUST ensure a unique constraint or transactional check prevents duplicate entries under concurrent POSTs; include a contract test (see T0ZZ) that simulates concurrent requests and asserts deterministic outcome (single resource created or a clear 409 conflict if a different user owns the key).
 - Revoked token or key: cache invalidation must reflect revocation within TTL or via explicit invalidation hook.
 - Malformed public_key: return 400 with validation errors.
 
