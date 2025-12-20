@@ -54,7 +54,9 @@ if (process.env.MONGO_CONNECTION_STRING) {
 } else if (process.env.MONGO_HOST) {
   Settings.mongo.url = `mongodb://${process.env.MONGO_HOST}/sharelatex`
 } else {
-  Settings.mongo.url = 'mongodb://127.0.0.1/sharelatex'
+  // DEV WARNING: When running inside Docker Compose/dev containers, prefer the compose mongo hostname
+  // (e.g., mongodb://mongo/sharelatex). Override with MONGO_CONNECTION_STRING or MONGO_HOST for other environments.
+  Settings.mongo.url = 'mongodb://mongo/sharelatex'
 }
 
 if (
