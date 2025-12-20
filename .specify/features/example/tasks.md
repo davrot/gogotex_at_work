@@ -58,18 +58,18 @@
 
 **Independent Test:** Create a token via POST and verify returned plaintext token once; subsequent GET shows `accessTokenPartial` only.
 
-- [ ] T014 [P] [US2] Verify Token model includes `hash`, `hashPrefix`, `algorithm`, `scopes`, `expiresAt` — services/web/app/src/models/PersonalAccessToken.js
-- [ ] T015 [P] [US2] Unit tests for token lifecycle & `replace=true` semantics — services/web/test/unit/src/Features/Token/Rotation.test.mjs
+- [x] T014 [P] [US2] Verify Token model includes `hash`, `hashPrefix`, `algorithm`, `scopes`, `expiresAt` — services/web/app/src/models/PersonalAccessToken.js
+- [x] T015 [P] [US2] Unit tests for token lifecycle & `replace=true` semantics — services/web/test/unit/src/Features/Token/Rotation.test.mjs
   - Acceptance: Unit tests must assert that when `replace=true` is passed on create, the previous token is marked inactive (introspection returns `active: false`), the new token is active, and stored metadata includes `algorithm` and `hashPrefix`. Tests should be deterministically runnable in CI and avoid DB casting issues (use in-memory model mocks or valid ObjectId fixtures). Include negative tests for malformed token input.
-- [ ] T016 [P] [US2] Integration tests for TokenController create/list/remove endpoints — services/web/test/integration/src/TokenControllerTests.mjs
-- [ ] T017 [US2] [P] Frontend: ensure `GitTokensPanel` lists tokens, shows plaintext on create, supports copy-to-clipboard, and handles network errors gracefully — services/web/frontend/js/features/settings/components/GitTokensPanel.tsx, services/web/test/frontend/features/settings/components/git-tokens.test.tsx
+- [x] T016 [P] [US2] Integration tests for TokenController create/list/remove endpoints — services/web/test/integration/src/TokenControllerTests.mjs
+- [x] T017 [US2] [P] Frontend: ensure `GitTokensPanel` lists tokens, shows plaintext on create, supports copy-to-clipboard, and handles network errors gracefully — services/web/frontend/js/features/settings/components/GitTokensPanel.tsx, services/web/test/frontend/features/settings/components/git-tokens.test.tsx
   - Acceptance: Plaintext token material is displayed only once on creation (UI must not store or show full hashes afterwards), copy-to-clipboard is accessible (with an ARIA live region announcing copy success), and automated frontend tests include axe accessibility checks and run in CI. The list view must show `accessTokenPartial` (masked) after creation and when re-fetching the token list.
-- [ ] T018 [US2] Add contract & service-origin rate-limit tests for token creation/listing — services/web/test/contract/src/ServiceOriginRateLimitTests.mjs
+- [x] T018 [US2] Add contract & service-origin rate-limit tests for token creation/listing — services/web/test/contract/src/ServiceOriginRateLimitTests.mjs
   - Contract test: services/web/test/contract/src/HashPrefixFormatContractTest.mjs — assert `hashPrefix` is 8 lowercase hex characters
-- [ ] T019 [US2] Reproduce & fix E2E 404 for GET `/internal/api/users/:userId/git-tokens` seen in Playwright run: inspect TokenRouter, AuthenticationController.requireLogin(), router mounting, and server logs during E2E — services/web/app/src/Features/Token/TokenRouter.mjs, services/web/app/src/Features/Token/TokenController.mjs, services/web/app/src/router.mjs, services/web/test/e2e/playwright/out/console.log
+- [x] T019 [US2] Reproduce & fix E2E 404 for GET `/internal/api/users/:userId/git-tokens` seen in Playwright run: inspect TokenRouter, AuthenticationController.requireLogin(), router mounting, and server logs during E2E — services/web/app/src/Features/Token/TokenRouter.mjs, services/web/app/src/Features/Token/TokenController.mjs, services/web/app/src/router.mjs, services/web/test/e2e/playwright/out/console.log
   - Acceptance: Playwright run (RESET_DB=true BASE_URL=...) shows no 404 for token list and UI shows token list or empty state instead of generic error.
 
-- [ ] T019b Negative auth tests for fingerprint lookup — services/web/test/unit/src/Features/SSHKey/SSHKeyLookupAuth.test.mjs
+- [x] T019b Negative auth tests for fingerprint lookup — services/web/test/unit/src/Features/SSHKey/SSHKeyLookupAuth.test.mjs
   - Acceptance: Unit and contract tests assert that `GET /internal/api/ssh-keys/:fingerprint` rejects unauthorized calls (401/403) via `AuthenticationController.requirePrivateApiAuth()` and that rate-limits are enforced (429 returned when over limit). Include both positive and negative auth cases.
 
 ---
@@ -103,7 +103,7 @@
 
 ## Phase 7: Cross-cutting — Observability, Rate-Limits & Security (US5)
 
-- [ ] T036 Add configurable `TRUST_X_SERVICE_ORIGIN` and `TRUSTED_PROXIES` support and tests — services/web/app/src/infrastructure/ServiceOrigin.mjs, services/web/test/unit/src/infrastructure/ServiceOrigin.test.mjs
+- [x] T036 Add configurable `TRUST_X_SERVICE_ORIGIN` and `TRUSTED_PROXIES` support and tests — services/web/app/src/infrastructure/ServiceOrigin.mjs, services/web/test/unit/src/infrastructure/ServiceOrigin.test.mjs (implemented; unit tests added)
 
 **Goal:** Structured logs, rate-limits (service-origin + per-user), SLOs, and audits for token/key events.
 
@@ -119,9 +119,12 @@
 
 - [x] T030 Documentation & rollout notes (feature flag `feature.git_auth.local_token_manager`) — docs/tokens.md, FEATURE_BRANCH_NOTES.md (implemented)
 - [x] T031 Accessibility audits & frontend E2E screenshots (Playwright) — services/web/test/e2e/playwright/, services/web/test/frontend/\*\* (implemented: `accessibility-ssh-git-tokens.spec.mjs`)
-- [ ] T032 Security review & retention policy verification — docs/logging-policy.md, services/web/test/contract/\*\*
-- [ ] T033 (BLOCKING) CI gating: add micro-benchmark gating and contract validation to pipeline — .gitlab-ci.yml, ci/benchmarks/
-  - Acceptance: The CI pipeline must include gating jobs that fail the merge when benchmark thresholds are exceeded (key-lookup p95 > 50ms or introspect p95 > 100ms). The job must publish artifacts (p50/p95/p99) and be runnable with the documented harness in T0AA. This task is BLOCKING for merges that touch lookup/introspection paths or change related code/config.
+- [x] T032 Security review & retention policy verification — docs/logging-policy.md, services/web/test/contract/\*\* (implemented; `LoggingRetentionPIITests.mjs` & `RetentionConfigContractTest.mjs` added; CI enforces `AUDIT_LOG_RETENTION_DAYS` >= 90)
+  - T032a Add contract test to assert `AUDIT_LOG_RETENTION_DAYS` is set in CI and >= 90 (implementation: `services/web/test/contract/src/RetentionConfigContractTest.mjs`).
+- [x] T033 (BLOCKING) CI gating: add micro-benchmark gating and contract validation to pipeline — .github/workflows/contract-tests-gating.yml (implemented: runs key-lookup & introspection benchmarks, checks SLOs, uploads artifacts)
+  - Acceptance: The CI pipeline includes gating jobs that fail the merge when benchmark thresholds (key-lookup p95 > 50ms or introspect p95 > 100ms). The job publishes artifacts (p50/p95/p99) and is runnable with the documented harness in T0AA.
+- [x] T038 Add SLO alerting & runbook — define alert rules for key-lookup and introspect p95 breaches, a runbook with owner and escalation steps, and tests to validate alerts fire (implementation & docs: `docs/slo-runbook.md`, CI alert smoke tests) (implemented)
+- [x] T039 Add `hashPrefix` cross-algorithm unit tests — verify `computeHashPrefixFromPlain` produces canonical 8-lower-hex and that `createToken` returns matching `hashPrefix` across supported algorithm configurations (unit tests: `services/web/test/unit/src/Features/Token/hashPrefix.test.mjs`) (implemented; tests pass)
 
 ---
 
@@ -169,8 +172,8 @@ Generated by: speckit task generator — source: .specify/features/example/{plan
   - Acceptance: CI job artifacts must include p50/p95/p99 for **warm** and **cold** runs. Runner profile: **2 vCPU, 4GB RAM**; benchmark harness and fixed seed dataset must be documented. The CI job name should be `ci/benchmarks/key-lookup` and must gate merges (fail the pipeline if thresholds exceeded).
 - [x] T026b Intro micro-benchmark for token introspection — ci/benchmarks/introspection-benchmark/bench.js
   - Acceptance: CI job publishes p50/p95/p99 for local introspection and OAuth2 fallback; includes warm and cold runs, uses runner profile **2 vCPU, 4GB RAM**, and is gated under `ci/benchmarks/introspect` job name.
-- [ ] T033 CI micro-benchmark gating & contract validation (parallel) — .gitlab-ci.yml / Jenkins
-  - Acceptance: Add explicit gating steps that fail merge when benchmark thresholds (T026/T026b) are exceeded and record artifacts for historical comparison.
+- [x] T033 CI micro-benchmark gating & contract validation (parallel) — .github/workflows/contract-tests-gating.yml (implemented: runs key-lookup & introspection benchmarks, checks SLOs, uploads artifacts)
+  - Acceptance: CI pipeline includes gating jobs that fail the merge when benchmark thresholds (key-lookup p95 > 50ms or introspect p95 > 100ms). The job publishes artifacts (p50/p95/p99) and is runnable with the documented harness in T0AA.
 
 ## Final — Documentation, Security & Accessibility
 
@@ -180,8 +183,9 @@ Generated by: speckit task generator — source: .specify/features/example/{plan
 - [x] T030 Add membership OpenAPI contract — specs/001-ssh-git-auth/contracts/membership.openapi.yaml (implemented)
 - [ ] T031 Add contract test for membership endpoint — services/git-bridge/test/contract/MembershipContractTest.java
 - [ ] T032 Security review checklist & retention policy verification tests — test/contract/logging/\*\*
-- [ ] T033 CI micro-benchmark gating & contract validation (parallel) — .gitlab-ci.yml / Jenkins
+- [x] T033 CI micro-benchmark gating & contract validation (parallel) — .github/workflows/contract-tests-gating.yml (implemented)
 - [ ] T034 Accessibility tests & frontend e2e (parallel) — services/web/test/e2e/\*\*
+- [x] T037 Fix fetch-mock recursion with global spy and add regression test — services/web/test/frontend/bootstrap.js, services/web/test/frontend/bootstrap-lite.js, ai_at_work/test/frontend/bootstrap.js, services/web/test/frontend/infrastructure/fetch-mock-regression.test.js (implemented)
 
 ## Notes
 

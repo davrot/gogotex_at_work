@@ -7,6 +7,7 @@ import {
   restoreScrollPosition,
   scrollPosition,
 } from '../../../../../frontend/js/features/source-editor/extensions/scroll-position'
+import customLocalStorage from '../../../../../frontend/js/infrastructure/local-storage' 
 
 const doc = `
 \\documentclass{article}
@@ -46,13 +47,13 @@ describe('CodeMirror scroll position extension', function () {
   it('stores scroll position when the view is destroyed', async function () {
     const currentDoc = mockDoc()
 
-    sinon.stub(window.Storage.prototype, 'getItem').callsFake(key => {
+    sinon.stub(customLocalStorage, 'getItem').callsFake(key => {
       switch (key) {
         case 'doc.position.test-doc':
-          return JSON.stringify({
+          return {
             cursorPosition: { row: 2, column: 2 },
             firstVisibleLine: 5,
-          })
+          }
         default:
           return null
       }
@@ -65,18 +66,19 @@ describe('CodeMirror scroll position extension', function () {
       }),
     })
 
-    const setItem = sinon.spy(window.Storage.prototype, 'setItem')
+    const setItem = sinon.spy(customLocalStorage, 'setItem')
     fireEvent.scroll(view.scrollDOM, { target: { scrollTop: 10 } })
 
     view.destroy()
 
-    const expected = JSON.stringify({
+    const expected = {
       cursorPosition: { row: 2, column: 2 },
       firstVisibleLine: 12,
-    })
+    }
 
     await waitFor(() => {
-      expect(setItem).to.have.been.calledWith('doc.position.test-doc', expected)
+      const expectedKey = 'doc.position.test-doc'
+      expect(setItem).to.have.been.calledWith(expectedKey, expected)
     })
   })
 
@@ -84,11 +86,11 @@ describe('CodeMirror scroll position extension', function () {
     const currentDoc = mockDoc()
 
     const getItem = sinon
-      .stub(window.Storage.prototype, 'getItem')
+      .stub(customLocalStorage, 'getItem')
       .callsFake(key => {
         switch (key) {
-          case 'editor.position.test-doc':
-            return JSON.stringify({ firstVisibleLine: 12 })
+          case 'doc.position.test-doc':
+            return { firstVisibleLine: 12 }
           default:
             return null
         }

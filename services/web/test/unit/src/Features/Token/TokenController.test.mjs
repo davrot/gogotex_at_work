@@ -57,6 +57,19 @@ describe('TokenController', function () {
     expect(ctx.res.statusCode).to.equal(200)
   })
 
+  it('list returns 429 when rate-limited', async function (ctx) {
+    // Make the rate limiter throw to simulate rate-limited origin
+    const RateLimiterModule = await import('../../../../../app/src/infrastructure/RateLimiter.js')
+    const sinon = await import('sinon')
+    sinon.stub(RateLimiterModule.tokenIntrospectRateLimiter, 'consume').rejects(new Error('rate-limited'))
+
+    await ctx.Controller.list(ctx.req, ctx.res)
+    expect(ctx.res.statusCode).to.equal(429)
+
+    // restore stub
+    try { RateLimiterModule.tokenIntrospectRateLimiter.consume.restore && RateLimiterModule.tokenIntrospectRateLimiter.consume.restore() } catch (e) {}
+  })
+
   it('remove returns 204 when revoked', async function (ctx) {
     await ctx.Controller.remove(ctx.req, ctx.res)
     expect(ctx.res.statusCode).to.equal(204)

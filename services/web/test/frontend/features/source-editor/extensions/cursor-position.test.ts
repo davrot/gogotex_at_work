@@ -7,6 +7,7 @@ import {
   cursorPosition,
   restoreCursorPosition,
 } from '../../../../../frontend/js/features/source-editor/extensions/cursor-position'
+import customLocalStorage from '../../../../../frontend/js/infrastructure/local-storage' 
 
 const doc = `
 \\documentclass{article}
@@ -35,19 +36,19 @@ describe('CodeMirror cursor position extension', function () {
   it('stores cursor position when the view is destroyed', async function () {
     const currentDoc = mockDoc()
 
-    sinon.stub(window.Storage.prototype, 'getItem').callsFake(key => {
+    sinon.stub(customLocalStorage, 'getItem').callsFake(key => {
       switch (key) {
         case 'doc.position.test-doc':
-          return JSON.stringify({
+          return {
             cursorPosition: { row: 1, column: 1 },
             firstVisibleLine: 5,
-          })
+          }
         default:
           return null
       }
     })
 
-    const setItem = sinon.spy(window.Storage.prototype, 'setItem')
+    const setItem = sinon.spy(customLocalStorage, 'setItem')
 
     const view = new EditorView({
       state: EditorState.create({
@@ -65,13 +66,13 @@ describe('CodeMirror cursor position extension', function () {
     await waitFor(() => {
       expect(setItem).to.have.been.calledWith(
         'doc.position.test-doc',
-        JSON.stringify({
+        {
           cursorPosition: {
             row: 3,
             column: 6,
           },
           firstVisibleLine: 5,
-        })
+        }
       )
     })
   })
@@ -80,14 +81,14 @@ describe('CodeMirror cursor position extension', function () {
     const currentDoc = mockDoc()
 
     const getItem = sinon
-      .stub(window.Storage.prototype, 'getItem')
+      .stub(customLocalStorage, 'getItem')
       .callsFake(key => {
         switch (key) {
           case 'doc.position.test-doc':
-            return JSON.stringify({
+            return {
               cursorPosition: { row: 3, column: 5 },
               firstVisibleLine: 0,
-            })
+            }
           default:
             return null
         }

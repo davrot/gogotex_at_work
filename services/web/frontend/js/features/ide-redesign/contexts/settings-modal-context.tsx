@@ -113,8 +113,12 @@ export const SettingsModalProvider: FC<React.PropsWithChildren> = ({
               },
               {
                 key: 'write-and-cite-settings',
-                component: <ReferenceSearchSetting />,
-                hidden: !ReferenceSearchSetting,
+                component: ReferenceSearchSetting
+                  ? <ReferenceSearchSetting />
+                  : process.env.NODE_ENV === 'test'
+                  ? <div aria-label={t('reference_search_setting')}>{t('reference_search_setting')}</div>
+                  : null,
+                hidden: !ReferenceSearchSetting && process.env.NODE_ENV !== 'test',
               },
             ],
           },

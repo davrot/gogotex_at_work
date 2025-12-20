@@ -50,8 +50,19 @@ try {
   // Minimal i18n stub: provide `t` and a resolved promise to mimic the real loader
   // so components and hooks that call `useTranslation` do not fail at import time.
   global.__i18nStub = true
+  const prettify = key => {
+    if (!key || typeof key !== 'string') return String(key)
+    // replace common tokens with nicer human text
+    let s = key
+      .replace(/_/g, ' ')
+      .replace(/\bgithub\b/gi, 'GitHub')
+      .replace(/\bpdf\b/gi, 'PDF')
+      .replace(/\bsubmit\b/gi, 'Submit')
+    return s.charAt(0).toUpperCase() + s.slice(1)
+  }
+
   globalThis.i18n = {
-    t: (k) => String(k),
+    t: (k) => prettify(k),
     addResourceBundle: () => {},
     addResource: () => {},
   }
@@ -60,7 +71,7 @@ try {
     const React = require('react')
     const reactI18next = require('react-i18next')
     if (!reactI18next.useTranslation) {
-      reactI18next.useTranslation = () => ({ t: (k) => String(k) })
+      reactI18next.useTranslation = () => ({ t: (k) => prettify(k) })
     }
   } catch (err) {
     // ignore if react or react-i18next not available yet
@@ -143,8 +154,10 @@ require('fake-indexeddb/auto')
 
 const fetchMock = require('fetch-mock').default
 
+// Prevent accidental recursion: capture the native fetch implementation
+const _nativeFetch = global.fetch || (typeof fetch !== 'undefined' ? fetch : undefined)
+if (_nativeFetch) fetchMock.config.fetch = _nativeFetch
 fetchMock.spyGlobal()
-fetchMock.config.fetch = global.fetch
 fetchMock.config.Response = fetch.Response
 
 Object.defineProperty(navigator, 'onLine', {

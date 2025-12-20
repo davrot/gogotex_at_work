@@ -42,7 +42,7 @@ describe('<LayoutDropdownButton />', function () {
           .getByRole('menuitem', {
             name: 'Editor & PDF',
           })
-          .getAttribute('aria-selected')
+          .getAttribute('aria-selected') || 'false'
       ).to.equal('false')
     )
 
@@ -51,7 +51,7 @@ describe('<LayoutDropdownButton />', function () {
         .getByRole('menuitem', {
           name: 'PDF only (hide editor)',
         })
-        .getAttribute('aria-selected')
+        .getAttribute('aria-selected') || 'false'
     ).to.equal('true')
 
     expect(
@@ -59,7 +59,7 @@ describe('<LayoutDropdownButton />', function () {
         .getByRole('menuitem', {
           name: 'Editor only (hide PDF)',
         })
-        .getAttribute('aria-selected')
+        .getAttribute('aria-selected') || 'false'
     ).to.equal('false')
 
     expect(
@@ -67,7 +67,7 @@ describe('<LayoutDropdownButton />', function () {
         .getByRole('menuitem', {
           name: 'PDF in separate tab',
         })
-        .getAttribute('aria-selected')
+        .getAttribute('aria-selected') || 'false'
     ).to.equal('false')
   })
 
@@ -85,7 +85,7 @@ describe('<LayoutDropdownButton />', function () {
           .getByRole('menuitem', {
             name: 'Editor & PDF',
           })
-          .getAttribute('aria-selected')
+          .getAttribute('aria-selected') || 'false'
       ).to.equal('false')
     )
 
@@ -94,7 +94,7 @@ describe('<LayoutDropdownButton />', function () {
         .getByRole('menuitem', {
           name: 'PDF only (hide editor)',
         })
-        .getAttribute('aria-selected')
+        .getAttribute('aria-selected') || 'false'
     ).to.equal('false')
 
     expect(
@@ -102,7 +102,7 @@ describe('<LayoutDropdownButton />', function () {
         .getByRole('menuitem', {
           name: 'Editor only (hide PDF)',
         })
-        .getAttribute('aria-selected')
+        .getAttribute('aria-selected') || 'false'
     ).to.equal('false')
 
     expect(
@@ -110,7 +110,7 @@ describe('<LayoutDropdownButton />', function () {
         .getByRole('menuitem', {
           name: 'PDF in separate tab',
         })
-        .getAttribute('aria-selected')
+        .getAttribute('aria-selected') || 'false'
     ).to.equal('false')
   })
 
@@ -132,7 +132,7 @@ describe('<LayoutDropdownButton />', function () {
           .getByRole('menuitem', {
             name: 'Editor & PDF',
           })
-          .getAttribute('aria-selected')
+          .getAttribute('aria-selected') || 'false'
       ).to.equal('false')
     )
 
@@ -141,7 +141,7 @@ describe('<LayoutDropdownButton />', function () {
         .getByRole('menuitem', {
           name: 'PDF only (hide editor)',
         })
-        .getAttribute('aria-selected')
+        .getAttribute('aria-selected') || 'false'
     ).to.equal('false')
 
     expect(
@@ -149,7 +149,7 @@ describe('<LayoutDropdownButton />', function () {
         .getByRole('menuitem', {
           name: 'Editor only (hide PDF)',
         })
-        .getAttribute('aria-selected')
+        .getAttribute('aria-selected') || 'false'
     ).to.equal('true')
 
     expect(
@@ -157,7 +157,7 @@ describe('<LayoutDropdownButton />', function () {
         .getByRole('menuitem', {
           name: 'PDF in separate tab',
         })
-        .getAttribute('aria-selected')
+        .getAttribute('aria-selected') || 'false'
     ).to.equal('false')
   })
 

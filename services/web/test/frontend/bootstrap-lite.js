@@ -31,8 +31,10 @@ require('fake-indexeddb/auto')
 
 // fetch-mock spy
 const fetchMock = require('fetch-mock').default
+// Prevent accidental recursion by ensuring config.fetch points to the native fetch
+const _nativeFetch = global.fetch || (typeof fetch !== 'undefined' ? fetch : undefined)
+if (_nativeFetch) fetchMock.config.fetch = _nativeFetch
 fetchMock.spyGlobal()
-fetchMock.config.fetch = global.fetch
 fetchMock.config.Response = fetch.Response
 
 // simple no-op for HTMLElement.scrollIntoView

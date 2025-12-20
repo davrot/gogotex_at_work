@@ -12,6 +12,15 @@ describe('ServiceOrigin helper', function () {
     delete process.env.TRUSTED_PROXIES
   })
 
+  it('ignores X-Service-Origin header when not configured as trusted', function () {
+    delete process.env.TRUST_X_SERVICE_ORIGIN
+    delete process.env.TRUSTED_PROXIES
+    const req = { headers: { 'x-service-origin': 'untrusted-header' }, ip: '9.9.9.9' }
+    // header should be ignored unless TRUST_X_SERVICE_ORIGIN is explicitly 'true'
+    expect(getServiceOrigin(req)).to.equal('ip:9.9.9.9')
+    expect(originRateKey(req)).to.equal('service-origin:ip:9.9.9.9')
+  })
+
   it('falls back to socket certificate CN when header absent', function () {
     const req = { headers: {}, socket: { getPeerCertificate: () => ({ subject: { CN: 'client-cn' } }) } }
     expect(getServiceOrigin(req)).to.equal('client-cn')

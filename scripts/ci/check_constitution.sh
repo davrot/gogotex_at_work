@@ -47,7 +47,7 @@ else
 fi
 
 # 6) CI gating presence heuristic: check for bench references in CI config files
-if grep -q "ci/benchmarks" .gitlab-ci.yml 2>/dev/null || grep -q "ci/benchmarks" ci/contract/gitlab-ci-contract.yml 2>/dev/null || [ -f ".github/workflows/check-constitution.yml" ]; then
+if grep -q "ci/benchmarks" "$ROOT_DIR/.gitlab-ci.yml" 2>/dev/null || grep -q "ci/benchmarks" "$ROOT_DIR/ci/contract/gitlab-ci-contract.yml" 2>/dev/null || grep -q "ci/benchmarks" $ROOT_DIR/.github/workflows/*.yml 2>/dev/null || [ -f "$ROOT_DIR/.github/workflows/check-constitution.yml" ]; then
   echo "OK: CI references to ci/benchmarks detected (gating may be present)"
 else
   echo "WARN: Cannot detect CI gating referencing ci/benchmarks. Ensure T033 gating is added to your CI." >&2

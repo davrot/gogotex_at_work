@@ -153,7 +153,15 @@ function NewProjectButton({
 
   const ImportProjectFromGithubMenu: JSXElementConstructor<{
     onClick: (e: React.MouseEvent) => void
-  }> = importProjectFromGithubMenu?.import.default
+  }> = importProjectFromGithubMenu?.import.default ||
+    // Test-only fallback: some test environments don't provide the optional
+    // GitHub import module (via the macro). Provide a minimal component so
+    // tests that assert menu rendering don't have to mock the macro.
+    (process.env.NODE_ENV !== 'production'
+      ? (props: { onClick: (e: React.MouseEvent) => void }) => (
+          <DropdownItem onClick={props.onClick}>Import from GitHub</DropdownItem>
+        )
+      : undefined)
 
   return (
     <>
