@@ -9,6 +9,10 @@
 
 [Extract from feature spec: primary requirement + technical approach from research]
 
+### Naming / Branding
+
+We will use **GoGoTeX** as the canonical label for Go-based services and components created during this migration (e.g., `git-bridge` Go implementation may be referred to as `git-bridge (GoGoTeX)`). Add `-gogotex` or `-gogotex` style annotations to image tags, service names, and internal docs where helpful to indicate an owned Go implementation. This branding helps reviewers and QA quickly differentiate legacy Node/Java components from migrated Go components during the migration period.
+
 ## Technical Context
 
 <!--

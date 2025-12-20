@@ -4,6 +4,9 @@
 **Feature Branch**: `001-ssh-git-auth`  
 **Created**: 2025-12-10  
 **Status**: Draft  
+
+**Naming (branding)**: Throughout this migration we'll use the label **GoGoTeX** to refer to Go-based replacements of Overleaf backend components (for example, `git-bridge` → `git-bridge-go` or `web-profile` → `web-profile-gogotex`). Use the **GoGoTeX** label in documentation, service names, and image tags to clearly indicate migrated components.
+
 **Input**: User stories and functional requirements provided by product/security team: implement SSH-only Git authentication in `git-bridge`, remove legacy HTTP/OAuth2 auth, add SSH key management in UI and storage, validate SSH keys via the internal web-profile API, reject deprecated auth methods silently, and log security events for auditing.
 
 ## Clarifications
