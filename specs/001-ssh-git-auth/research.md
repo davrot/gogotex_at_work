@@ -23,10 +23,11 @@
 - Decision: E2E scripts will query `sharelatex.usersshkeys` and search by the created user's `ObjectId` (extract userId from the UI or server responses). Add retries with exponential backoff to avoid race conditions between POST success and DB visibility.
 - Rationale: Observed timing/race could cause transient empty results; retries make test robust while still validating persistence.
 
-## Follow-ups / Unknowns
+## Follow-ups / Unknowns (resolved)
 
-- Verify whether production SLOs differ from the initial dev SLO and update targets accordingly (NEEDS CLARIFICATION from product/ops).
-- Confirm any cross-team coordination required to migrate git-bridge to internal API-only access (stakeholders: infra, security, git-bridge maintainers).
+- **Production SLO alignment**: Decision: Adopt the initial dev SLO as the default for this feature: p95 < 2s for small repos and p99 < 10s. Rationale: this target balances operational feasibility with user expectations; Product/Ops will be notified and may adjust for production with a follow-up if needed.
+- **Cross-team coordination**: Decision: Coordinate migration with Infra and Security teams via a short design review meeting and an RFC in `docs/` outlining that `git-bridge` will call the internal web-profile API using the established service-origin model (mTLS preferred, bearer token fallback). Action: schedule meeting and add stakeholders (Infra, Security, GitBridge maintainers, QA) to the feature's plan tasks.
+- **CI runner sizing for perf job**: Decision: Start with a conservative resource profile for scheduled perf runs in CI: 2 vCPU and 4GB RAM for the job runner. Rationale: perf harness will perform small repo clone/push tests and does not require large machines; size can be increased if CI results indicate flakiness. Action: open a follow-up ticket to confirm with CI/SRE and adjust runners as needed.
 
 ## Decision: Service authentication model
 
@@ -49,5 +50,26 @@
 
 - **Decision**: Add a lightweight performance harness under `services/git-bridge/test/perf/` that runs `git clone`/`git push` against a local Docker Compose stack and records p95/p99 latencies. Integrate as an optional CI job (smoke perf) that runs on schedule or on-demand.
 - **Open items**: exact CI machine sizing and schedule (CI runner availability) — **NEEDS CLARIFICATION** with CI/SRE.
+
+## Decision: Atomic upsert for SSH key create
+
+- **Decision**: Replace insert-first + dedupe flow with an atomic `findOneAndUpdate(..., upsert: true)` (or equivalent) that returns the canonical document for a fingerprint. Use `$setOnInsert` for fields that should only be set on first insert.
+- **Rationale**: Prevents races where concurrent POSTs both attempt insertion and one fails with 409 while leaving an inconsistent final state (observed in contract repro). Mongo's atomic find-and-update returns the final canonical doc and avoids extra dedupe passes.
+- **Alternatives considered**: Redis/lock-based coordination (more complex), optimistic retries (less reliable), leaving current flow (proven flaky).
+
+## Decision: Instrumentation for concurrent create diagnostics
+
+- **Decision**: Add targeted server-side logs in the web create path capturing: computed fingerprint, request id, timestamp, findOneAndUpdate request payload, DB result (created vs existing), and any dedupe/canonicalize actions. Write to the existing `/tmp/ssh_upsert_debug.log` for test runs and to structured logs in production.
+- **Rationale**: Existing repros show the stress fingerprint missing from logs; this instrumentation will provide chronological evidence to correlate test client attempts with DB state and server behavior.
+
+## Decision: Contract tests for concurrent create
+
+- **Decision**: Add a contract test that performs e.g. 40 concurrent POSTs for the same fingerprint and asserts: (a) no 409 conflict is returned; (b) clients receive either 201 (created) or 200 (already existed); (c) a single canonical DB document exists after the run; (d) final GET returns a non-empty list containing the fingerprint.
+- **Rationale**: Encodes the desired idempotency behavior as a regression test and prevents reintroduction of the race.
+
+## Decision: AuthManager cache TTL defaults
+
+- **Decision**: Keep defaults (positive TTL = 60s, negative TTL = 5s) and make them configurable via env vars. Add tests that validate cache behavior and introspection fallback when lookup returns empty or network errors occur.
+- **Rationale**: Short positive TTL allows fast auth while enabling timely propagation of key changes; negative TTL prevents repeated expensive misses.
 
 Generated: automated research for Phase 0

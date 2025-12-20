@@ -11,35 +11,33 @@
 
 ## Technical Context
 
-**Language/Version**: Go 1.25 (primary for `git-bridge`), Node.js 20.x (web/profile), MongoDB 6.x, Redis 7.x, Docker Compose for local integration.
-**Primary Dependencies**: Go stdlib + `go-git` or invoking system `git` (decision: **NEEDS CLARIFICATION**), `ssh`/authentication libraries, `chi`/`gorilla`-style HTTP router for internal API calls; on the web side: Express + Mongoose (existing).
-**Storage**: User SSH keys persisted in MongoDB (web-profile service); `git-bridge` will retrieve keys via the internal authenticated web-profile API (direct DB access from `git-bridge` is disallowed unless explicitly authorized).
-**Testing**: Unit tests: `go test` for `git-bridge` logic; Integration tests: Docker Compose environment with real services (web, mongo, redis, git-bridge) and contract tests (Mocha) for cross-service behaviors; Performance tests: representative `git clone`/`git push` benchmark harness (runnable in CI / locally).
-**Target Platform**: Linux server containers (Docker); CI runners that can run Docker compose stacks.
-**Project Type**: Backend service (networked, containerized), integrating with the web-profile service and the repo storage backend.
-**Performance Goals**: For small test repos (<=1MB, <=10 files) target **p95 < 2s**, **p99 < 10s** for `git clone` and `git push` under normal load (matching spec SC-003).
-**Constraints**: Must use the internal web-profile API for key retrieval and honor existing security model (service tokens / mTLS — **NEEDS CLARIFICATION** on the chosen auth mechanism). Must not introduce any persistent plaintext private key storage. Must be compatible with existing docker-based dev environment and CI.
-**Scale/Scope**: Initial rollout scoped to staging environments and small test repos; production must be able to handle expected Overleaf traffic (estimated scale: thousands of daily users; exact SRE targets **NEEDS CLARIFICATION**).
+<!--
+  ACTION REQUIRED: Replace the content in this section with the technical details
+  for the project. The structure here is presented in advisory capacity to guide
+  the iteration process.
+-->
 
-### Open questions / NEEDS CLARIFICATION
-
-- Auth between `git-bridge` and web-profile internal API: prefer service token or mTLS? (security team requirement) — **NEEDS CLARIFICATION**
-- Strategy for Git authentication implementation: run an SSH server that consults web-profile per connection, or validate SSH keys during Git push handshake and map to users without a full SSHd? (design tradeoffs: performance vs simplicity) — **NEEDS CLARIFICATION**
-- Use of `go-git` vs shelling out to system `git` for repository operations and hook handling — **NEEDS CLARIFICATION**
-- CI performance-test runner availability and limits (how to run p95/p99 measurements reliably in CI) — **NEEDS CLARIFICATION**
-- Migration coordination window for removing Java legacy code (timing + integration owners) — **NEEDS CLARIFICATION**
+**Language/Version**: Go 1.21 (git-bridge) and Node.js 18+ (web)  
+**Primary Dependencies**: net/ssh (golang.org/x/crypto/ssh), system `git` binary (invoked via os/exec), Mongoose 8.x (web), MongoDB 6.x  
+**Storage**: MongoDB (`sharelatex.usersshkeys` collection)  
+**Testing**: Go unit/integration tests (`go test`), Mocha contract tests for web (`npm test` / `test:contract`), Playwright for E2E where applicable  
+**Target Platform**: Linux containers (Docker Compose local dev, Kubernetes/staging/production)  
+**Project Type**: multi-service backend: `services/git-bridge` (Go) and `services/web` (Node.js)  
+**Performance Goals**: p95 < 2s for small repos (clone/push); p99 < 10s (see spec)  
+**Constraints**: Must retrieve SSH keys via internal authenticated web-profile API (no direct DB reads by `git-bridge` unless authorized). Use system `git` for repo ops initially to ensure parity.  
+**Scale/Scope**: Serve Overleaf production traffic (tens to hundreds of requests/sec); initial perf harness targets representative local runs and CI scheduled perf jobs
 
 ## Constitution Check
 
 _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
-- **Code Quality (NON-NEGOTIABLE)**: OK — implementation will follow project linters, formatting, and PR review rules. Unit tests will accompany all new logic.
-- **Testing Standards (NON-NEGOTIABLE)**: PARTIAL — unit and integration tests are planned; performance tests are required for acceptance and will be added in Phase 1. CI integration for performance tests is **NEEDS CLARIFICATION**.
-- **User Experience Consistency**: N/A for core auth but UI changes (SSH key management) will follow component library and accessibility requirements.
-- **Performance Requirements**: MUST be met; performance test harness and targets are included in Phase 1. No violations yet but the approach depends on CI runner availability (**NEEDS CLARIFICATION**).
-- **Observability & Versioning**: OK — security/auth events and metrics will be instrumented; logging format and audit fields will be specified in Phase 1.
+- **Code Quality**: Linting and formatting enforced by existing project ESLint/Prettier and Go linters; PRs will include small, focused changes and tests. (Plan: add linters to `services/git-bridge` CI job.)
+- **Testing Standards**: Unit tests required for parsing/validation and auth logic; integration/contract tests (Mocha) required for idempotency and auth flows; performance harness will be added for `git-bridge` (perf tests optional in CI).
+- **User Experience Consistency**: Web UI changes limited to SSH key management components and follow existing styles. Acceptance tests will validate UI flows.
+- **Performance Requirements**: Performance SLOs (p95 < 2s) defined in spec and will be validated by the perf harness.
+- **Observability & Versioning**: Structured logs and `/tmp/ssh_upsert_debug.log` instrumentation added for test runs; production will use structured logging; versioning: `git-bridge` will follow semantic versioning.
 
-**Decision**: Proceed to Phase 0 research with the open clarifications listed in Technical Context (auth mechanism, git implementation choice, CI performance runner). These clarifications must be resolved in Phase 0 research (research.md) before moving to Phase 1 design.
+No constitution violations are identified at Phase 0; follow-ups (e.g., CI runner sizing for perf jobs) are documented in research.md as NEEDS CLARIFICATION.
 
 ## Project Structure
 

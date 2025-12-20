@@ -1,0 +1,111 @@
+openapi: 3.0.3
+info:
+  title: Internal SSH Keys API
+  version: "1.0.0"
+paths:
+  /internal/api/users/{userId}/ssh-keys:
+    get:
+      summary: List SSH keys for a user
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of SSH keys
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SSHKey"
+    post:
+      summary: Create or ensure SSH key (idempotent by fingerprint)
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                public_key:
+                  type: string
+                key_name:
+                  type: string
+              required:
+                - public_key
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SSHKeyResponse"
+        "200":
+          description: Already existed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SSHKeyResponse"
+        "409":
+          description: Conflict - key exists for different user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+  /internal/api/users/{userId}/ssh-keys/{keyId}:
+    delete:
+      summary: Remove an existing SSH key
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: keyId
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Removed
+        "404":
+          description: Not found
+components:
+  schemas:
+    SSHKey:
+      type: object
+      properties:
+        id:
+          type: string
+        key_name:
+          type: string
+        label:
+          type: string
+        public_key:
+          type: string
+        fingerprint:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        userId:
+          type: string
+    SSHKeyResponse:
+      allOf:
+        - $ref: "#/components/schemas/SSHKey"
