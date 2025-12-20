@@ -17,3 +17,11 @@ func TestSlugFromPath(t *testing.T) {
 		}
 	}
 }
+
+func BenchmarkSlugFromPath(b *testing.B) {
+	input := "/repo/acme/hello-world.git"
+	for i := 0; i < b.N; i++ {
+		_ = SlugFromPath(input)
+	}
+}
+
