@@ -4,7 +4,7 @@ This is a minimal benchmark harness for the Go `git-bridge` binary. It runs Go b
 
 Usage:
 
-  cd ci/benchmarks/git-bridge-benchmark
-  ./run.sh
+cd ci/benchmarks/git-bridge-benchmark
+./run.sh
 
 The script will run `go test -bench` in `services/git-bridge` and write `out.txt` in this folder.
