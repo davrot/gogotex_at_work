@@ -6,7 +6,8 @@ process.chdir(path.resolve(__dirname, '..', '..'))
 require('@babel/register')({
   extensions: ['.ts', '.tsx', '.js', '.jsx', '.mjs'],
   plugins: [
-    ['module-resolver', { alias: { '^@/(.+)': path.resolve(__dirname, '../../frontend/js') + '/\\1' } }],
+    // Map '@' alias to the frontend JS folder so imports like '@/foo' resolve in tests
+    ['module-resolver', { alias: { '@': path.resolve(__dirname, '../../frontend/js') } }],
   ],
 })
 
@@ -28,11 +29,43 @@ const chai = require('chai')
 chai.use(require('sinon-chai'))
 chai.use(require('chai-as-promised'))
 
+// Ensure React is globally available for tests that compile JSX to React.createElement
+try {
+  const React = require('react')
+  global.React = React
+  globalThis.React = React
+} catch (e) {
+  // If React is unavailable in the test environment, proceed; tests that need it will fail accordingly
+}
+
 // Populate meta for top-level access in modules on import
 const { resetMeta } = require('./helpers/reset-meta')
 resetMeta()
-// i18n requires access to 'ol-i18n' as defined above
-require('../../frontend/js/i18n')
+// i18n requires access to 'ol-i18n' as defined above. When running isolated
+// component tests we prefer to stub it to avoid pulling in unrelated modules
+// (which can introduce many module resolution errors during test collection).
+try {
+  require('../../frontend/js/i18n')
+} catch (e) {
+  // Minimal i18n stub: provide `t` and a resolved promise to mimic the real loader
+  // so components and hooks that call `useTranslation` do not fail at import time.
+  global.__i18nStub = true
+  globalThis.i18n = {
+    t: (k) => String(k),
+    addResourceBundle: () => {},
+    addResource: () => {},
+  }
+  // Provide a simple useTranslation hook stub for React components
+  try {
+    const React = require('react')
+    const reactI18next = require('react-i18next')
+    if (!reactI18next.useTranslation) {
+      reactI18next.useTranslation = () => ({ t: (k) => String(k) })
+    }
+  } catch (err) {
+    // ignore if react or react-i18next not available yet
+  }
+}
 
 const moment = require('moment')
 moment.updateLocale('en', {

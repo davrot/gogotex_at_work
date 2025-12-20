@@ -62,6 +62,13 @@ export default function SSHKeysPanel({userId}:{userId?:string|null}){
     e.preventDefault();
     setError(null); setSuccess(null);
     if(!isPublicKeyValid) { setError('Invalid OpenSSH public key format'); return; }
+
+    // Guard: require a user id so we don't attempt an ambiguous /user/ endpoint in tests/dev
+    if (!effectiveUserId) {
+      setError('No user id available for SSH key create')
+      return
+    }
+
     setIsAdding(true);
     try{
       console.debug('SSHKeysPanel: addKey effectiveUserId=', effectiveUserId)
@@ -82,7 +89,11 @@ export default function SSHKeysPanel({userId}:{userId?:string|null}){
     setError(null); setSuccess(null);
     try{
       const uid = effectiveUserId ?? userId
-      const path = uid ? `/internal/api/users/${uid}/ssh-keys/${id}` : `/user/ssh-keys/${id}`
+      if (!uid) {
+        setError('No user id available for SSH key delete')
+        return
+      }
+      const path = `/internal/api/users/${uid}/ssh-keys/${id}`
       await deleteJSON(path)
       await fetchKeys()
       setSuccess('SSH key deleted')
