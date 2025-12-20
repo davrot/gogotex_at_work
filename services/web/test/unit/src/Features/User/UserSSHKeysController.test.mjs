@@ -45,6 +45,20 @@ describe('UserSSHKeysController', function () {
     expect(body).to.have.property('fingerprint')
   })
 
+  it('create falls back to fetch when raw.value is null but lastErrorObject.upserted present', async function (ctx) {
+    ctx.req.body = { key_name: 'test-fallback', public_key: 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQFALLBACK' }
+    // Simulate rawResult from findOneAndUpdate: value null, but lastErrorObject.upserted exists
+    ctx.UserSSHKey.findOneAndUpdate = sinon.stub().returns({ exec: async () => ({ value: null, lastErrorObject: { upserted: '694700000000000000000000' } }) })
+    // Simulate that a subsequent findOne will return the canonical doc
+    ctx.UserSSHKey.findOne.returns({ lean: () => ({ exec: async () => ({ _id: 'canon-id', fingerprint: 'SHA256:MOCKFALLBACK', userId: 'u1', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), keyName: 'test-fallback', publicKey: 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQFALLBACK' }) }) })
+
+    await ctx.Controller.create(ctx.req, ctx.res)
+    expect(ctx.res.statusCode).to.equal(201)
+    const body = JSON.parse(ctx.res.body)
+    expect(body).to.have.property('id', 'canon-id')
+    expect(body).to.have.property('fingerprint', 'SHA256:MOCKFALLBACK')
+  })
+
   it('create uses session user id when params.userId missing', async function (ctx) {
     // override SessionManager mock for this test (absolute URL)
     vi.resetModules()
