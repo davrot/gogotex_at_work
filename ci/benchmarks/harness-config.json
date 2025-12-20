@@ -5,7 +5,7 @@
     "introspection": { "seed_hint": "ci/benchmarks/introspection-benchmark/seed.json", "recommended_size": "200-1000" }
   },
   "bench_commands": {
-    "key_lookup": "BENCH_URL=http://localhost:3000/internal/api/ssh-keys/SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA BENCH_ITER=200 BENCH_CONCURRENCY=20 BENCH_OUTPUT=ci/benchmarks/key-lookup-benchmark/out.json node ci/benchmarks/key-lookup-benchmark/bench.js",
+    "key_lookup": "BENCH_URL=http://develop-web-1:3000/internal/api/ssh-keys/SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA BENCH_ITER=200 BENCH_CONCURRENCY=20 BENCH_OUTPUT=ci/benchmarks/key-lookup-benchmark/out.json node ci/benchmarks/key-lookup-benchmark/bench.js",
     "introspection": "BENCH_URL=http://localhost:3000/internal/api/tokens/introspect BENCH_ITER=200 BENCH_CONCURRENCY=20 BENCH_TOKEN=invalid-token BENCH_OUTPUT=ci/benchmarks/introspection-benchmark/out.json node ci/benchmarks/introspection-benchmark/bench.js"
   },
   "artifact_format": { "json": true, "fields": ["p50", "p95", "p99", "samples", "errors"] },

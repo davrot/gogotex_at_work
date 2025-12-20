@@ -22,7 +22,11 @@ FP_LINE=$(ssh-keygen -lf "$PUB" -E sha256)
 FP=$(echo "$FP_LINE" | awk '{print $2}')
 
 echo "Seeding SSH key for user $USER_ID (fingerprint: $FP)"
-MONGO_URI="${MONGO_URI:-mongodb://localhost:27017/overleaf}" node services/web/tools/seed_ssh_key.mjs "$USER_ID" "$(cat $PUB)"
+# Default to dev compose mongo and validate host to avoid localhost usage
+MONGO_URI="${MONGO_URI:-mongodb://mongo:27017/overleaf}"
+MONGO_HOST=$(echo "$MONGO_URI" | sed -E 's|mongodb://([^/:@]+).*|\1|')
+./scripts/dev/validate-host.sh MONGO_URI "$MONGO_HOST" "MongoDB host"
+node services/web/tools/seed_ssh_key.mjs "$USER_ID" "$(cat $PUB)"
 
 # Wait for git-bridge SSH port to be ready
 echo "Waiting for git-bridge SSH on $GIT_HOST:$SSH_PORT..."

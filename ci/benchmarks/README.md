@@ -29,7 +29,7 @@ Benchmarks support both warm and cold runs.
 Commands
 
 - Key lookup (example):
-  BENCH_URL=http://localhost:3000/internal/api/ssh-keys/SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA BENCH_ITER=200 BENCH_CONCURRENCY=20 BENCH_OUTPUT=out.json node ci/benchmarks/key-lookup-benchmark/bench.js
+  BENCH_URL=http://develop-web-1:3000/internal/api/ssh-keys/SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA BENCH_ITER=200 BENCH_CONCURRENCY=20 BENCH_OUTPUT=out.json node ci/benchmarks/key-lookup-benchmark/bench.js
 
 - Introspection (example):
   BENCH_URL=http://localhost:3000/internal/api/tokens/introspect BENCH_ITER=200 BENCH_CONCURRENCY=20 BENCH_TOKEN=invalid-token BENCH_OUTPUT=out.json node ci/benchmarks/introspection-benchmark/bench.js
