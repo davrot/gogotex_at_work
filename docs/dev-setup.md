@@ -294,7 +294,9 @@ For full git-over-SSH acceptance against a local `git-bridge` instance (when `ss
 
 ## Webpack Dev Server Ports
 
-The webpack dev server runs inside a container and is commonly exposed on port `3808` and is reachable on the compose network as `http://develop-webpack-1:3808` (note: do not use `localhost` or `127.0.0.1` when running e2e tests — these hosts are blocked for tests). If you relied on port `80` previously, use `http://develop-webpack-1:3808` instead or set up a local reverse-proxy forwarding `:80` to `:3808`.
+**⚠️ IMPORTANT: Do NOT use `127.0.0.1` or `localhost` for service addresses in the dev environment or when running E2E/Playwright tests.** Using `127.0.0.1` or `localhost` from inside dev containers or test runners is blocked and will cause failing or flaky tests and confusing debugging. Always use the compose service hostname and port visible on the development network (for example `http://develop-webpack-1:3808`) or configure a proper reverse proxy, as shown below.
+
+The webpack dev server runs inside a container and is commonly exposed on port `3808` and is reachable on the compose network as `http://develop-webpack-1:3808`. If you relied on port `80` previously, use `http://develop-webpack-1:3808` instead or set up a local reverse-proxy forwarding `:80` to `:3808`.
 
 Note: HTTPS termination for services (including `git-bridge` in production) is handled by the common nginx proxy / load balancer. Individual services typically listen on HTTP and rely on the proxy for TLS; for local development this is often emulated by exposing service ports directly or by configuring a local reverse-proxy.
 
