@@ -8,3 +8,10 @@
 !/Makefile
 !/LICENSE
 !/vendor
+
+# Allow Go migration sources into docker build context
+!go.mod
+!go.sum
+!cmd/**
+!internal/**
+!services/**
