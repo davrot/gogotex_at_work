@@ -405,62 +405,77 @@ class User {
   }
 
   loginWithEmailPassword(email, password, callback) {
-    this.getCsrfToken(error => {
-      if (error != null) {
-        return callback(error)
-      }
-      this.request.post(
-        {
-          url: settings.enableLegacyLogin ? '/login/legacy' : '/login',
-          json: {
-            email,
-            password,
-            'g-recaptcha-response': 'valid',
-          },
-        },
-        (error, response, body) => {
-          if (error != null) {
-            return callback(error)
-          }
-          if (response.statusCode !== 200) {
-            // Debug: print failed login response for triage
-            // eslint-disable-next-line no-console
-            console.debug('[User.loginWithEmailPassword] failed login:', { status: response.statusCode, body })
-            // Additional triage: run direct check via AuthenticationManager to see if bcrypt.compare matches
-            AuthenticationManager.promises._checkUserPassword({ email }, password)
-              .then(checkRes => {
-                try {
-                  console.debug('[User.loginWithEmailPassword] direct check after failed login', { userId: checkRes.user && checkRes.user._id ? String(checkRes.user._id) : null, match: checkRes.match, hashInfo: checkRes.user && checkRes.user.hashedPassword ? { length: checkRes.user.hashedPassword.length, prefix: checkRes.user.hashedPassword.slice(0,8) } : null })
-                } catch (e) {}
-                return callback(
-                  new OError(
-                    `login failed: status=${response.statusCode} body=${JSON.stringify(body)}`,
-                    { response, body }
-                  )
-                )
-              })
-              .catch(err => {
-                // eslint-disable-next-line no-console
-                console.error('[User.loginWithEmailPassword] error while doing direct check', err && err.stack ? err.stack : err)
-                return callback(
-                  new OError(
-                    `login failed: status=${response.statusCode} body=${JSON.stringify(body)}`,
-                    { response, body }
-                  )
-                )
-              })
-            return
-          }
-          // get new csrf token, then return result of login
-          this.getCsrfToken(err => {
-            if (err) {
-              return callback(OError.tag(err, 'after login'))
-            }
-            callback(null, response, body)
-          })
+    // Add resilience for transient 429 rate-limit responses by retrying a few times with backoff.
+    // Increase defaults to tolerate transient rate-limiter interference in heavy parallel runs.
+    const maxRetries = 10
+    const baseDelay = 200
+    const attempt = (retriesLeft, delay) => {
+      this.getCsrfToken(error => {
+        if (error != null) {
+          return callback(error)
         }
-      )
-    })
+        this.request.post(
+          {
+            url: settings.enableLegacyLogin ? '/login/legacy' : '/login',
+            json: {
+              email,
+              password,
+              'g-recaptcha-response': 'valid',
+            },
+          },
+          (error, response, body) => {
+            if (error != null) {
+              return callback(error)
+            }
+            if (response.statusCode !== 200) {
+              // Debug: print failed login response for triage
+              // eslint-disable-next-line no-console
+              console.debug('[User.loginWithEmailPassword] failed login:', { status: response.statusCode, body })
+
+              // If we got a 429 and we can retry, wait and retry
+              if (response.statusCode === 429 && retriesLeft > 0) {
+                try { console.debug('[User.loginWithEmailPassword] retrying after 429, retriesLeft=', retriesLeft) } catch (e) {}
+                return setTimeout(() => attempt(retriesLeft - 1, Math.min(1000, delay * 2)), delay)
+              }
+
+              // Additional triage: run direct check via AuthenticationManager to see if bcrypt.compare matches
+              AuthenticationManager.promises._checkUserPassword({ email }, password)
+                .then(checkRes => {
+                  try {
+                    console.debug('[User.loginWithEmailPassword] direct check after failed login', { userId: checkRes.user && checkRes.user._id ? String(checkRes.user._id) : null, match: checkRes.match, hashInfo: checkRes.user && checkRes.user.hashedPassword ? { length: checkRes.user.hashedPassword.length, prefix: checkRes.user.hashedPassword.slice(0,8) } : null })
+                  } catch (e) {}
+                  return callback(
+                    new OError(
+                      `login failed: status=${response.statusCode} body=${JSON.stringify(body)}`,
+                      { response, body }
+                    )
+                  )
+                })
+                .catch(err => {
+                  // eslint-disable-next-line no-console
+                  console.error('[User.loginWithEmailPassword] error while doing direct check', err && err.stack ? err.stack : err)
+                  return callback(
+                    new OError(
+                      `login failed: status=${response.statusCode} body=${JSON.stringify(body)}`,
+                      { response, body }
+                    )
+                  )
+                })
+              return
+            }
+            // get new csrf token, then return result of login
+            this.getCsrfToken(err => {
+              if (err) {
+                return callback(OError.tag(err, 'after login'))
+              }
+              callback(null, response, body)
+            })
+          }
+        )
+      })
+    }
+
+    attempt(maxRetries, baseDelay)
   }
 
   ensureUserExists(callback) {

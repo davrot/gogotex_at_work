@@ -10,7 +10,7 @@
   - `keyName`: String, optional, default `''`
   - `publicKey`: String, required (OpenSSH format)
   - `privateKeyHash`: String, optional, default `''` (non-reversible diagnostic hash)
-  - `fingerprint`: String, computed server-side (e.g., `SHA256:...`), unique (sparse index)
+  - `fingerprint`: String, computed server-side (e.g., `SHA256:...`), **unique (non-sparse)**; plan includes a startup dedupe aggregation to remove duplicate legacy documents and enforce a deterministic canonical record policy.
   - `createdAt`: Date, default now
   - `updatedAt`: Date, set on save
   - `__v`: Number (Mongoose version)
@@ -18,7 +18,7 @@
 ## Validation Rules
 
 - `publicKey` must match OpenSSH public key regex (e.g., type + base64 + optional comment); invalid keys rejected with 400.
-- `fingerprint` computed server-side and set on create; `fingerprint` must be unique (sparse) to support idempotent creates.
+- `fingerprint` computed server-side and set on create; `fingerprint` must be unique (non-sparse) to support idempotent creates; plan includes startup dedupe to clean up legacy duplicates.
 - `userId` must reference an existing user (controller-level check).
 
 ## State Transitions

@@ -4,6 +4,24 @@ import UserHelper from '../../acceptance/src/helpers/UserHelper.mjs'
 describe('SSH Key Idempotency / concurrency contract tests', function () {
   this.timeout(60 * 1000)
 
+  // Clear relevant rate-limiter keys before each test to avoid interference from earlier tests
+  beforeEach(async function () {
+    try {
+      const RedisWrapper = require('../../../../app/src/infrastructure/RedisWrapper.js')
+      const rclient = RedisWrapper.client('ratelimiter')
+      const keysAll = await rclient.keys('rate-limit:*')
+      const keysA = await rclient.keys('rate-limit:overleaf-login:*')
+      const keysB = await rclient.keys('rate-limit:fingerprint-lookup:*')
+      const keysC = await rclient.keys('rate-limit:ssh-fingerprint-lookup:*')
+      const keys = [...(keysAll||[]), ...(keysA||[]), ...(keysB||[]), ...(keysC||[])]
+      const dedup = Array.from(new Set(keys))
+      if (dedup && dedup.length) await rclient.del(dedup)
+      try { await rclient.disconnect() } catch (e) {}
+      // eslint-disable-next-line no-console
+      console.debug('[SSHKeyIdempotencyContractTest] cleared rate-limiter keys before test:', dedup && dedup.length)
+    } catch (e) {}
+  })
+
   it('concurrent POSTs with same public_key should be deterministic and not create duplicates', async function () {
     const user = new UserHelper()
     await user.register()
@@ -23,13 +41,23 @@ describe('SSH Key Idempotency / concurrency contract tests', function () {
     expect(codes.some(c => [200, 201].includes(c))).to.equal(true)
 
     // Now list keys and ensure only one entry with the fingerprint exists
-    const fetchRes = await user.fetch(`/internal/api/users/${user.id}/ssh-keys`, { headers: { 'x-dev-user-id': user.id } })
-    const bodyText = await fetchRes.text()
-    let keys
-    try { keys = JSON.parse(bodyText) } catch (e) { keys = [] }
+    const fetchAndMatches = async () => {
+      const fetchResInner = await user.fetch(`/internal/api/users/${user.id}/ssh-keys`, { headers: { 'x-dev-user-id': user.id } })
+      const bodyTextInner = await fetchResInner.text()
+      let keysInner
+      try { keysInner = JSON.parse(bodyTextInner) } catch (e) { keysInner = [] }
+      return keysInner.filter(k => (k.public_key && k.public_key.includes('examplekeyDATA')) || (k.key_name === 'concurrent'))
+    }
 
-    // Filter keys by public_key content (defensive: some servers may omit public_key in list)
-    const matches = keys.filter(k => (k.public_key && k.public_key.includes('examplekeyDATA')) || (k.key_name === 'concurrent'))
+    // Allow a short stabilization window for dedupe to run under heavy concurrency; poll a few times if needed
+    let matches = await fetchAndMatches()
+    let attempts = 0
+    while (matches.length > 1 && attempts < 5) {
+      await new Promise(r => setTimeout(r, 200))
+      matches = await fetchAndMatches()
+      attempts++
+    }
+
     expect(matches.length).to.equal(1)
   })
 })

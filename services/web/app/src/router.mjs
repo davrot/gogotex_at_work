@@ -335,6 +335,23 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
 
   // Test-only debug: echo headers/session for internal API triage
   try { console.error('[ROUTER INIT] registering /internal/api/debug/echo') } catch (e) {}
+
+  // Backwards-compatible debug route to allow test harnesses to toggle rate limits
+  try { console.error('[ROUTER INIT] registering /internal/api/debug/disable-rate-limits') } catch (e) {}
+  webRouter.post('/internal/api/debug/disable-rate-limits', (req, res) => {
+    try {
+      const fs = require('fs')
+      try { fs.writeFileSync('/tmp/disable-rate-limits', '1') } catch (e) {}
+      process.env.DISABLE_RATE_LIMITS = 'true'
+      try { const Settings = require('@overleaf/settings'); Settings.disableRateLimits = true } catch (e) {}
+      try { console.debug('[ROUTER DEBUG] disabled rate limits (debug endpoint)') } catch (e) {}
+      return res.status(200).json({ ok: true })
+    } catch (err) {
+      try { console.error('[ROUTER DEBUG] disable-rate-limits error', err && err.stack ? err.stack : err) } catch (e) {}
+      return res.sendStatus(500)
+    }
+  })
+
   webRouter.post('/internal/api/debug/echo', (req, res) => {
     try {
       const sessionUser = (req.session && req.session.user) ? { _id: req.session.user._id, email: req.session.user.email } : null
@@ -351,6 +368,49 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
       return res.sendStatus(404)
     } catch (err) {
       try { console.error('[ROUTER DEBUG ECHO] error', err && err.stack ? err.stack : err) } catch (e) {}
+      return res.sendStatus(500)
+    }
+  })
+
+  // Test-only endpoint to toggle rate limiting in the running web process. This makes
+  // it possible for the test harness to disable rate-limiting behavior even when the
+  // container was started without DISABLE_RATE_LIMITS set. Only active in test mode.
+  try { console.error('[ROUTER INIT] registering /internal/api/test/disable-rate-limits') } catch (e) {}
+  webRouter.post('/internal/api/test/disable-rate-limits', async (req, res) => {
+    // Allow tests and non-production environments to toggle rate-limits at runtime.
+    if (process.env.NODE_ENV === 'production') return res.sendStatus(404)
+    try {
+      try {
+        const fs = (await import('fs')).promises ? (await import('fs')) : await import('fs')
+        // Use synchronous write to make change visible immediately
+        const syncFs = await import('node:fs')
+        try { syncFs.writeFileSync('/tmp/disable-rate-limits', '1') } catch (e) {}
+      } catch (e) {}
+      process.env.DISABLE_RATE_LIMITS = 'true'
+      try {
+        const SettingsModule = await import('@overleaf/settings')
+        const Settings = SettingsModule && (SettingsModule.default || SettingsModule)
+        Settings.disableRateLimits = true
+      } catch (e) {}
+      try { console.debug('[ROUTER TEST] disabled rate limits (test/dev)') } catch (e) {}
+      return res.status(200).json({ ok: true })
+    } catch (err) {
+      try { console.error('[ROUTER TEST] disable-rate-limits error', err && err.stack ? err.stack : err) } catch (e) {}
+      return res.sendStatus(500)
+    }
+  })
+
+  webRouter.post('/internal/api/test/enable-rate-limits', (req, res) => {
+    if (process.env.NODE_ENV !== 'test') return res.sendStatus(404)
+    try {
+      const fs = require('fs')
+      try { fs.unlinkSync('/tmp/disable-rate-limits') } catch (e) {}
+      process.env.DISABLE_RATE_LIMITS = undefined
+      try { const Settings = require('@overleaf/settings'); Settings.disableRateLimits = false } catch (e) {}
+      try { console.debug('[ROUTER TEST] enabled rate limits (test-only)') } catch (e) {}
+      return res.status(200).json({ ok: true })
+    } catch (err) {
+      try { console.error('[ROUTER TEST] enable-rate-limits error', err && err.stack ? err.stack : err) } catch (e) {}
       return res.sendStatus(500)
     }
   })

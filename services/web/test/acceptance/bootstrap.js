@@ -178,7 +178,62 @@ try {
   const Settings = require('@overleaf/settings')
   // disable rate limits only when test runner requests it
   if (process.env.TEST_DISABLE_RATE_LIMITS === 'true') {
+    // Ensure both the runtime Settings and process env used by rate limiter modules
+    // reflect the test intent. Some modules read env vars on import, so setting the
+    // env here avoids ordering issues in tests that require rate limits to be off.
+    process.env.DISABLE_RATE_LIMITS = 'true'
     Settings.disableRateLimits = true
+    // eslint-disable-next-line no-console
+    console.debug('[bootstrap] TEST_DISABLE_RATE_LIMITS requested - disabled rate limits')
+
+    // Also attempt to notify the running web process (if any) to disable rate limits
+    // by calling the test-only admin route. This handles cases where the web service
+    // was started without DISABLE_RATE_LIMITS set in its environment.
+    try {
+      (async () => {
+        try {
+          const fetch = (await import('node-fetch')).default
+          const base = process.env.WEB_BASE_URL || (process.env.HTTP_TEST_HOST ? `http://${process.env.HTTP_TEST_HOST}:${process.env.HTTP_TEST_PORT || 3000}` : 'http://127.0.0.1:3000')
+          const healthUrl = `${base.replace(/\/$/, '')}/health`
+          const targetUrl = `${base.replace(/\/$/, '')}/internal/api/test/disable-rate-limits`
+          const sleep = ms => new Promise(r => setTimeout(r, ms))
+          let healthy = false
+          let attempts = 0
+          const maxHealthAttempts = 8
+          while (attempts < maxHealthAttempts) {
+            attempts++
+            try {
+              const h = await fetch(healthUrl, { method: 'GET', timeout: 2000 })
+              if (h && h.status === 200) { healthy = true; break }
+            } catch (e) {
+              // ignore, will retry
+            }
+            await sleep(200 * attempts)
+          }
+          try { require('fs').appendFileSync('/tmp/bootstrap_disable_rate_limits.log', JSON.stringify({ t: new Date().toISOString(), event: 'health_check', base, healthy, attempts }) + '\n') } catch (e) {}
+          // Try to POST to the disable endpoint even if health check failed; the web process
+          // may still accept the request sooner than /health becomes ready. Retry with backoff.
+          const maxPostAttempts = 8
+          for (let i = 1; i <= maxPostAttempts; i++) {
+            try {
+              const r = await fetch(targetUrl, { method: 'POST', timeout: 2000 })
+              if (r && (r.status >= 200 && r.status < 300)) {
+                console.debug('[bootstrap] requested web process to disable rate limits via /internal/api/test/disable-rate-limits')
+                try { require('fs').appendFileSync('/tmp/bootstrap_disable_rate_limits.log', JSON.stringify({ t: new Date().toISOString(), event: 'disable_post_success', attempt: i }) + '\n') } catch (e) {}
+                break
+              } else {
+                try { require('fs').appendFileSync('/tmp/bootstrap_disable_rate_limits.log', JSON.stringify({ t: new Date().toISOString(), event: 'disable_post_non2xx', attempt: i, status: r && r.status }) + '\n') } catch (e) {}
+              }
+            } catch (e) {
+              try { require('fs').appendFileSync('/tmp/bootstrap_disable_rate_limits.log', JSON.stringify({ t: new Date().toISOString(), event: 'disable_post_error', attempt: i, err: e && e.message }) + '\n') } catch (e) {}
+            }
+            await sleep(500 * i)
+          }
+        } catch (e) {
+          // ignore module import failures
+        }
+      })()
+    } catch (e) {}
   }
   // Ensure service-origin basic auth credentials exist for tests
   if (!Settings.httpAuthUsers || Object.keys(Settings.httpAuthUsers).length === 0) {

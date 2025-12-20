@@ -6,6 +6,24 @@ import Settings from '@overleaf/settings'
 describe('SSH fingerprint lookup contract tests', function () {
   this.timeout(60 * 1000)
 
+  // Clear relevant rate-limiter keys before each test to avoid interference from earlier tests
+  beforeEach(async function () {
+    try {
+      const RedisWrapper = require('../../../../app/src/infrastructure/RedisWrapper.js')
+      const rclient = RedisWrapper.client('ratelimiter')
+      const keysAll = await rclient.keys('rate-limit:*')
+      const keysA = await rclient.keys('rate-limit:overleaf-login:*')
+      const keysB = await rclient.keys('rate-limit:fingerprint-lookup:*')
+      const keysC = await rclient.keys('rate-limit:ssh-fingerprint-lookup:*')
+      const keys = [...(keysAll||[]), ...(keysA||[]), ...(keysB||[]), ...(keysC||[])]
+      const dedup = Array.from(new Set(keys))
+      if (dedup && dedup.length) await rclient.del(dedup)
+      try { await rclient.disconnect() } catch (e) {}
+      // eslint-disable-next-line no-console
+      console.debug('[SSHKeyLookupContractTest] cleared rate-limiter keys before test:', dedup && dedup.length)
+    } catch (e) {}
+  })
+
   it('returns userId for a known fingerprint', async function () {
     const user = new UserHelper()
     // Debug: inspect user helper before calling register

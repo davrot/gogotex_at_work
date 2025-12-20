@@ -5,6 +5,24 @@ import fs from 'node:fs'
 describe('SSH Key CRUD contract tests', function () {
   this.timeout(60 * 1000)
 
+  // Clear relevant rate-limiter keys before each test to avoid interference from earlier tests
+  beforeEach(async function () {
+    try {
+      const RedisWrapper = require('../../../../app/src/infrastructure/RedisWrapper.js')
+      const rclient = RedisWrapper.client('ratelimiter')
+      const keysAll = await rclient.keys('rate-limit:*')
+      const keysA = await rclient.keys('rate-limit:overleaf-login:*')
+      const keysB = await rclient.keys('rate-limit:fingerprint-lookup:*')
+      const keysC = await rclient.keys('rate-limit:ssh-fingerprint-lookup:*')
+      const keys = [...(keysAll||[]), ...(keysA||[]), ...(keysB||[]), ...(keysC||[])]
+      const dedup = Array.from(new Set(keys))
+      if (dedup && dedup.length) await rclient.del(dedup)
+      try { await rclient.disconnect() } catch (e) {}
+      // eslint-disable-next-line no-console
+      console.debug('[SSHKeyCRUDContractTest] cleared rate-limiter keys before test:', dedup && dedup.length)
+    } catch (e) {}
+  })
+
   it('create/list/delete SSH keys as logged-in user', async function () {
     const user = new UserHelper()
     // Debug: ensure register() is present

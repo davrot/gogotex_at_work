@@ -11,26 +11,35 @@
 
 ## Technical Context
 
-**Language/Version**: Node.js (>=18), modern ESM and some legacy CommonJS interop  
-**Primary Dependencies**: Express (web server), Mongoose (MongoDB ODM), Playwright (E2E), Vitest/Mocha (unit/contract tests), Docker Compose (dev infra), ioredis, webpack for dev frontend builds  
-**Storage**: MongoDB (replica set in dev using `mongo` service, DB name `sharelatex`)  
-**Testing**: Vitest for focused unit tests (ESM), Mocha for legacy suites, Playwright for E2E; contract tests for API interactions; CI runs tests in Docker-based env  
-**Target Platform**: Linux servers (containers); dev and CI run in Docker Compose dev stacks  
-**Project Type**: Web application (backend + frontend assets), with a separate `git-bridge` service (Java) that integrates via internal API  
-**Performance Goals**: For small repositories (<= 1MB and ≤ 10 files), the **p95** latency for `git clone` and `git push` should be < **2s**, and **p99** < **10s** under normal load. Target error rate for these operations should be < **0.5%** over a representative sample. Phase 1 MUST add a performance test harness (task T027) that reports p50/p95/p99, success rate, and error counts and publishes results as CI artifacts for review.  
-**Constraints**: Must integrate with existing dev Docker Compose network (services addressable via internal hostnames like `develop-*`); performance tests must run in an isolated, reproducible environment (CI job or preconfigured local harness) and avoid globally mutating infra.  
-**Scale/Scope**: Initial rollout targeted at single cluster; feature impacts authentication for all Git operations and UI account management
+**Language/Version**: Go 1.25 (primary for `git-bridge`), Node.js 20.x (web/profile), MongoDB 6.x, Redis 7.x, Docker Compose for local integration.
+**Primary Dependencies**: Go stdlib + `go-git` or invoking system `git` (decision: **NEEDS CLARIFICATION**), `ssh`/authentication libraries, `chi`/`gorilla`-style HTTP router for internal API calls; on the web side: Express + Mongoose (existing).
+**Storage**: User SSH keys persisted in MongoDB (web-profile service); `git-bridge` will retrieve keys via the internal authenticated web-profile API (direct DB access from `git-bridge` is disallowed unless explicitly authorized).
+**Testing**: Unit tests: `go test` for `git-bridge` logic; Integration tests: Docker Compose environment with real services (web, mongo, redis, git-bridge) and contract tests (Mocha) for cross-service behaviors; Performance tests: representative `git clone`/`git push` benchmark harness (runnable in CI / locally).
+**Target Platform**: Linux server containers (Docker); CI runners that can run Docker compose stacks.
+**Project Type**: Backend service (networked, containerized), integrating with the web-profile service and the repo storage backend.
+**Performance Goals**: For small test repos (<=1MB, <=10 files) target **p95 < 2s**, **p99 < 10s** for `git clone` and `git push` under normal load (matching spec SC-003).
+**Constraints**: Must use the internal web-profile API for key retrieval and honor existing security model (service tokens / mTLS — **NEEDS CLARIFICATION** on the chosen auth mechanism). Must not introduce any persistent plaintext private key storage. Must be compatible with existing docker-based dev environment and CI.
+**Scale/Scope**: Initial rollout scoped to staging environments and small test repos; production must be able to handle expected Overleaf traffic (estimated scale: thousands of daily users; exact SRE targets **NEEDS CLARIFICATION**).
+
+### Open questions / NEEDS CLARIFICATION
+
+- Auth between `git-bridge` and web-profile internal API: prefer service token or mTLS? (security team requirement) — **NEEDS CLARIFICATION**
+- Strategy for Git authentication implementation: run an SSH server that consults web-profile per connection, or validate SSH keys during Git push handshake and map to users without a full SSHd? (design tradeoffs: performance vs simplicity) — **NEEDS CLARIFICATION**
+- Use of `go-git` vs shelling out to system `git` for repository operations and hook handling — **NEEDS CLARIFICATION**
+- CI performance-test runner availability and limits (how to run p95/p99 measurements reliably in CI) — **NEEDS CLARIFICATION**
+- Migration coordination window for removing Java legacy code (timing + integration owners) — **NEEDS CLARIFICATION**
 
 ## Constitution Check
 
 _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
-- **Code Quality (required)**: All new backend and frontend code will be linted and formatted; PRs must include focused diffs and description.
-- **Testing Standards (required)**: Unit tests for new logic (key parsing, fingerprinting), contract tests for internal API between web-profile and git-bridge, and Playwright E2E for UI flows. Focused test harnesses (`test/focused`) are used to avoid global infra changes.
-- **Observability (required)**: Add structured logs for SSH key add/delete events (`sshkey.added`, `sshkey.removed`) and ensure events include user_id and fingerprint (no private key material).
-- **Performance (informative)**: Define p95/p99 SLOs for Git operations in Phase 1.
+- **Code Quality (NON-NEGOTIABLE)**: OK — implementation will follow project linters, formatting, and PR review rules. Unit tests will accompany all new logic.
+- **Testing Standards (NON-NEGOTIABLE)**: PARTIAL — unit and integration tests are planned; performance tests are required for acceptance and will be added in Phase 1. CI integration for performance tests is **NEEDS CLARIFICATION**.
+- **User Experience Consistency**: N/A for core auth but UI changes (SSH key management) will follow component library and accessibility requirements.
+- **Performance Requirements**: MUST be met; performance test harness and targets are included in Phase 1. No violations yet but the approach depends on CI runner availability (**NEEDS CLARIFICATION**).
+- **Observability & Versioning**: OK — security/auth events and metrics will be instrumented; logging format and audit fields will be specified in Phase 1.
 
-Status: **Pending** — constitution alignment requires measurable SLOs and performance tests. This will be satisfied after implementing the performance test task T027 and validating results in CI.
+**Decision**: Proceed to Phase 0 research with the open clarifications listed in Technical Context (auth mechanism, git implementation choice, CI performance runner). These clarifications must be resolved in Phase 0 research (research.md) before moving to Phase 1 design.
 
 ## Project Structure
 

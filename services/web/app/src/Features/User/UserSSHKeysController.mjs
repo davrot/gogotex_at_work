@@ -229,25 +229,131 @@ export async function create(req, res) {
       try { console.error('DEBUG existing lookup failed', e && e.stack ? e.stack : e) } catch (ee) {}
     }
 
-    const doc = new UserSSHKey({
-      userId,
-      keyName: keyName || '',
-      publicKey,
-      fingerprint,
-    })
+    // Prefer insertOne-first to make concurrency deterministic: when multiple
+    // workers attempt to create the same fingerprint concurrently, only one
+    // insert should succeed; others will get a duplicate-key error which we
+    // handle by fetching the canonical document.
     try {
-      try { console.error('DEBUG about to save new ssh key doc', { userId, fingerprint }) } catch (e) {}
-      await doc.save()
-      try { console.error('DEBUG saved new ssh key doc id=', String(doc._id)) } catch (e) {}
-    } catch (e) {
-      // handle duplicate key errors gracefully (race case)
-      if (e && e.code === 11000) {
-        const existing = await UserSSHKey.findOne({ fingerprint }).lean().exec()
-        if (existing && String(existing.userId) === String(userId)) {
-          try { console.error('DEBUG duplicate handled - returning existing doc as 200') } catch (e) {}
-          return res.status(200).json({ id: String(existing._id), key_name: existing.keyName || existing.key_name, label: existing.keyName || existing.label, public_key: existing.publicKey || existing.public_key, fingerprint: existing.fingerprint, created_at: existing.createdAt || existing.created_at, updated_at: existing.updatedAt || existing.updated_at, userId: String(existing.userId) })
+      const now = new Date()
+      const requestId = (req && req.get && req.get('x-request-id')) || req.headers['x-request-id'] || crypto.randomUUID()
+      let insertedDoc = null
+      try {
+        insertedDoc = await UserSSHKey.create({ userId, keyName: keyName || '', publicKey, fingerprint, createdAt: now, updatedAt: now })
+        try { fs.appendFileSync('/tmp/ssh_upsert_debug.log', JSON.stringify({ t: new Date().toISOString(), requestId, event: 'insert_success', id: String(insertedDoc._id), fingerprint }) + '\n') } catch (e) {}
+      } catch (insErr) {
+        // Duplicate key indicates another concurrent insert succeeded first
+        if (insErr && insErr.code === 11000) {
+          try { fs.appendFileSync('/tmp/ssh_upsert_debug.log', JSON.stringify({ t: new Date().toISOString(), requestId, event: 'insert_duplicate_key', err: insErr && insErr.message }) + '\n') } catch (e) {}
+          // Read canonical doc and return appropriate status
+          const existing = await UserSSHKey.findOne({ fingerprint }).lean().exec()
+          if (existing && String(existing.userId) === String(userId)) {
+            return res.status(200).json({ id: String(existing._id), key_name: existing.keyName || existing.key_name, label: existing.keyName || existing.label, public_key: existing.publicKey || existing.public_key, fingerprint: existing.fingerprint, created_at: existing.createdAt || existing.created_at, updated_at: existing.updatedAt || existing.updated_at, userId: String(existing.userId) })
+          }
+          return res.status(409).json({ message: 'public_key already exists for a different user' })
         }
-        try { console.error('DEBUG duplicate handled - returning 409') } catch (e) {}
+        throw insErr
+      }
+
+      // If insert succeeded, proceed to canonicalize/dedupe as a safety net
+      const upserted = insertedDoc ? (insertedDoc.toObject ? insertedDoc.toObject() : insertedDoc) : null
+      try { console.error('DEBUG insert succeeded id=', upserted && String(upserted._id), 'requestId=', requestId) } catch (e) {}
+
+      // Canonicalize/dedupe immediately after upsert to avoid race windows where multiple
+      // concurrent requests both observe a freshly-inserted document and return before
+      // a cleanup happens elsewhere. This ensures a single canonical doc persists.
+      try {
+        const all = await UserSSHKey.find({ fingerprint }).sort({ createdAt: 1 }).lean().exec()
+        if (all.length > 1) {
+          try { console.error('DEBUG dedupe: found duplicates count=', all.length, 'fingerprint=', fingerprint) } catch (e) {}
+          try { fs.appendFileSync('/tmp/ssh_dedupe_debug.log', JSON.stringify({ t: new Date().toISOString(), requestId, event: 'dedupe_found', fingerprint, count: all.length, docs: all.map(a => ({ id: String(a._id), userId: String(a.userId), createdAt: a.createdAt })) }) + '\n') } catch (e) {}
+          // Prefer a document owned by this user if present, else keep the oldest
+          let keeper = all.find(a => String(a.userId) === String(userId)) || all[0]
+          try { console.error('DEBUG dedupe: keeper=', keeper && String(keeper._id), 'keeperUser=', keeper && String(keeper.userId)) } catch (e) {}
+          const toDelete = all.filter(a => String(a._id) !== String(keeper._id)).map(a => a._id)
+          try {
+            const delRes = await UserSSHKey.deleteMany({ _id: { $in: toDelete } })
+            try { console.error('DEBUG dedupe: deleted count=', delRes && delRes.deletedCount) } catch (e) {}
+            try { fs.appendFileSync('/tmp/ssh_dedupe_debug.log', JSON.stringify({ t: new Date().toISOString(), requestId, event: 'dedupe_deleted', fingerprint, deletedCount: delRes && delRes.deletedCount, toDelete: toDelete.map(d => String(d)) }) + '\n') } catch (e) {}
+          } catch (ee) {
+            try { console.error('DEBUG dedupe: deleteMany failed', ee && ee.stack ? ee.stack : ee) } catch (e) {}
+          }
+          // Re-fetch keeper to ensure we return a canonical copy
+          const canonical = await UserSSHKey.findById(keeper._id).lean().exec()
+          if (!canonical) {
+            // should not happen, but if it does, return 500
+            return res.sendStatus(500)
+          }
+          if (String(canonical.userId) !== String(userId)) {
+            return res.status(409).json({ message: 'public_key already exists for a different user' })
+          }
+          // Determine whether we consider this creation to be fresh
+          const createdAtCanon = canonical && (canonical.createdAt || canonical.created_at)
+          const createdRecentlyCanon = createdAtCanon ? (Math.abs(new Date(createdAtCanon) - now) < 2000) : false
+          try { console.error('DEBUG dedupe: returning canonical id=', String(canonical._id), 'createdRecently=', createdRecentlyCanon) } catch (e) {}
+          return res.status(createdRecentlyCanon ? 201 : 200).json({ id: String(canonical._id), key_name: canonical.keyName || canonical.key_name, label: canonical.keyName || canonical.label, public_key: canonical.publicKey || canonical.public_key, fingerprint: canonical.fingerprint, created_at: canonical.createdAt || canonical.created_at, updated_at: canonical.updatedAt || canonical.updated_at, userId: String(canonical.userId) })
+        }
+      } catch (dede) {
+        try { console.error('DEBUG dedupe failed, continuing with upserted doc', dede && dede.stack ? dede.stack : dede) } catch (e) {}
+      }
+
+      // Determine whether we created or found an existing doc. If created_at is very recent, treat as created
+      const createdAt = upserted && (upserted.createdAt || upserted.created_at)
+      const createdRecently = createdAt ? (Math.abs(new Date(createdAt) - now) < 2000) : false
+
+      try { console.error('DEBUG upserted doc id=', String(upserted._id), 'createdRecently=', createdRecently) } catch (e) {}
+
+      if (createdRecently) {
+        // created by this upsert
+        // set cache below and respond with 201
+        var doc = upserted
+        try { logger.info({ type: 'sshkey.added', userId, keyId: String(doc._id), fingerprint: doc.fingerprint, timestamp: new Date().toISOString() }) } catch (e) {}
+        // include user metadata (lazy import to avoid module resolution during tests)
+        let username = null
+        let displayName = null
+        try {
+          const { User } = await import('../../../models/User.js')
+          const user = await User.findById(userId).lean().exec()
+          username = user && user.email ? user.email : null
+          displayName = user
+            ? `${user.first_name || ''}${user.first_name && user.last_name ? ' ' : ''}${user.last_name || ''}`.trim() || null
+            : null
+        } catch (e) {
+          // ignore and continue without user metadata
+        }
+
+        try {
+          const lcModule = await import(new URL('../../../lib/lookupCache.mjs', import.meta.url).href)
+          const lc = (lcModule && lcModule.default) || lcModule
+          const effectiveLc = _testLookupCache || lc
+          effectiveLc && effectiveLc.set && effectiveLc.set(doc.fingerprint, { userId: doc.userId }, Number(process.env.CACHE_LOOKUP_TTL_SECONDS || 60))
+        } catch (e) {}
+
+        return res.status(201).json({
+          id: String(doc._id),
+          key_name: doc.keyName || doc.key_name,
+          label: doc.keyName || doc.label || doc.key_name,
+          public_key: doc.publicKey || doc.public_key,
+          fingerprint: doc.fingerprint,
+          created_at: doc.createdAt || doc.created_at,
+          updated_at: doc.updatedAt || doc.updated_at,
+          userId: userId,
+          username,
+          display_name: displayName,
+        })
+      }
+
+      // Otherwise, found existing for same user - idempotent success
+      return res.status(200).json({ id: String(upserted._id), key_name: upserted.keyName || upserted.key_name, label: upserted.keyName || upserted.label, public_key: upserted.publicKey || upserted.public_key, fingerprint: upserted.fingerprint, created_at: upserted.createdAt || upserted.created_at, updated_at: upserted.updatedAt || upserted.updated_at, userId: String(upserted.userId) })
+    } catch (e) {
+      // If duplicate index error slipped through, fall back to the previous recovery path
+      if (e && e.code === 11000) {
+        try { fs.appendFileSync('/tmp/ssh_upsert_debug.log', JSON.stringify({ t: new Date().toISOString(), requestId, event: 'duplicate_key_error', err: (e && e.message) || e }) + '\n') } catch (ee) {}
+        const existing = await UserSSHKey.find({ fingerprint }).lean().exec()
+        try { fs.appendFileSync('/tmp/ssh_upsert_debug.log', JSON.stringify({ t: new Date().toISOString(), requestId, event: 'duplicate_key_existing_docs', fingerprint, docs: existing && existing.map(d => ({ id: String(d._id), userId: String(d.userId), createdAt: d.createdAt })) }) + '\n') } catch (ee) {}
+        const keeper = (existing && existing.find(d => String(d.userId) === String(userId))) || (existing && existing[0])
+        if (keeper && String(keeper.userId) === String(userId)) {
+          return res.status(200).json({ id: String(keeper._id), key_name: keeper.keyName || keeper.key_name, label: keeper.keyName || keeper.label, public_key: keeper.publicKey || keeper.public_key, fingerprint: keeper.fingerprint, created_at: keeper.createdAt || keeper.created_at, updated_at: keeper.updatedAt || keeper.updated_at, userId: String(keeper.userId) })
+        }
         return res.status(409).json({ message: 'public_key already exists for a different user' })
       }
       throw e

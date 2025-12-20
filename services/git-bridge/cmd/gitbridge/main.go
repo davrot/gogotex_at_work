@@ -1,11 +1,14 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+
+	"github.com/overleaf/git-bridge/internal/ssh"
 )
 
 var version = "dev"
@@ -19,6 +22,25 @@ func main() {
 		return
 	}
 	log.Printf("Starting git-bridge (go) with config=%s", *config)
+	// Initialize AuthManager and embedded SSH server if SSH_FEATURE_ENABLED=true
+	if getenv("SSH_FEATURE_ENABLED") == "true" {
+		am, err := ssh.NewAuthManagerFromEnv(nil)
+		if err != nil {
+			log.Fatalf("failed to create AuthManager: %v", err)
+		}
+		defer am.Close(context.Background())
+		sshAddr := getenv("SSH_LISTEN_ADDR")
+		if sshAddr == "" {
+			sshAddr = "0.0.0.0:22"
+		}
+		srv := ssh.NewServer(am, sshAddr)
+		if err := srv.Start(); err != nil {
+			log.Fatalf("failed to start ssh server: %v", err)
+		}
+		defer srv.Stop(context.Background())
+		log.Printf("SSH server listening on %s", sshAddr)
+	}
+
 	// Start a minimal HTTP server (health endpoint) on port from PORT env or default 8080
 	port := "8080"
 	if p := getenv("PORT"); p != "" {

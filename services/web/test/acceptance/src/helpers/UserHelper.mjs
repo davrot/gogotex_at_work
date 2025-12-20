@@ -437,6 +437,18 @@ class UserHelper {
     }
     const userHelper = new UserHelper()
     const loginPath = Settings.enableLegacyLogin ? '/login/legacy' : '/login'
+    // Test-only: clear overleaf-login rate-limit keys in Redis before attempting login to reduce flakiness
+    if (process.env.NODE_ENV === 'test') {
+      try {
+        const RedisWrapper = require('../../../../app/src/infrastructure/RedisWrapper.js')
+        const rclient = RedisWrapper.client('ratelimiter')
+        const loginKeys = await rclient.keys('rate-limit:overleaf-login:*')
+        if (loginKeys && loginKeys.length) await rclient.del(loginKeys)
+        try { await rclient.disconnect() } catch (e) {}
+        // eslint-disable-next-line no-console
+        console.debug('[UserHelper.loginUser] cleared overleaf-login keys before initial login attempts')
+      } catch (e) {}
+    }
     // Attempt login with a few retries if we observe 429 rate-limit responses
     let response
     for (let attempt = 1; attempt <= 5; attempt++) {
