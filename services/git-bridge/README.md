@@ -70,12 +70,21 @@ sudo update-alternatives --set javac /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/j
 
 Install Go (for Go-based development):
 
+- Recommended: **Go 1.25.x** (tested with **1.25.5**). If you can, install the latest Go 1.25 patch release.
+
+Native install example (Ubuntu):
+
 ```
-# example for Ubuntu
 sudo apt-get update
 sudo apt-get install -y golang-go
-# or download from https://go.dev/dl/
+# or download from https://go.dev/dl/ (choose 1.25.x)
 ```
+
+If you cannot or prefer not to install Go locally, use the Docker-backed make targets provided in the `Makefile`:
+
+- Build with Docker: `make docker-go-build` (uses `golang:1.25` by default)
+- Run tests with Docker: `make docker-go-test`
+- Run benchmarks with Docker: `make docker-go-bench`
 
 Create a config file according to the format below.
 

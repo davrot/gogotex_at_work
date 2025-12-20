@@ -21,7 +21,8 @@ Next steps (Phase 0 → Phase 1 handoff):
 
 How to build and run Go locally (developer steps):
 
-- Install Go 1.21+ (see `services/git-bridge/README.md`)
+- Recommended: **Go 1.25.x** (tested with 1.25.5). See `services/git-bridge/README.md` for install instructions.
+- If you don't want to install Go locally, use the Docker-backed make targets: `make docker-go-build`, `make docker-go-test`, `make docker-go-bench` (these use `golang:1.25`).
 - Run `make go-build` to compile the binary to `bin/git-bridge`
 - Run `make go-test` to run the unit tests
 - Run `make go-bench` to run Go benchmarks

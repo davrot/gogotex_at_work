@@ -84,6 +84,18 @@ go-test: check-go
 go-bench: check-go
 	$(GO) test -bench=. ./... -run=^$
 
+# Docker-backed Go targets (useful if you don't have Go locally installed)
+DOCKER_GO_IMAGE ?= golang:1.25
+
+docker-go-build:
+	docker run --rm -v $(PWD):/app -w /app/services/git-bridge $(DOCKER_GO_IMAGE) sh -c "go build -o ./bin/git-bridge ./cmd/gitbridge"
+
+docker-go-test:
+	docker run --rm -v $(PWD):/app -w /app/services/git-bridge $(DOCKER_GO_IMAGE) sh -c "go test ./... -v"
+
+docker-go-bench:
+	docker run --rm -v $(PWD):/app -w /app/services/git-bridge $(DOCKER_GO_IMAGE) sh -c "go test -bench=. ./... -run=^$"
+
 package: clean
 	mvn $(MVN_OPTS) package -DskipTests
 
@@ -104,4 +116,4 @@ clean_ci:
 	-docker rmi -f $(IMAGE_CI) $(IMAGE_REPO_FINAL)
 	-git clean -xdf .
 
-.PHONY: run package build clean test runtime-conf go-build go-test go-bench go-mod-tidy
+.PHONY: run package build clean test runtime-conf go-build go-test go-bench go-mod-tidy docker-go-build docker-go-test docker-go-bench
