@@ -3,7 +3,9 @@ FROM golang:1.25 AS builder
 WORKDIR /app
 COPY . /app
 WORKDIR /app
-RUN go env && go build -o /git-bridge ./cmd/gitbridge
+# Build a static Go binary (disable cgo) for maximum compatibility with Alpine
+ENV CGO_ENABLED=0
+RUN go env && GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "-s -w" -o /git-bridge ./cmd/gitbridge
 
 FROM alpine:3.18
 RUN apk add --no-cache bash gettext ca-certificates
