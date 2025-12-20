@@ -72,13 +72,16 @@ GOBIN ?= $(PWD)/bin
 go-mod-tidy:
 	$(GO) mod tidy
 
-go-build:
+check-go:
+	@command -v $(GO) >/dev/null || (echo "go not found; please install Go 1.21+" && exit 1)
+
+go-build: check-go
 	$(GO) build -o $(GOBIN)/git-bridge ./cmd/gitbridge
 
-go-test:
+go-test: check-go
 	$(GO) test ./... -v
 
-go-bench:
+go-bench: check-go
 	$(GO) test -bench=. ./... -run=^$
 
 package: clean
