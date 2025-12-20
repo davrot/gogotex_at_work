@@ -48,7 +48,11 @@ done
 
 # Seed the key into Mongo via the Node seeder (use host->mongodb port mapping)
 echo "Seeding SSH key into Mongo (user=${USER_ID})..."
-MONGO_URI=${MONGO_URI:-mongodb://127.0.0.1:27017/sharelatex}
+# Default to the compose mongo service (do NOT use 127.0.0.1 in container/test context)
+MONGO_URI=${MONGO_URI:-mongodb://mongo:27017/sharelatex}
+# Validate the host portion of MONGO_URI to prevent accidental localhost usage
+MONGO_HOST=$(echo "$MONGO_URI" | sed -E 's|mongodb://([^/:@]+).*|\1|')
+./scripts/dev/validate-host.sh MONGO_URI "$MONGO_HOST" "MongoDB host"
 NODE_PATH=.
 MONGO_URI="$MONGO_URI" node services/web/tools/seed_ssh_key.mjs "$USER_ID" "$PUB"
 
