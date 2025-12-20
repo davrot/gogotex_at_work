@@ -21,19 +21,26 @@ docker run -v `pwd`/conf/local.json:/conf/runtime.json writelatex-git-bridge
 
 - `maven` (for building, running tests and packaging)
 - `jdk-8` (for compiling and running)
+- `go` 1.21+ (for Go-based development; only required once you opt into the Go migration)
 
 ### Commands
 
 To be run from the base directory:
 
-**Build jar**:
+**Build jar** (Java):
 `mvn package`
 
-**Run tests**:
+**Run Java tests**:
 `mvn test`
 
 **Clean**:
 `mvn clean`
+
+**Build Go binary** (Go migration):
+`make go-build`
+
+**Run Go tests**:
+`make go-test`
 
 To be run from the dev-environment:
 
@@ -43,12 +50,15 @@ To be run from the dev-environment:
 **Run tests**:
 `bin/run git-bridge make test`
 
-**Clean**:
-`bin/run git-bridge make clean`
+**Build Go binary**:
+`bin/run git-bridge make go-build`
+
+**Run Go tests**:
+`bin/run git-bridge make go-test`
 
 ### Installation
 
-Install dependencies:
+Install dependencies (Java-based build):
 
 ```
 sudo apt-get update
@@ -56,6 +66,15 @@ sudo apt-get install -y maven
 sudo apt-get install -y openjdk-8-jdk
 sudo update-alternatives --set java /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java
 sudo update-alternatives --set javac /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/javac
+```
+
+Install Go (for Go-based development):
+
+```
+# example for Ubuntu
+sudo apt-get update
+sudo apt-get install -y golang-go
+# or download from https://go.dev/dl/
 ```
 
 Create a config file according to the format below.

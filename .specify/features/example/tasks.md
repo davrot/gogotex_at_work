@@ -2,6 +2,31 @@
 
 **Input:** Extracted from: .specify/features/example/plan.md, .specify/features/example/spec.md
 
+## Phase 0: Language migration — Java → Go
+
+**Goal:** Replace the Java implementation of `git-bridge` with a Go implementation, update the dev/test/CI tooling, and port all tests and benchmarks so the repository no longer requires Java maintenance.
+
+- [x] T040 Setup Go toolchain in dev environment (devcontainer/Dockerfile, Makefile) — install Go 1.21+ in dev container and provide `make build`/`make test`/`make bench` targets in `services/git-bridge`. 
+  - Acceptance: `make build` produces `services/git-bridge/bin/git-bridge`; `make test` runs Go unit tests locally. **Status:** skeleton added (Makefile targets, `go.mod`, minimal `cmd/` and `internal/` packages).
+
+- [ ] T041 Replace Java/Maven CI & build with Go modules — update `.github/workflows/*` to run `go build` and `go test`, include `go vet`/`golangci-lint`, and ensure CI artifacts are produced where needed.
+  - Acceptance: CI job builds and runs Go tests successfully.
+
+- [ ] T042 Port `git-bridge` code from Java to Go — implement SSH server, fingerprint→user lookup, introspection client, membership checks, audit logging, and existing feature contracts in Go.
+  - Acceptance: `go test ./...` covers ported unit tests and passes.
+
+- [ ] T043 Port test suite from Java to Go — migrate unit, integration, contract, and E2E tests to Go test harnesses (or maintain contract tests in existing JS framework but run orchestration via Go where appropriate).
+  - Acceptance: Contract tests referencing `git-bridge` execute against the Go binary and pass in CI.
+
+- [ ] T044 Migrate benchmarks & harness to target Go binary — ensure `ci/benchmarks` can invoke the Go binary in dev and CI to produce p50/p95/p99 artifacts.
+  - Acceptance: Bench harness produces artifacts and meets gating requirements in CI.
+
+- [ ] T045 Remove Java sources and Maven configs after successful migration — deprecate and remove `pom.xml`, `src/main/java`, and Java test directories when CI shows parity.
+  - Acceptance: No Java build steps remain in CI and Java sources removed from repo.
+
+- [ ] T046 Update docs, `spec.md`, `plan.md`, and README to describe Go-based development and testing instructions.
+  - Acceptance: `.specify` docs, README, and CONTRIBUTING show Go build/test instructions.
+
 ## Phase 1: Setup
 
 - [x] T001 Validate feature docs and plan presence — .specify/features/example/plan.md, .specify/features/example/spec.md (docs present)
@@ -19,7 +44,7 @@
 - [x] T0AA (BLOCKING) Formalize benchmark runner profile & harness — ci/benchmarks/README.md, ci/benchmarks/harness-config.json (implemented)
   - Acceptance: Provide a reproducible runner profile (recommended 2 vCPU, 4GB RAM), a seeded dataset (documented seed and size), harness command-lines, artifact format (p50/p95/p99), and example invocation for warm/cold runs. The harness must be runnable in local/dev CI and in the CI runner used for gating.
 
-- [x] T0YY Add canonical repo-path → projectId mapping examples & parsing unit tests — specs/001-ssh-git-auth/examples/repo-paths.md, services/git-bridge/test/unit/RepoPathParsingTest.java (examples + tests added)
+- [x] T0YY Add canonical repo-path → projectId mapping examples & parsing unit tests — specs/001-ssh-git-auth/examples/repo-paths.md, services/git-bridge/internal/repo/repo_path_parsing_test.go (examples + tests added) (Go)
   - Acceptance: Add canonical mapping examples (including `.git` suffix handling, url-encoded paths, namespaces, leading/trailing slashes) and unit tests that assert canonical parsing results and edge case behaviors.
 
 - [x] T0ZZ Add idempotency concurrency contract test for SSH key POST — services/web/test/contract/src/SSHKeyIdempotencyContractTest.mjs (implemented)
@@ -95,9 +120,9 @@
 - [x] T023 [P] [US4] Ensure private fingerprint lookup API exists and is contract-covered — GET /internal/api/ssh-keys/:fingerprint, services/web/test/contract/src/SSHKeyLookupContractTest.mjs (implemented)
 - [x] T024 [US4] Short-lived cache and pubsub invalidation for fingerprint lookup — services/web/app/src/lib/cache.js, services/web/lib/pubsub.js (implemented)
 - [x] T024b Implement synchronous cache invalidation API & contract tests — POST /internal/api/cache/invalidate, services/web/test/contract/src/CacheInvalidationContractTest.mjs (implemented)
-- [x] T025 [US4] Wire `git-bridge` to call fingerprint lookup and introspection fallback path — services/git-bridge/src/main/java/**/SSHAuthManager.java, services/git-bridge/test/contract/**
+- [x] T025 [US4] Wire `git-bridge` (Go) to call fingerprint lookup and introspection fallback path — services/git-bridge/internal/ssh/auth_manager.go, services/git-bridge/test/contract/\*\*
 - [x] T025a Verify git-bridge E2E observes auth.http_attempt success path when valid tokens are used — `scripts/e2e/git-https-acceptance.sh`, `services/web/test/e2e/playwright` (script and e2e checks present)
-- [x] T026a [US4] Membership enforcement tests at RPC handler (integration) — `services/git-bridge/src/test/java/.../WebProfileSSHServerMembershipE2ETest.java` (implemented)
+- [x] T026a [US4] Membership enforcement tests at RPC handler (integration) — `services/git-bridge/test/integration/web_profile_ssh_membership_e2e_test.go` (implemented)
 
 ---
 
@@ -153,9 +178,9 @@ Generated by: speckit task generator — source: .specify/features/example/{plan
 
 - [x] T020 Short-lived cache + pubsub invalidation — services/web/app/src/lib/cache.js, services/web/lib/pubsub.js, services/git-bridge cache handling
   - Acceptance: TTL default 60s; negative lookup TTL default 5s; invalidation published on revoke/delete.
-- [x] T021 Wire `git-bridge` to call introspection fallback & fingerprint lookup — services/git-bridge/src/main/java/\*\*/SSHAuthManager.java (implemented)
+- [x] T021 Wire `git-bridge` to call introspection fallback & fingerprint lookup — services/git-bridge/internal/ssh/auth_manager.go (implemented, Go)
   - Acceptance: `git-bridge` uses fast-path lookup and falls back to old behavior gracefully.
-- [x] T022 Membership enforcement at RPC handler — git-bridge RPC handlers, membership API contract (implemented: `WebProfileSSHServerMembershipE2ETest.java`)
+- [x] T022 Membership enforcement at RPC handler — git-bridge RPC handlers, membership API contract (implemented: `test/integration/web_profile_ssh_membership_e2e_test.go`) (Go)
   - Acceptance: non-member push returns 403; membership contract verified.
 - [x] T023 Contract test + E2E for git-bridge auth/membership flow — services/git-bridge/test/contract/\*\*, services/web/test/e2e/ (implemented)
 
@@ -181,7 +206,7 @@ Generated by: speckit task generator — source: .specify/features/example/{plan
 - [ ] T028 Security review & privacy checklist — docs/logging-policy.md
 - [ ] T029 Accessibility & frontend e2e screens — services/web/test/e2e/\*\*
 - [x] T030 Add membership OpenAPI contract — specs/001-ssh-git-auth/contracts/membership.openapi.yaml (implemented)
-- [ ] T031 Add contract test for membership endpoint — services/git-bridge/test/contract/MembershipContractTest.java
+- [ ] T031 Add contract test for membership endpoint — services/git-bridge/test/contract/membership_contract_test.go (Go)
 - [ ] T032 Security review checklist & retention policy verification tests — test/contract/logging/\*\*
 - [x] T033 CI micro-benchmark gating & contract validation (parallel) — .github/workflows/contract-tests-gating.yml (implemented)
 - [ ] T034 Accessibility tests & frontend e2e (parallel) — services/web/test/e2e/\*\*

@@ -3,7 +3,7 @@
 ## Architecture / Stack
 
 - `services/web` (Node.js/Express, Mongoose) — hosts SSH key and token APIs and token introspection endpoint.
-- `services/git-bridge` (Java, Maven) — handles SSH and HTTP git access and must call introspection and SSH key lookup endpoints.
+- `services/git-bridge` (Go, Go modules) — handles SSH and HTTP git access and must call introspection and SSH key lookup endpoints. **Decision:** implement `git-bridge` in Go (golang) due to lack of Java maintainers; see Phase 0 in `tasks.md` for migration tasks.
 - Data store: MongoDB collections for `user_ssh_keys` and `personal_access_tokens` (hashed secrets).
 
 ## Data Model References
@@ -37,6 +37,17 @@ Note: the `V0ReplacementAdapter` (legacy snapshot parity) is a substantial integ
 ## Rollout & Migration
 
 - Roll out `token-introspect` and `PersonalAccessToken` behind a feature flag. Suggested flag name: `feature.git_auth.local_token_manager` (default: `false`). Deploy in stages: enable internally (canary) → monitor metrics (auth error rate, lookup latency, introspection latency, audit logs) → enable for a subset of orgs → full rollout. Ensure `Oauth2Filter` can be configured to call the local introspection endpoint when the external service is offline and document configuration for fallback.
+
+### Go migration approach (2025-12-20)
+
+- Overview: Migrate `services/git-bridge` from Java to a new Go implementation in a phased manner to minimize disruption. The migration prioritizes feature parity for authentication, membership checks, and audit logging, and also aims to preserve contract compatibility.
+- Phases:
+  1. Add a new Go module in `services/git-bridge` with a minimal `main` and package layout; provide development `Makefile` and devcontainer/Dockerfile updates to install Go (see `T040`). Run Go unit tests in parallel with existing Java tests during the initial phase to validate parity.
+  2. Port core features (SSH auth, fingerprint lookup, introspect client, membership enforcement) to Go and add equivalent unit tests and benchmarks (`T042`/`T043`/`T044`). Keep the Java build around until contract/integration tests pass consistently against the Go binary in CI.
+  3. Replace CI build steps to build and test the Go binary, update benchmark jobs to target the Go binary, and ensure gates pass (`T041`).
+  4. When parity and CI stability are proven, deprecate and remove Java sources and Maven configs (`T045`) and finalize docs (`T046`).
+
+- Rollout & validation: Use contract tests and the CI benchmark gating to assert parity; ensure E2E tests exercise the deployed Go binary; incrementally remove Java artifacts only after CI contracts and benchmarks pass for a configurable period (for example, one week of green runs).
 
 ## Constitution Check
 

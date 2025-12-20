@@ -14,6 +14,10 @@ This feature implements SSH public-key management and a local HTTPS personal-acc
 
 - Q: How should SSH support be provided for `git-bridge` to enable full git-over-SSH tests and audits? → A: Option A (embed an SSH server directly in `git-bridge`). Rationale: keeps auth, audit, and membership checks colocated for simpler tracing and fewer moving parts.
 
+### Implementation language decision (2025-12-20)
+
+- Decision: Implement the `git-bridge` service in **Go (golang)** instead of Java. Rationale: there is no available Java maintainer for this service; Go offers a smaller runtime, easier cross-compilation, and a lower maintenance burden for long-lived infra components. The plan and tasks are updated to reflect this migration (see `tasks.md` Phase 0: Language migration).
+
 ## Functional Requirements
 
 1. User can add/remove SSH public keys for their account. (key-management-add-remove)

@@ -65,6 +65,21 @@ docker_test:
 clean:
 	mvn $(MVN_OPTS) clean
 
+# --- Go build/test targets (migration skeleton) ---
+GO ?= go
+GOBIN ?= $(PWD)/bin
+
+go-mod-tidy:
+	$(GO) mod tidy
+
+go-build:
+	$(GO) build -o $(GOBIN)/git-bridge ./cmd/gitbridge
+
+go-test:
+	$(GO) test ./... -v
+
+go-bench:
+	$(GO) test -bench=. ./... -run=^$
 
 package: clean
 	mvn $(MVN_OPTS) package -DskipTests
@@ -86,4 +101,4 @@ clean_ci:
 	-docker rmi -f $(IMAGE_CI) $(IMAGE_REPO_FINAL)
 	-git clean -xdf .
 
-.PHONY: run package build clean test runtime-conf
+.PHONY: run package build clean test runtime-conf go-build go-test go-bench go-mod-tidy
