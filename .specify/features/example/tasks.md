@@ -13,10 +13,10 @@
   - Acceptance: CI job builds and runs Go tests successfully.
 
 - [ ] T042 Port `git-bridge` code from Java to Go — implement SSH server, fingerprint→user lookup, introspection client, membership checks, audit logging, and existing feature contracts in Go.
-  - Acceptance: `go test ./...` covers ported unit tests and passes. **Status:** initial skeleton (health endpoint, repo-path parsing, auth manager stub) added; further porting required.
+  - Acceptance: `go test ./...` covers ported unit tests and passes. **Status:** initial skeleton (health endpoint, repo-path parsing, auth manager stub) added; basic lookup client implemented; further porting required.
 
 - [ ] T043 Port test suite from Java to Go — migrate unit, integration, contract, and E2E tests to Go test harnesses (or maintain contract tests in existing JS framework but run orchestration via Go where appropriate).
-  - Acceptance: Contract tests referencing `git-bridge` execute against the Go binary and pass in CI. **Status:** unit tests for repo parsing and auth manager added; contract/integration porting ongoing.
+  - Acceptance: Contract tests referencing `git-bridge` execute against the Go binary and pass in CI. **Status:** unit tests for repo parsing, auth manager and lookup client added; contract/integration porting ongoing.
 
 - [ ] T044 Migrate benchmarks & harness to target Go binary — ensure `ci/benchmarks` can invoke the Go binary in dev and CI to produce p50/p95/p99 artifacts.
   - Acceptance: Bench harness produces artifacts and meets gating requirements in CI.
