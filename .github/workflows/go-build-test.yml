@@ -31,6 +31,21 @@ jobs:
           cd services/git-bridge
           go vet ./...
 
+      - name: Build binary
+        run: |
+          cd services/git-bridge
+          go build -o ./bin/git-bridge ./cmd/gitbridge
+
+      - name: Run healthcheck (integration smoke)
+        run: |
+          cd services/git-bridge
+          nohup ./bin/git-bridge > /tmp/gitbridge.log 2>&1 &
+          # wait for server to start
+          for i in $(seq 1 10); do
+            curl -f http://127.0.0.1:8080/health && break || sleep 1
+          done
+          tail -n +1 /tmp/gitbridge.log || true
+
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v4
         with:
