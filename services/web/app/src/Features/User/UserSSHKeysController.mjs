@@ -238,8 +238,27 @@ export async function create(req, res) {
         }
 
         if (!doc) {
-          try { fs.appendFileSync('/tmp/ssh_upsert_debug.log', JSON.stringify({ t: new Date().toISOString(), requestId, event: 'findOneAndUpdate_no_doc', fingerprint }) + '\n') } catch (e) {}
-          return res.sendStatus(500)
+          try { fs.appendFileSync('/tmp/ssh_upsert_debug.log', JSON.stringify({ t: new Date().toISOString(), requestId, event: 'findOneAndUpdate_no_doc_initial', fingerprint, raw: raw && raw.lastErrorObject ? raw.lastErrorObject : null }) + '\n') } catch (e) {}
+
+          // Retry fetch with exponential backoff to handle driver/server visibility delays
+          const maxRetries = Number(process.env.SSH_UPSERT_RETRIES || 5)
+          const baseDelayMs = Number(process.env.SSH_UPSERT_BASE_DELAY_MS || 20)
+          for (let attempt = 1; attempt <= maxRetries && !doc; attempt++) {
+            try {
+              await new Promise(r => setTimeout(r, baseDelayMs * Math.pow(2, attempt - 1)))
+            } catch (e) {}
+            try {
+              doc = await UserSSHKey.findOne({ fingerprint }).lean().exec()
+              try { fs.appendFileSync('/tmp/ssh_upsert_debug.log', JSON.stringify({ t: new Date().toISOString(), requestId, event: 'findOneAndUpdate_retry_fetch', fingerprint, attempt, docId: doc && String(doc._id) }) + '\n') } catch (e) {}
+            } catch (e) {
+              try { fs.appendFileSync('/tmp/ssh_upsert_debug.log', JSON.stringify({ t: new Date().toISOString(), requestId, event: 'findOneAndUpdate_retry_fetch_failed', fingerprint, attempt, err: e && e.message }) + '\n') } catch (e) {}
+            }
+          }
+
+          if (!doc) {
+            try { fs.appendFileSync('/tmp/ssh_upsert_debug.log', JSON.stringify({ t: new Date().toISOString(), requestId, event: 'findOneAndUpdate_no_doc_final', fingerprint, processUptime: process.uptime() }) + '\n') } catch (e) {}
+            return res.sendStatus(500)
+          }
         }
 
         // If the canonical doc belongs to a different user, it's a conflict
