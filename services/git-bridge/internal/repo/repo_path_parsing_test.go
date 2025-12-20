@@ -10,7 +10,7 @@ func TestSlugFromPath(t *testing.T) {
 		"/repo/acme/nested/inner.git": "acme/nested/inner",
 		"repo/owner/.git": "owner",
 		"/repo//acme///hello-world.git": "acme/hello-world",
-		"/repo/acme/%2E%2E/escape.git": "acme/..\/escape", // keep path-clean behavior
+		"/repo/acme/%2E%2E/escape.git": "escape", // path.Clean removes '..' segments
 	}
 	for in, want := range cases {
 		got := SlugFromPath(in)
