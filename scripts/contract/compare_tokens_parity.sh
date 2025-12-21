@@ -4,9 +4,10 @@ set -euo pipefail
 # compare_tokens_parity.sh <node_base_url> <go_base_url> <userId>
 # Example: ./compare_tokens_parity.sh http://develop-web-1:3000 http://localhost:3900 test-user
 
-NODE_BASE=${1:-}
-GO_BASE=${2:-}
-USER_ID=${3:-test-compare}
+# Allow callers to pass base URLs either as positional args or via env vars (NODE_BASE/GO_BASE)
+NODE_BASE=${1:-${NODE_BASE:-}}
+GO_BASE=${2:-${GO_BASE:-}}
+USER_ID=${3:-${USER_ID:-test-compare}}
 
 if [ -z "$NODE_BASE" ] || [ -z "$GO_BASE" ]; then
   echo "Usage: $0 <node_base_url> <go_base_url> <userId>"
@@ -19,13 +20,28 @@ mkdir -p "$ARTIFACT_DIR"
 echo "Artifact dir: $ARTIFACT_DIR"
 trap 'rm -rf "$TMPDIR"' EXIT
 
+# Compute repository root (repo-relative paths used later) early so we can mount the correct dir into docker
+SCRIPT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+
 # Determine how to run Node-based seeders: prefer local node, else fall back to a dockerized node container
 if command -v node >/dev/null 2>&1; then
   NODE_CMD=node
 elif command -v docker >/dev/null 2>&1; then
-  NODE_CMD='docker run --rm -v "$PWD":/work -w /work node:20 node'
+  # Use an absolute repo root path to ensure the container can access the seeder scripts
+  NODE_CMD="docker run --rm -v \"$SCRIPT_ROOT\":/work -w /work node:20 node"
 else
   NODE_CMD=node
+fi
+
+# Prepare seeder paths and arguments (absolute on host, repo-relative inside docker)
+SEED_TOKEN_P="${SCRIPT_ROOT}/services/web/tools/seed_token.mjs"
+CREATE_USER_P="${SCRIPT_ROOT}/services/web/tools/create_test_user.mjs"
+
+SEED_TOKEN_ARG="$SEED_TOKEN_P"
+CREATE_USER_ARG="$CREATE_USER_P"
+if echo "$NODE_CMD" | grep -q "docker run"; then
+  SEED_TOKEN_ARG="services/web/tools/seed_token.mjs"
+  CREATE_USER_ARG="services/web/tools/create_test_user.mjs"
 fi
 
 function call_post() {
@@ -88,7 +104,11 @@ if [ "$NODE_STATUS" = "302" ] || [ "$NODE_STATUS" = "401" ] || [ "$NODE_STATUS" 
   # If supplied userId isn't a 24-char hex ObjectId, create a test user and use its ObjectId
   if ! echo "$USER_ID" | grep -Eq '^[0-9a-fA-F]{24}$'; then
     echo "$USER_ID does not appear to be an ObjectId; creating test user via services/web/tools/create_test_user.mjs"
+    if echo "$NODE_CMD" | grep -q "docker run"; then
+    CREATED_ID=$(docker run --rm -v "$SCRIPT_ROOT":/work -w /work node:20 node "$CREATE_USER_ARG" "$USER_ID@example.com" 2>/dev/null || true)
+  else
     CREATED_ID=$($NODE_CMD services/web/tools/create_test_user.mjs "$USER_ID@example.com" 2>/dev/null || true)
+  fi
     if [ -n "$CREATED_ID" ]; then
       echo "Created test user id: $CREATED_ID"
       USER_ID="$CREATED_ID"
@@ -99,24 +119,52 @@ if [ "$NODE_STATUS" = "302" ] || [ "$NODE_STATUS" = "401" ] || [ "$NODE_STATUS" 
 
   NODE_SEED_OUT="$TMPDIR/node_seed.out"
   GO_SEED_OUT="$TMPDIR/go_seed.out"
-  # Determine repo root and use absolute seeder paths so script is cwd-agnostic
-  SCRIPT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-  SEED_TOKEN_P="${SCRIPT_ROOT}/services/web/tools/seed_token.mjs"
-  CREATE_USER_P="${SCRIPT_ROOT}/services/web/tools/create_test_user.mjs"
 
-  # Seed tokens via Node seeder script
-  MONGO_URI="$MONGO_URI" $NODE_CMD "$SEED_TOKEN_P" "$USER_ID" >"$NODE_SEED_OUT" 2>&1 || true
+  # If externally-provided seed ids are present, skip seeding via node scripts and use the provided ids
+  if [ -n "${NODE_SEED_ID:-}" ] && [ -n "${GO_SEED_ID:-}" ]; then
+    echo "Using externally-provided seeded ids: node=$NODE_SEED_ID go=$GO_SEED_ID"
+    GO_USER_ID="${GO_USER_OVERRIDE:-${USER_ID}-go}"
+  else
+    # (SEED_TOKEN_P / CREATE_USER_P are computed near the top so they are available in all branches)
+    # Use previously computed SEED_TOKEN_ARG / CREATE_USER_ARG values here.
+
+    # Seed tokens via Node seeder script
+    if echo "$NODE_CMD" | grep -q "docker run"; then
+      # Sanity-check: verify the seeder script is visible inside the container before attempting to run it
+      if ! docker run --rm -v "$SCRIPT_ROOT":/work -w /work node:20 node -e "console.log(require('fs').existsSync('$SEED_TOKEN_ARG'))" 2>/dev/null | grep -q "true"; then
+        echo "Warning: seeder script not visible inside docker at $SEED_TOKEN_ARG (mounted $SCRIPT_ROOT:/work)."
+        echo "Docker may not be able to mount the repository path from this environment. Proceeding to run seeder to capture error output."
+      fi
+      docker run --rm -e MONGO_URI="$MONGO_URI" -v "$SCRIPT_ROOT":/work -w /work node:20 node "$SEED_TOKEN_ARG" "$USER_ID" >"$NODE_SEED_OUT" 2>&1 || true
+    else
+      MONGO_URI="$MONGO_URI" $NODE_CMD "$SEED_TOKEN_ARG" "$USER_ID" >"$NODE_SEED_OUT" 2>&1 || true
+    fi
+  fi
   # For Go user, seed separate user id to avoid direct collision in same DB
   GO_USER_ID="${GO_USER_OVERRIDE:-${USER_ID}-go}"
   # If GO_USER_ID isn't an ObjectId, create a separate test user for Go side
   if ! echo "$GO_USER_ID" | grep -Eq '^[0-9a-fA-F]{24}$'; then
-    CREATED_GO_ID=$($NODE_CMD "$CREATE_USER_P" "${GO_USER_ID}@example.com" 2>/dev/null || true)
+    if echo "$NODE_CMD" | grep -q "docker run"; then
+      CREATED_GO_ID=$(docker run --rm -v "$SCRIPT_ROOT":/work -w /work node:20 node "$CREATE_USER_ARG" "${GO_USER_ID}@example.com" 2>/dev/null || true)
+    else
+      CREATED_GO_ID=$($NODE_CMD "$CREATE_USER_ARG" "${GO_USER_ID}@example.com" 2>/dev/null || true)
+    fi
     if [ -n "$CREATED_GO_ID" ]; then
       echo "Created Go test user id: $CREATED_GO_ID"
       GO_USER_ID="$CREATED_GO_ID"
     fi
   fi
-  MONGO_URI="$MONGO_URI" $NODE_CMD "$SEED_TOKEN_P" "$GO_USER_ID" >"$GO_SEED_OUT" 2>&1 || true
+  if echo "$NODE_CMD" | grep -q "docker run"; then
+    docker run --rm -e MONGO_URI="$MONGO_URI" -v "$SCRIPT_ROOT":/work -w /work node:20 node "$SEED_TOKEN_ARG" "$GO_USER_ID" >"$GO_SEED_OUT" 2>&1 || true
+  else
+    MONGO_URI="$MONGO_URI" $NODE_CMD "$SEED_TOKEN_ARG" "$GO_USER_ID" >"$GO_SEED_OUT" 2>&1 || true || true
+  fi
+
+  # If caller provided NODE_SEED_ID/GO_SEED_ID externally, populate minimal seed output files so parsing below succeeds
+  if [ -n "${NODE_SEED_ID:-}" ] && [ -n "${GO_SEED_ID:-}" ]; then
+    echo "{\"id\": \"$NODE_SEED_ID\", \"token\": \"${NODE_SEED_TOKEN:-}\"}" >"$NODE_SEED_OUT" || true
+    echo "{\"id\": \"$GO_SEED_ID\", \"token\": \"${GO_SEED_TOKEN:-}\"}" >"$GO_SEED_OUT" || true
+  fi
   echo "Node seeder output:"
   sed -n '1,120p' "$NODE_SEED_OUT" || true
   echo "Go seeder output:"
