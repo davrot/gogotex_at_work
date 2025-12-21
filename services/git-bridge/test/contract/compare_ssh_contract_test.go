@@ -98,9 +98,38 @@ func TestCompareSSParity(t *testing.T) {
 	goUserID := primitive.NewObjectID().Hex()
 	goFp := seedSSHKey(t, ctx, mongoURI, goUserID)
 
-	// If we successfully seeded both databases, consider parity satisfied via seeding fallback
+	// If we successfully seeded both databases, verify GET /internal/api/ssh-keys/:fingerprint on both sides
 	if nodeFp != "" && goFp != "" {
 		t.Logf("Both Node and Go seeded: node=%s go=%s", nodeFp, goFp)
+		// helper GET fingerprint
+		getFP := func(base, fp string) (int, []byte, error) {
+			url := fmt.Sprintf("%s/internal/api/ssh-keys/%s", base, fp)
+			req, _ := http.NewRequest("GET", url, nil)
+			req.SetBasicAuth("overleaf", "overleaf")
+			client := &http.Client{Timeout: 5 * time.Second}
+			res, err := client.Do(req)
+			if err != nil {
+				return 0, nil, err
+			}
+			defer res.Body.Close()
+			b, _ := io.ReadAll(res.Body)
+			return res.StatusCode, b, nil
+		}
+
+		nStatus, nBody, err := getFP(nodeBase, nodeFp)
+		if err != nil { t.Fatalf("node fingerprint get failed: %v", err) }
+		if nStatus != 200 { t.Fatalf("node fingerprint GET returned %d", nStatus) }
+		if !strings.Contains(string(nBody), userID) {
+			t.Fatalf("node fingerprint lookup returned unexpected body: %s", string(nBody))
+		}
+
+		gStatus, gBody, err := getFP(goBase, goFp)
+		if err != nil { t.Fatalf("go fingerprint get failed: %v", err) }
+		if gStatus != 200 { t.Fatalf("go fingerprint GET returned %d", gStatus) }
+		if !strings.Contains(string(gBody), goUserID) {
+			t.Fatalf("go fingerprint lookup returned unexpected body: %s", string(gBody))
+		}
+
 		return
 	}
 

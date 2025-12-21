@@ -120,3 +120,17 @@ export async function removeSSHKey(userId, keyId) {
     return false
   }
 }
+
+// ---- Fingerprint lookup support ----
+export async function getSSHKeyByFingerprint(fingerprint) {
+  const url = `${DEFAULT_BASE.replace(/\/$/, '')}/internal/api/ssh-keys/${encodeURIComponent(fingerprint)}`
+  try {
+    const res = await fetch(url, { method: 'GET', headers: { Authorization: authHeader(), Accept: 'application/json' } })
+    if (res.status === 200) return await res.json()
+    if (res.status === 404) return null
+    return null
+  } catch (err) {
+    logger.err({ err }, 'webprofile fingerprint lookup call failed')
+    return null
+  }
+}

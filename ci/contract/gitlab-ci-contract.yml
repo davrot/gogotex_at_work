@@ -125,6 +125,34 @@ ssh_keys_parity_check:
     PARITY_USER: ${PARITY_USER:-parity-user}
     MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017/sharelatex}
 
+# E2E delegation parity check — runs Playwright-focused delegation flow when requested
+ssh_delegation_parity_check:
+  stage: contract
+  when: always
+  allow_failure: true
+  script:
+    - chmod +x scripts/ci/run_ssh_smoke_ci.sh
+    - |
+      set -euo pipefail
+      NODE_BASE=${NODE_BASE:-http://develop-web-1:3000}
+      GO_BASE=${GO_BASE:-http://webprofile-api-ci:3900}
+      PARITY_USER=${PARITY_USER:-parity-delegation}
+      export MONGO_URI=${MONGO_URI:-mongodb://mongo:27017/sharelatex}
+      echo "Running delegation parity smoke test (node=$NODE_BASE go=$GO_BASE)"
+      # Run the smoke CI wrapper with delegation parity mode
+      DELEGATION_PARITY=1 AUTH_SSH_USE_WEBPROFILE_API='true' CONFIRM_DEV_SETUP=true CONFIRM_BASE_URL=true BASE_URL=${BASE_URL:-http://develop-webpack-1:3808} COMPOSE_FILE=${COMPOSE_FILE:-develop/docker-compose.yml} PROJECT_DIR=${PROJECT_DIR:-develop} ./scripts/ci/run_ssh_smoke_ci.sh
+  timeout: 30m
+  artifacts:
+    when: always
+    paths:
+      - services/web/test/e2e/playwright/out/*
+    expire_in: 1 week
+  variables:
+    NODE_BASE: ${NODE_BASE}
+    GO_BASE: ${GO_BASE}
+    PARITY_USER: ${PARITY_USER:-parity-delegation}
+    MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017/sharelatex}
+
 # Strict parity runner — triggers when repo contains ci/PARITY_STRICT (intended to be added to default branch when parity is stable)
 ssh_keys_parity_required:
   stage: contract
