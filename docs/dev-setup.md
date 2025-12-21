@@ -291,6 +291,21 @@ You can configure `web` to delegate token introspection and token management to 
 export AUTH_LOCAL_INTROSPECT_URL=http://localhost:3900
 # enable delegation
 export AUTH_TOKEN_USE_WEBPROFILE_API=true
+
+# Running the WebProfile (Go shim) locally
+# - Build and run the shim locally with Go 1.25+ and point it at the same Mongo instance used by your `develop` compose network:
+#   go build -o /tmp/webprofile-api ./services/git-bridge/cmd/webprofile-api && MONGO_URI="mongodb://mongo:27017/sharelatex" /tmp/webprofile-api &
+# - Or use the helper that attaches the shim to your `develop` compose network:
+#   ./scripts/contract/run_webprofile_in_network.sh webprofile-api-local
+# - In CI the `contract-tests-gating` workflow writes an `.env.ci` file and passes it to `docker compose` so the web service will get:
+#   AUTH_TOKEN_USE_WEBPROFILE_API=true
+#   AUTH_LOCAL_INTROSPECT_URL=http://webprofile-api-ci:3900
+#   WEBPROFILE_ADMIN_USER=overleaf
+#   WEBPROFILE_ADMIN_PASS=overleaf
+# - To run local parity checks against a running `develop` stack (or the shim started above):
+#   AUTH_TOKEN_ALLOW_BCRYPT_FALLBACK=true ./scripts/contract/compare_tokens_parity.sh http://develop-web-1:3000 http://localhost:3900 <user>
+# - For debugging, the `scripts/contract` directory contains helper scripts to start the shim and compare introspect/token parity.
+
 ```
 
 When enabled, `web` will call the Go shim for `introspect` and token create/list/revoke; this helps test parity and enables a phased cutover (the legacy Node manager is used as a fallback if the Go shim is unavailable).
