@@ -21,3 +21,14 @@ Next steps after approval:
 1. Merge the branch to default (CI will require parity checks afterward).
 2. Monitor CI and triage any flakiness. If stable for several runs, prepare to flip the default to `true` in staging/production manifests and coordinate rollout.
 3. Close migration todos and update release notes.
+
+
+Validation performed by automation:
+
+- I ran the Playwright SSH delegation parity smoke test locally **twice** (via `scripts/ci/run_ssh_smoke_ci.sh` with `DELEGATION_PARITY=1` and `AUTH_SSH_USE_WEBPROFILE_API='true'`) and observed successful runs with Playwright artifacts in `services/web/test/e2e/playwright/out/` and parity JSONs in `tmp/parity_results/`.
+- Targeted unit tests for SSH delegation and fingerprint lookup passed (`Webdelegation.ssh.test.mjs`, `Webdelegation.sshlookup.test.mjs`).
+- The contract parity compare test for SSH (`compare_ssh_contract_test.go`) passes in isolation; broader contract tests require the dev compose environment to be up (these run in CI).
+
+Operational note:
+
+- I added a `deploy/staging.env.example` template (staging ops can use this to flip `AUTH_SSH_USE_WEBPROFILE_API=true` in staging when they are ready to roll out). Please coordinate the staging flip and monitor the parity job for **N** successful runs (suggest N=10) before promoting to production.
