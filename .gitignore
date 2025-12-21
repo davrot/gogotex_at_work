@@ -7,7 +7,6 @@ docker-compose.override.yml
 other_mods
 node_modules
 services/web/node_modules
-develop_llm
 # Build and output
 dist/
 build/
