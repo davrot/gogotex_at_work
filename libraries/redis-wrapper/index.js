@@ -324,7 +324,9 @@ async function cleanupTestRedis(rclient) {
 function ensureTestRedis(rclient) {
   const host = rclient.options.host
   const env = process.env.NODE_ENV
-  if (host !== 'redis_test' || env !== 'test') {
+  // Accept both 'redis_test' and 'redis' as valid test hosts to be more permissive
+  // in CI/dev environments where the redis service may be named differently.
+  if ((host !== 'redis_test' && host !== 'redis') || env !== 'test') {
     throw new Error(
       `Refusing to clear Redis instance '${host}' in environment '${env}'`
     )

@@ -3,7 +3,7 @@
 
 **Feature Branch**: `001-ssh-git-auth`  
 **Created**: 2025-12-10  
-**Status**: Draft  
+**Status**: Draft
 
 **Naming (branding)**: Throughout this migration we'll use the label **GoGoTeX** to refer to Go-based replacements of Overleaf backend components (for example, `git-bridge` → `git-bridge-go` or `web-profile` → `web-profile-gogotex`). Use the **GoGoTeX** label in documentation, service names, and image tags to clearly indicate migrated components.
 
@@ -76,13 +76,17 @@ As an Overleaf user, I want to manage my SSH keys in the Overleaf web UI so that
 - **FR-001**: Remove all HTTP/S and OAuth2 authentication mechanisms from `git-bridge` and ensure no codepath accepts HTTP Basic Auth or OAuth2 tokens for Git operations.
 - **FR-002**: Implement SSH-based Git authentication exclusively for all Git operations handled by `git-bridge`.
 - **FR-003**: Remove all references to legacy/deprecated APIs and components (including OAuth2 filter and related modules) from the `git-bridge` codebase and configuration.
-- **FR-004**: Validate SSH keys used for Git operations by retrieving the user's public SSH keys via the internal authenticated web-profile API. `git-bridge` MUST use this API; direct MongoDB reads from `git-bridge` are not permitted unless explicitly authorized and documented.
-- **FR-005**: Reject all attempts to authenticate using HTTP Basic Auth or OAuth2 tokens; responses MUST NOT reveal that these methods ever existed (opaque rejection behavior).
+- **FR-004 (consolidated)**: SSH key retrieval and storage MUST be handled via the internal authenticated WebProfile API. `git-bridge` MUST call `WebProfileClient.getUserSSHKeys(userId)` (or equivalent) to obtain the authoritative list of public keys for a user; direct DB reads by `git-bridge` are disallowed unless explicitly authorized and documented. The web service MUST persist SSH key records under the user's profile (attributes: `user_id`, `key_name`, `public_key`, `fingerprint`, `private_key_hash` (optional, non-reversible), `created_at`, `updated_at`).
+- **FR-005 (clarified)**: Deprecated auth attempts (HTTP Basic, OAuth2) MUST be rejected with a consistent, opaque response: HTTP 401, `Content-Type: application/json`, and body `{"error":"unauthorized"}`. The response MUST not leak which auth methods were supported historically. Security logs MUST record an event with fields: `event="deprecated_auth_attempt"`, `method="http-basic|oauth2"`, `source_ip`, `user_agent`, `timestamp`, and a correlation id; logs MUST NOT contain passwords, tokens, or private key material.
 - **FR-006**: Log security-relevant events related to authentication attempts (successful SSH auth, failed SSH auth, attempted use of deprecated methods) with sufficient context for audit trails while avoiding sensitive data leakage.
 - **FR-007**: Ensure compatibility with the Overleaf development environment: Docker environment variables, build scripts, and container restart workflow must continue to work for `git-bridge` development and debugging.
-- **FR-008**: Integrate SSH key storage and retrieval with existing user profile management in the web service; keys MUST be persisted in MongoDB under the user's profile.
 - **FR-009**: Provide UI components in the web UI for adding, listing, and revoking SSH public keys from the user's account settings; these UI changes are part of this feature's scope and must be wired to storage.
 - **FR-010**: Ensure private keys are never stored in full plaintext; only public keys and optional hashed metadata (`private_key_hash`) are stored as described in Assumptions.
+
+**Duplicate-key policy**: Key fingerprint MUST be globally unique across users. Adding a public key whose fingerprint already exists:
+
+- if owned by the same user → idempotent: return HTTP 200 and the existing key resource (no duplicate created).
+- if owned by a different user → reject with HTTP 409 Conflict and a structured audit log event: `event="ssh_key_conflict"`, `fingerprint`, `existing_user_id`, `attempted_user_id`, `timestamp`.
 
 **Acceptance**: Add a test that attempts to POST a private key payload to the SSH key API and verifies the API returns 4xx and that no private key material is present in the DB, logs, or artifacts. (See task T034.)
 

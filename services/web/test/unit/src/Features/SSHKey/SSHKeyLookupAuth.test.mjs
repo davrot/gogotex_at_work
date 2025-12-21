@@ -5,7 +5,9 @@ import path from 'node:path'
 const modulePath = path.join(import.meta.dirname, '../../../../../app/src/Features/Discovery/DiscoveryRouter.mjs')
 
 describe('SSHKey lookup auth enforcement (unit)', function () {
-  beforeEach(async function (ctx) {
+  let ctx
+  beforeEach(async function () {
+    ctx = {}
     ctx.webRouter = {}
     ctx.privateApiRouter = { get: sinon.stub() }
     ctx.requirePrivateApiAuth = sinon.stub().returns('requirePrivate')

@@ -21,6 +21,10 @@ describe('UserSSHKeysController', function () {
     MockUserSSHKey.find = sinon.stub()
     MockUserSSHKey.findOneAndDelete = sinon.stub()
     MockUserSSHKey.findOne = sinon.stub()
+    // Default upsert behavior: simulate findOneAndUpdate with rawResult.value representing created doc
+    MockUserSSHKey.findOneAndUpdate = sinon.stub().returns({ exec: async () => ({ value: { _id: 'mock-k', fingerprint: 'SHA256:MOCK', userId: 'u1', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), keyName: '', publicKey: '' } }) })
+    // Provide a collection.insertOne stub for insert-fallback code paths
+    MockUserSSHKey.collection = { insertOne: sinon.stub().resolves({}) }
     ctx.UserSSHKey = MockUserSSHKey
     // Use absolute file URLs for mocks to match controller imports exactly
     // Mock both src and non-src paths to be robust against import resolution
@@ -65,6 +69,10 @@ describe('UserSSHKeysController', function () {
     vi.doMock(new URL('../../../../../app/src/Features/Authentication/SessionManager.mjs', import.meta.url).toString(), () => ({ default: { getLoggedInUserId: () => 'session-u' } }), { virtual: false })
     // re-import controller to pick up overridden mock
     const Controller = (await import(modulePath))
+    if (Controller && typeof Controller.__setUserSSHKeyForTest === 'function') Controller.__setUserSSHKeyForTest(ctx.UserSSHKey)
+
+    // Ensure the mocked upsert returns a doc that belongs to the session user
+    ctx.UserSSHKey.findOneAndUpdate = sinon.stub().returns({ exec: async () => ({ value: { _id: 'mock-k', fingerprint: 'SHA256:MOCK', userId: 'session-u', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), keyName: '', publicKey: '' } }) })
 
     ctx.req = { params: {}, body: { key_name: 's', public_key: 'ssh-ed25519 AAAAB3Nza' }, headers: {} }
     ctx.UserSSHKey.find.returns({ lean: () => ({ exec: async () => [] }) })
@@ -83,6 +91,7 @@ describe('UserSSHKeysController', function () {
     vi.doMock(new URL('../../../../../app/src/Features/Helpers/AdminAuthorizationHelper.mjs', import.meta.url).toString(), () => ({ default: { hasAdminAccess: () => false } }), { virtual: false })
     // re-import controller to pick up overridden mock
     const Controller = (await import(modulePath))
+    if (Controller && typeof Controller.__setUserSSHKeyForTest === 'function') Controller.__setUserSSHKeyForTest(ctx.UserSSHKey)
 
     ctx.req = { params: { userId: 'other' }, body: { key_name: 's', public_key: 'ssh-ed25519 AAAAB3Nza' }, headers: {} }
     ctx.UserSSHKey.find.returns({ lean: () => ({ exec: async () => [] }) })
@@ -106,6 +115,10 @@ describe('UserSSHKeysController', function () {
     vi.doMock(new URL('../../../../../app/src/Features/Authentication/SessionManager.mjs', import.meta.url).toString(), () => ({ default: { getLoggedInUserId: () => 'session-u', getSessionUser: () => ({ _id: 'session-u', isAdmin: true }) } }), { virtual: false })
     vi.doMock(new URL('../../../../../app/src/Features/Helpers/AdminAuthorizationHelper.mjs', import.meta.url).toString(), () => ({ default: { hasAdminAccess: () => true } }), { virtual: false })
     const Controller = (await import(modulePath))
+    if (Controller && typeof Controller.__setUserSSHKeyForTest === 'function') Controller.__setUserSSHKeyForTest(ctx.UserSSHKey)
+
+    // Ensure the mocked upsert returns a doc that belongs to the requested user when admin
+    ctx.UserSSHKey.findOneAndUpdate = sinon.stub().returns({ exec: async () => ({ value: { _id: 'mock-k', fingerprint: 'SHA256:MOCK', userId: 'other', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), keyName: '', publicKey: '' } }) })
 
     ctx.req = { params: { userId: 'other' }, body: { key_name: 's', public_key: 'ssh-ed25519 AAAAB3Nza' }, headers: {} }
     ctx.UserSSHKey.find.returns({ lean: () => ({ exec: async () => [] }) })
@@ -126,6 +139,7 @@ describe('UserSSHKeysController', function () {
     vi.resetModules()
     vi.doMock(new URL('../../../../../app/src/Features/Authentication/SessionManager.mjs', import.meta.url).toString(), () => ({ default: { getLoggedInUserId: () => 'session-l' } }), { virtual: false })
     const Controller = (await import(modulePath))
+    if (Controller && typeof Controller.__setUserSSHKeyForTest === 'function') Controller.__setUserSSHKeyForTest(ctx.UserSSHKey)
     ctx.req = { params: {}, headers: {} }
     ctx.UserSSHKey.find.returns({ lean: () => ({ exec: async () => [{ _id: 'k2', keyName: 'k', publicKey: 'ssh-rsa AAA', fingerprint: 'fp', createdAt: '2025-01-01', userId: 'session-l' } ] }) })
     await Controller.list(ctx.req, ctx.res)
@@ -139,6 +153,7 @@ describe('UserSSHKeysController', function () {
     vi.resetModules()
     vi.doMock(new URL('../../../../../app/src/Features/Authentication/SessionManager.mjs', import.meta.url).toString(), () => ({ default: { getLoggedInUserId: () => 'session-r' } }), { virtual: false })
     const Controller = (await import(modulePath))
+    if (Controller && typeof Controller.__setUserSSHKeyForTest === 'function') Controller.__setUserSSHKeyForTest(ctx.UserSSHKey)
     const fakeDoc = { _id: 'k3', fingerprint: 'SHA256:BBBB', userId: 'session-r' }
     ctx.UserSSHKey.findOneAndDelete.resolves(fakeDoc)
     ctx.req = { params: { keyId: 'k3' }, headers: {} }

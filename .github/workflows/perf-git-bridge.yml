@@ -1,0 +1,21 @@
+name: Perf: git-bridge
+
+on:
+  schedule:
+    - cron: '0 2 * * *' # run daily at 02:00 UTC
+  workflow_dispatch: {}
+
+jobs:
+  run-perf:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Git
+        run: sudo apt-get update && sudo apt-get install -y git jq
+      - name: Run perf benchmark
+        run: bash services/git-bridge/test/perf/benchmark_clone_push.sh | tee perf.out
+      - name: Upload perf results
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf/git-bridge-$(date +'%Y%m%d')
+          path: services/git-bridge/test/perf/report.json

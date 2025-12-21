@@ -217,6 +217,47 @@ Starting the `web` service in development mode will update the backend automatic
 
 ## MongoDB initialization
 
+## SSH key parity checks (Node vs Go) 🔁
+
+We run a non-blocking parity check in CI that compares the Node `web` and the Go `webprofile-api` shim for the SSH key endpoints. This job is currently allowed to fail until parity is fully stable.
+
+To run the parity check locally, ensure `web` (Node) is reachable (for example `http://develop-web-1:3000`) and the Go shim is running locally on `:3900` (or pass a custom `GO_BASE`). Then run:
+
+````bash
+scripts/contract/compare_ssh_parity.sh http://develop-web-1:3000 http://webprofile-api-ci:3900 my-compare-user
+
+# If you want to target a shim running on the host (not in the compose network), pass `http://localhost:3900` explicitly as the GO_BASE parameter.
+
+Helper: to start the Go shim attached to the local `develop_default` compose network run:
+
+```bash
+# builds image and attaches container to the develop network (publish port 3900 to host)
+./scripts/contract/run_webprofile_in_network.sh
+# Then from your dev container or other containers on the develop_default network use:
+#   http://webprofile-api-ci:3900
+# If you need to reach the shim from your host machine you may use http://localhost:3900
+````
+
+````
+
+If the Node web instance requires authentication for POSTs, the script will seed keys directly into MongoDB (using `services/web/tools/seed_ssh_key.mjs`) and compare GET responses instead.
+
+CI behaviour: The `ssh_keys_parity_check` job will try to start the Go shim automatically in one of three ways (in order):
+
+- If `go` is installed in the runner, it builds and runs the binary locally.
+- Else if `docker` is available, it builds a `webprofile-api` image from `services/git-bridge/cmd/webprofile-api` and runs it as a container (port 3900 exposed).
+- Otherwise it expects a reachable `GO_BASE` endpoint and logs a warning if it cannot start the shim.
+
+The job waits for the shim to be responsive and runs `scripts/contract/compare_ssh_parity.sh`. The job uploads the parity outputs to `tmp/parity_results/` as job artifacts (available in the job UI) for debugging failures.
+
+We also include a scheduled (`ssh_keys_parity_nightly`) runner that re-runs the parity comparison multiple times (default 5 runs) to detect flakiness over time; its artifacts are also uploaded to `tmp/parity_results/`.
+
+When parity is stable and you want the CI to block on parity divergence, create the repository toggle file `ci/PARITY_STRICT` with content `true` and merge it to the default branch. The `ssh_keys_parity_check` job inspects `ci/PARITY_STRICT` at runtime; when present and set to `true` parity failures will fail the pipeline. Otherwise parity failures are recorded but non-blocking.
+
+Before enabling strict mode, run the **Validation** job (`ssh_keys_parity_validation`) manually from the Pipelines page (it performs multiple consecutive parity runs and will fail if any mismatch occurs). If the validation job succeeds reliably (e.g., 10 runs pass), add `ci/PARITY_STRICT` (content `true`) via PR and merge it to make parity mismatches block merges. Artifacts from validation runs are saved to `tmp/parity_results/` to aid debugging.
+
+## MongoDB initialization
+
 The development compose setup provides a MongoDB service (`mongo`) configured to run as a replica set named `overleaf` and mounts an initialization script at `/docker-entrypoint-initdb.d/mongodb-init-replica-set.js`. Follow these steps to ensure the replica set is initialized and reachable:
 
 1. Start the `mongo` container (it is started automatically by `bin/up`):
@@ -227,7 +268,7 @@ cd develop
 bin/up
 # or start only mongo
 docker compose -f develop/docker-compose.yml up -d mongo
-```
+````
 
 2. Wait for the container to accept connections and for the init script to run. You can follow the logs:
 

@@ -12,6 +12,11 @@
 - [ ] T041 Replace Java/Maven CI & build with Go modules — update `.github/workflows/*` to run `go build` and `go test`, include `go vet`/`golangci-lint`, and ensure CI artifacts are produced where needed.
   - Acceptance: CI job builds and runs Go tests successfully.
 
+- [x] T041a Add CI parity job to run SSH key endpoint parity between Node and Go — implement a contract-stage job that builds/starts the Go `webprofile-api` shim, runs `scripts/contract/compare_ssh_parity.sh`, and fails the job on divergence. Initially mark `allow_failure: true` until parity is stable; flip to required when tests are reliable. — **Status: completed**
+
+- [x] T041b Add validation job and run-book to validate parity stability before flipping strictness — implement `ssh_keys_parity_validation` (manual job) that runs parity multiple times and fails on any mismatch; document run-book and flip criteria (e.g., 10 consecutive passes). — **Status: completed**
+  - Acceptance: `ci/contract/gitlab-ci-contract.yml` includes `ssh_keys_parity_check` job; job builds `services/git-bridge/cmd/webprofile-api` if `go` is available and runs the parity script; job exits non-zero on fingerprint mismatch.
+
 - [ ] T042 Port `git-bridge` code from Java to Go — implement SSH server, fingerprint→user lookup, introspection client, membership checks, audit logging, and existing feature contracts in Go.
   - Acceptance: `go test ./...` covers ported unit tests and passes. **Status:** initial skeleton (health endpoint, repo-path parsing, auth manager stub) added; basic lookup client implemented; further porting required.
 
