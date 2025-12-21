@@ -3,9 +3,15 @@ import crypto from 'crypto'
 import { createRequire } from 'module'
 const require = createRequire(import.meta.url)
 
+// Ensure module picks up local DB behavior (opt out of WebProfile delegation)
+const _origUseWebprofile = process.env.AUTH_TOKEN_USE_WEBPROFILE_API
+process.env.AUTH_TOKEN_USE_WEBPROFILE_API = 'false'
 // Import manager module (default export)
 const managerModule = await import('../../../../../app/src/Features/Token/PersonalAccessTokenManager.mjs')
 const manager = managerModule.default
+// restore env for other tests
+if (_origUseWebprofile === undefined) delete process.env.AUTH_TOKEN_USE_WEBPROFILE_API
+else process.env.AUTH_TOKEN_USE_WEBPROFILE_API = _origUseWebprofile
 
 // Import the model and stub `find` to inspect queries
 const PersonalAccessTokenModel = require('../../../../../app/src/models/PersonalAccessToken')

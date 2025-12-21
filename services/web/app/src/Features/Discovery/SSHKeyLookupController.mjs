@@ -34,6 +34,32 @@ export async function lookup(req, res) {
   }
 
   try {
+    // If configured, delegate fingerprint lookup to Go webprofile API (opt-in)
+    if (process.env.AUTH_SSH_USE_WEBPROFILE_API === 'true') {
+      try {
+        const client = await import(new URL('../Token/WebProfileClient.mjs', import.meta.url).href)
+        const resObj = await client.getSSHKeyByFingerprint(fingerprint)
+        if (resObj && resObj.userId) {
+          // Cache the positive/negative result as before
+          try { const lookupCacheModule = await import('../../lib/lookupCache.mjs'); const lookupCache = (lookupCacheModule && lookupCacheModule.default) || lookupCacheModule; lookupCache && lookupCache.set && lookupCache.set(fingerprint, { userId: resObj.userId }, Number(process.env.CACHE_LOOKUP_TTL_SECONDS || 60)) } catch (e) {}
+          timer.done()
+          metrics.inc('ssh.key_lookup.hit', 1)
+          return res.status(200).json({ userId: String(resObj.userId) })
+        }
+        if (resObj && resObj.notFound) {
+          // explicit 404 from upstream
+          try { const lookupCacheModule = await import('../../lib/lookupCache.mjs'); const lookupCache = (lookupCacheModule && lookupCacheModule.default) || lookupCacheModule; lookupCache && lookupCache.set && lookupCache.set(fingerprint, null, Number(process.env.CACHE_NEGATIVE_TTL_SECONDS || 5)) } catch (e) {}
+          timer.done()
+          metrics.inc('ssh.key_lookup.miss', 1)
+          return res.status(404).json({})
+        }
+        // If resObj is undefined it indicates an unexpected error in the delegation call; fall through to DB-backed lookup
+        // If resObj contains { error: true } (non-404 non-200), also fall back to DB for resilience
+      } catch (e) {
+        try { logger.err({ err: e, fingerprint }, 'webprofile ssh fingerprint delegation failed, falling back to DB') } catch (ee) {}
+      }
+    }
+
     // caching: consult lookup cache first
     try { const lookupCacheModule = await import('../../lib/lookupCache.mjs'); const lookupCache = (lookupCacheModule && lookupCacheModule.default) || lookupCacheModule; const cached = lookupCache && lookupCache.get && lookupCache.get(fingerprint); if (typeof cached !== 'undefined') { timer.done(); metrics.inc(cached ? 'ssh.key_lookup.hit' : 'ssh.key_lookup.miss', 1); if (!cached) return res.status(404).json({}); return res.status(200).json({ userId: String(cached.userId) }) } } catch (e) {}
 

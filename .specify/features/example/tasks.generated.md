@@ -6,7 +6,7 @@
 
 **Goal:** Replace the Java implementation of `git-bridge` with a Go implementation, update the dev/test/CI tooling, and port all tests and benchmarks so the repository no longer requires Java maintenance.
 
-- [x] T040 Setup Go toolchain in dev environment (devcontainer/Dockerfile, Makefile) — install Go 1.21+ in dev container and provide `make build`/`make test`/`make bench` targets in `services/git-bridge`.
+- [x] T040 Setup Go toolchain in dev environment (devcontainer/Dockerfile, Makefile) — install Go 1.25+ in dev container and provide `make build`/`make test`/`make bench` targets in `services/git-bridge`.
   - Acceptance: `make build` produces `services/git-bridge/bin/git-bridge`; `make test` runs Go unit tests locally. **Status:** skeleton added (Makefile targets, `go.mod`, minimal `cmd/` and `internal/` packages).
 
 - [ ] T041 Replace Java/Maven CI & build with Go modules — update `.github/workflows/*` to run `go build` and `go test`, include `go vet`/`golangci-lint`, and ensure CI artifacts are produced where needed.
@@ -21,7 +21,7 @@
 - [ ] T044 Migrate benchmarks & harness to target Go binary — ensure `ci/benchmarks` can invoke the Go binary in dev and CI to produce p50/p95/p99 artifacts.
   - Acceptance: Bench harness produces artifacts and meets gating requirements in CI.
 
-- [ ] T045 Remove Java sources and Maven configs after successful migration — deprecate and remove `pom.xml`, `src/main/java`, and Java test directories when CI shows parity.
+- [x] T045 Remove Java sources and Maven configs after successful migration — deprecate and remove `pom.xml`, `src/main/java`, and Java test directories when CI shows parity.
   - Acceptance: No Java build steps remain in CI and Java sources removed from repo.
 
 - [ ] T046 Update docs, `spec.md`, `plan.md`, and README to describe Go-based development and testing instructions.

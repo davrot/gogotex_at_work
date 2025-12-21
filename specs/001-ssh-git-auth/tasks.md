@@ -72,18 +72,29 @@ description: "Tasks for SSH-only Git authentication feature"
 
 **Independent Test**: Use UI automation or API tests to add a key via the web UI, verify persistence in MongoDB (through web-profile API), and confirm auth via git-bridge integration test from US1.
 
-### Tests
+---
 
-- [ ] T019 [P] [US3] Add backend contract tests for the web-profile SSH key endpoints: services/web/test/unit/src/User/UserSSHKeysController.test.mjs
-- [ ] T020 [P] [US3] Add frontend unit/component tests for the account settings SSH Keys component: services/web/test/frontend/features/settings/components/ssh-keys.test.tsx
+## Phase N: Polish & Cross-Cutting Concerns
 
-### Implementation
+- [ ] T026 [P] Update codebase scanning/CI to assert no OAuth2/HTTP Basic handlers remain in services/git-bridge: .github/workflows/\*\* or CI scripts
+- [ ] T027 (updated) [P] Add performance harness, benchmarks, and CI gating for clone/push latency:
+  - Add a benchmark script `services/git-bridge/test/perf/benchmark_clone_push.sh` (or Go harness) that runs clone/push against a representative repo (<=1MB, <=10 files) and emits JSON metrics: p50,p95,p99, errors, and duration.
+  - Define thresholds: p95 < 2s, p99 < 10s; scheduled perf job fails if thresholds exceeded.
+  - Add a GitHub Actions workflow `.github/workflows/perf-git-bridge.yml` that runs nightly and archives results as artifacts `perf/git-bridge-YYYYMMDD.json`.
+  - Add a lightweight on-PR smoke job (5 runs) that warns on regressions (non-blocking).
+- [ ] T028 [P] Update developer quickstart and docker-compose dev files to document SSH-only testing and env vars: develop/docker-compose.dev.yml and services/git-bridge/README.md
+- [ ] T029 [P] Security review and documentation updates in docs/security/ssh-git-auth.md
+- [ ] **T034 [P] Validate private-key handling**: Add integration and unit tests to assert that private keys are never persisted to MongoDB or application logs. Tests MUST:
+  - verify back-end controller endpoints (web-profile controller and any import APIs) reject or strip private-key submissions,
+  - assert DB documents for SSH keys contain only public key and optional non-reversible metadata (e.g., `private_key_hash`), and
+  - add a CI gate that fails if any test detects private-key storage or leakage.
 
-- [ ] T021 [US3] Add backend controller for SSH key CRUD in services/web/app/src/Features/User/UserSSHKeysController.mjs (endpoints: GET /internal/api/users/:userId/ssh-keys, POST /internal/api/users/:userId/ssh-keys, DELETE /internal/api/users/:userId/ssh-keys/:keyId)
-- [ ] T022 [US3] Wire controller routes in services/web/app/src/express-app.js or routing registration file used by the web service
-- [ ] T023 [US3] Add frontend account settings component and wiring: services/web/frontend/js/features/settings/components/ssh-keys.tsx and integrate into services/web/frontend/js/features/settings/components/root.tsx
-- [ ] T024 [US3] Add server-side validation to reject malformed SSH public keys in services/web/app/src/Features/User/UserSSHKeysController.mjs
-- [ ] T025 [US3] Add integration test that verifies key added via web UI is returned by WebProfileClient and usable by git-bridge integration tests: services/web/test/integration/user_ssh_keys.integration.mjs
+- [ ] T035 Consolidate SSH key FRs (merge FR-004/FR-008) and add contract tests to validate retrieval & storage contract (update spec.md accordingly)
+- [ ] T036 Add opaque rejection tests for deprecated auth methods and assert structured logging (see FR-005)
+- [ ] T037 Add duplicate-key behaviour tests (idempotent for same-user, 409 for conflict) and controller assertions
+- [ ] T038 Replace `/tmp/ssh_upsert_debug.log` with structured logger events and add unit tests verifying emitted fields (no private key data)
+- [ ] T039 Add metrics instrumentation for SSH upsert flows and a smoke test validating counters/histograms
+- [ ] T040 Add env flag to gate verbose debug logs (staging only) and remove production reliance on `/tmp` debug files
 
 ---
 

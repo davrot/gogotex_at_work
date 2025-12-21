@@ -167,7 +167,7 @@ services:
   git-bridge:
     build:
       context: ../services/git-bridge
-      dockerfile: Dockerfile.go
+      dockerfile: Dockerfile.builder
     env_file:
       - dev.env
     environment:

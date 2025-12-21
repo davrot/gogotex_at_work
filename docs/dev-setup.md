@@ -2,6 +2,12 @@
 
 This document provides a concise overview for getting the development environment running locally.
 
+## Quick start (minimal)
+
+- Install Node.js (via nvm) and Go (>= 1.25). See sections below for details.
+- Start a local MongoDB (via `docker compose` or your preferred method).
+- Build and run `webprofile-api` shim for contract/consistency checks: see **Spec Kit** later in this doc.
+
 ## Prerequisites
 
 - Install Node.js via `nvm` (recommended):
@@ -29,11 +35,25 @@ npx playwright install
 npx playwright install-deps
 ```
 
-- Java & Maven (required by some services/build tasks):
+- Go (required for git-bridge now):
 
-Install OpenJDK 21 (or newer) and Maven 3.8+ on Linux or macOS. Several git-bridge tests and builds target Java 21, so please prefer a Java 21 JDK for local development.
+Install Go 1.25+ on Linux or macOS. The `git-bridge` service now uses a Go implementation; please prefer Go 1.25+ for local development.
 
-Debian/Ubuntu (apt; Corretto/Temurin examples):
+Debian/Ubuntu (apt example):
+
+Option A — Install Go via apt (example):
+
+```bash
+sudo apt-get update
+sudo apt-get install -y golang-go
+```
+
+If you cannot (or prefer not to) install Go locally, you can use the Docker-backed Makefile targets provided in `services/git-bridge`:
+
+- Build with Docker: `make docker-go-build` (uses `golang:1.25` by default)
+- Run tests with Docker: `make docker-go-test`
+
+> **Note**: The legacy Java/Maven instructions have been deprecated and removed from the primary workflows. If you require Java-based builds, use an archived branch or request a temporary re-enable.
 
 Option A — Amazon Corretto 21 (apt):
 
@@ -42,7 +62,7 @@ Option A — Amazon Corretto 21 (apt):
 sudo curl -fsSL https://apt.corretto.aws/corretto.key | sudo apt-key add -
 echo "deb https://apt.corretto.aws stable main" | sudo tee /etc/apt/sources.list.d/corretto.list
 sudo apt-get update
-sudo apt-get install -y java-21-amazon-corretto-jdk maven
+sudo apt-get install -y golang-go
 ```
 
 Option B — Temurin 21 (if available for your distro):
@@ -69,8 +89,8 @@ macOS (Homebrew):
 
 ```bash
 brew update
-brew install temurin21 maven
-# follow any post-install instructions to set JAVA_HOME if shown
+brew install golang
+# follow any post-install instructions to set GOPATH/GOROOT if shown
 ```
 
 Verify the installations:
@@ -90,30 +110,26 @@ If your environment uses the VS Code dev container, install Java/Maven on the ho
 
 Running Maven tests without host JDK 21:
 
-If you cannot (or prefer not to) install JDK 21 on your host, you can run Maven in a container that provides Java 21:
+If you cannot (or prefer not to) install Go on your host, you can use the Docker-backed make targets which run Go inside a container (see above), or use the `golang:1.25` container directly for temporary builds/tests:
 
 ```bash
-docker run --rm -v /absolute/path/to/services/git-bridge:/app -w /app maven:3-amazoncorretto-21-debian mvn -Dtest=WebProfileUserKeysAuthContractTest test
+docker run --rm -v /absolute/path/to/services/git-bridge:/app -w /app golang:1.25 sh -c "go test ./... -v"
 ```
 
 This is a convenient fallback for CI-like test runs or temporary verification.
 
 ### Running integration (E2E) tests locally
 
-Integration and end-to-end tests have their own Maven profile named `integration-tests` which uses the Failsafe plugin. To run all integration tests locally:
+Integration and end-to-end tests were previously implemented in Java/Maven. For the Go migration, prefer running the Go-based integration tests and the contract tests against the Go shim. If you need to run the archived Java integration tests, run them from the archived branch or re-enable the legacy job temporarily via the `LEGACY_JAVA_RUN` toggle in CI.
+
+For Go-based tests run locally:
 
 ```bash
-# Run all integration tests (may take longer)
-mvn -Pintegration-tests -DskipTests=false verify
+cd services/git-bridge
+make go-test
+# or (Docker-backed)
+make docker-go-test
 ```
-
-To run a single integration test class:
-
-```bash
-mvn -Pintegration-tests -DskipTests=false -Dit.test=WebProfileSSHServerE2ETest verify
-```
-
-Note: The CI configuration already runs the SSH E2E tests in the `gitbridge_ssh_e2e` job defined in `ci/contract/gitlab-ci-contract.yml`.
 
 ## Build & Start Services
 
@@ -125,7 +141,12 @@ bin/build
 bin/up
 ```
 
-If you only need to build or run the `git-bridge` service during development or for contract tests, you can build/start it individually. Building `git-bridge` requires Java 21 and Maven (see the Java & Maven section above):
+**Host vs Container networking note:**
+
+- If you run commands from your **host shell**, `localhost` / `127.0.0.1` refers to services published to the host (for example the Mongo port `127.0.0.1:27017` is accessible from the host). Use `http://localhost:3900` to reach a shim you started on the host.
+- If you run commands from **inside the VS Code dev container** or another container, `localhost` refers to _that container_ and will NOT reach other services. In that case use compose service hostnames on the develop network (for example `http://develop-web-1:3000` or `http://webprofile-api-ci:3900`).
+
+If you only need to build or run the `git-bridge` service during development or for contract tests, you can build/start it individually. `git-bridge` is implemented in **Go**; use the Go build or the provided Docker-backed Makefile targets. If you need the legacy Java/Maven build, it is archived — check out the `archive/java-git-bridge` branch or contact the maintainers for a temporary re-enable.
 
 ```bash
 # Build just the git-bridge image using the develop compose setup
@@ -217,6 +238,98 @@ Starting the `web` service in development mode will update the backend automatic
 
 ## MongoDB initialization
 
+## SSH key parity checks (Node vs Go) 🔁
+
+We run a non-blocking parity check in CI that compares the Node `web` and the Go `webprofile-api` shim for the SSH key endpoints. This job is currently allowed to fail until parity is fully stable.
+
+To run the parity check locally, ensure `web` (Node) is reachable (for example `http://develop-web-1:3000`) and the Go shim is running locally on `:3900` (or pass a custom `GO_BASE`). Then run:
+
+````bash
+scripts/contract/compare_ssh_parity.sh http://develop-web-1:3000 http://webprofile-api-ci:3900 my-compare-user
+
+# If you want to target a shim running on the host (not in the compose network), pass `http://localhost:3900` explicitly as the GO_BASE parameter.
+
+Helper: to start the Go shim attached to the local `develop_default` compose network run:
+
+```bash
+# builds image and attaches container to the develop network (publish port 3900 to host)
+./scripts/contract/run_webprofile_in_network.sh
+# Then from your dev container or other containers on the develop_default network use:
+#   http://webprofile-api-ci:3900
+# If you need to reach the shim from your host machine you may use http://localhost:3900
+````
+
+**Spec Kit:** For a provider-agnostic runbook (build shim, run contract tests, run integration script), see **`.specify/features/example/ci.md`**.
+
+**Run membership contract test locally (example):**
+
+```bash
+# Start a local shim (see 'Build & Run webprofile-api (local)' in the Spec Kit)
+export TARGET_BASE_URL=http://localhost:3900
+cd services/git-bridge/test/contract
+TARGET_BASE_URL=${TARGET_BASE_URL} go test -run TestMembershipEndpointNonMemberForbidden ./... -v
+```
+
+### Token introspection integration test
+
+The introspection integration test requires a reachable MongoDB (`MONGO_URI`) and a running `webprofile-api` instance (default `http://localhost:3900`). You can set the `MONGO_URI` and `TARGET_BASE_URL` env vars when running the test:
+
+```bash
+# example (assumes a local mongodb on 27017 and shim on :3900)
+export MONGO_URI=mongodb://localhost:27017
+export TARGET_BASE_URL=http://localhost:3900
+cd services/git-bridge/test/contract
+MONGO_URI=${MONGO_URI} TARGET_BASE_URL=${TARGET_BASE_URL} go test -run TestIntrospectIntegration_Bcrypt -v
+```
+
+### Use Go shim for token operations (optional)
+
+You can configure `web` to delegate token introspection and token management to the Go `webprofile-api` by setting:
+
+```bash
+# point to the Go shim base URL
+export AUTH_LOCAL_INTROSPECT_URL=http://localhost:3900
+# enable delegation
+export AUTH_TOKEN_USE_WEBPROFILE_API=true
+
+# Running the WebProfile (Go shim) locally
+# - Build and run the shim locally with Go 1.25+ and point it at the same Mongo instance used by your `develop` compose network:
+#   go build -o /tmp/webprofile-api ./services/git-bridge/cmd/webprofile-api && MONGO_URI="mongodb://mongo:27017/sharelatex" /tmp/webprofile-api &
+# - Or use the helper that attaches the shim to your `develop` compose network:
+#   ./scripts/contract/run_webprofile_in_network.sh webprofile-api-local
+# - In CI the `contract-tests-gating` workflow writes an `.env.ci` file and passes it to `docker compose` so the web service will get:
+#   AUTH_TOKEN_USE_WEBPROFILE_API=true
+#   AUTH_LOCAL_INTROSPECT_URL=http://webprofile-api-ci:3900
+#   WEBPROFILE_ADMIN_USER=overleaf
+#   WEBPROFILE_ADMIN_PASS=overleaf
+# - To run local parity checks against a running `develop` stack (or the shim started above):
+#   AUTH_TOKEN_ALLOW_BCRYPT_FALLBACK=true ./scripts/contract/compare_tokens_parity.sh http://develop-web-1:3000 http://localhost:3900 <user>
+# - For debugging, the `scripts/contract` directory contains helper scripts to start the shim and compare introspect/token parity.
+
+```
+
+When enabled, `web` will call the Go shim for `introspect` and token create/list/revoke; this helps test parity and enables a phased cutover (the legacy Node manager is used as a fallback if the Go shim is unavailable).
+
+````
+
+If the Node web instance requires authentication for POSTs, the script will seed keys directly into MongoDB (using `services/web/tools/seed_ssh_key.mjs`) and compare GET responses instead.
+
+CI behaviour: The `ssh_keys_parity_check` job will try to start the Go shim automatically in one of three ways (in order):
+
+- If `go` is installed in the runner, it builds and runs the binary locally.
+- Else if `docker` is available, it builds a `webprofile-api` image from `services/git-bridge/cmd/webprofile-api` and runs it as a container (port 3900 exposed).
+- Otherwise it expects a reachable `GO_BASE` endpoint and logs a warning if it cannot start the shim.
+
+The job waits for the shim to be responsive and runs `scripts/contract/compare_ssh_parity.sh`. The job uploads the parity outputs to `tmp/parity_results/` as job artifacts (available in the job UI) for debugging failures.
+
+We also include a scheduled (`ssh_keys_parity_nightly`) runner that re-runs the parity comparison multiple times (default 5 runs) to detect flakiness over time; its artifacts are also uploaded to `tmp/parity_results/`.
+
+When parity is stable and you want the CI to block on parity divergence, create the repository toggle file `ci/PARITY_STRICT` with content `true` and merge it to the default branch. The `ssh_keys_parity_check` job inspects `ci/PARITY_STRICT` at runtime; when present and set to `true` parity failures will fail the pipeline. Otherwise parity failures are recorded but non-blocking.
+
+Before enabling strict mode, run the **Validation** job (`ssh_keys_parity_validation`) manually from the Pipelines page (it performs multiple consecutive parity runs and will fail if any mismatch occurs). If the validation job succeeds reliably (e.g., 10 runs pass), add `ci/PARITY_STRICT` (content `true`) via PR and merge it to make parity mismatches block merges. Artifacts from validation runs are saved to `tmp/parity_results/` to aid debugging.
+
+## MongoDB initialization
+
 The development compose setup provides a MongoDB service (`mongo`) configured to run as a replica set named `overleaf` and mounts an initialization script at `/docker-entrypoint-initdb.d/mongodb-init-replica-set.js`. Follow these steps to ensure the replica set is initialized and reachable:
 
 1. Start the `mongo` container (it is started automatically by `bin/up`):
@@ -227,7 +340,7 @@ cd develop
 bin/up
 # or start only mongo
 docker compose -f develop/docker-compose.yml up -d mongo
-```
+````
 
 2. Wait for the container to accept connections and for the init script to run. You can follow the logs:
 

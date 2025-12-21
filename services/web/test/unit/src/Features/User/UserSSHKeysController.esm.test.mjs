@@ -61,6 +61,22 @@ describe('UserSSHKeysController (ESM)', async () => {
     UserSSHKey.find = vi.fn().mockReturnValue({ lean: () => ({ exec: async () => [] }) })
     UserSSHKey.findOne = vi.fn().mockReturnValue({ lean: () => ({ exec: async () => null }) })
     UserSSHKey.findOneAndDelete = vi.fn().mockReturnValue({ exec: async () => null })
+    // Default upsert behavior: respect the incoming update.$setOnInsert.userId and filter.fingerprint
+    UserSSHKey.findOneAndUpdate = vi.fn().mockImplementation((filter, update, options) => ({ exec: async () => {
+      // If a findOne mock reports an existing document, return it as the existing value
+      try {
+        if (UserSSHKey.findOne) {
+          const existing = await UserSSHKey.findOne(filter).lean().exec()
+          if (existing) {
+            // ensure createdAt is in the past so controller treats it as existing
+            const createdAt = new Date(Date.now() - 5000).toISOString()
+            return { value: { _id: existing._id || 'existing-id', fingerprint: existing.fingerprint || (filter && filter.fingerprint), userId: existing.userId, createdAt, updatedAt: existing.updatedAt || new Date().toISOString(), keyName: existing.keyName || existing.key_name || '' } }
+          }
+        }
+      } catch (e) {}
+      // Otherwise simulate a newly created doc from the upsert
+      return { value: { _id: 'mock-k', fingerprint: (filter && filter.fingerprint) || 'SHA256:MOCK', userId: (update && update.$setOnInsert && update.$setOnInsert.userId) || '000000000000000000000000', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), keyName: (update && update.$setOnInsert && update.$setOnInsert.keyName) || '' } }
+    } }))
 
     // Inject the mocked model into the controller for deterministic isolation
     if (Controller && typeof Controller.__setUserSSHKeyForTest === 'function') {

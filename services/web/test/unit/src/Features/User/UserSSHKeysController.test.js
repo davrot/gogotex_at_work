@@ -11,28 +11,38 @@ const userModelPath = path.resolve(__dirname, '../../../../../app/src/models/Use
 const lookupCachePath = path.resolve(__dirname, '../../../../../app/src/lib/lookupCache.mjs')
 
 describe('UserSSHKeysController', function () {
-  beforeEach(function () {
+  beforeEach(async function () {
     this.UserSSHKey = {
       find: sinon.stub(),
       findOneAndDelete: sinon.stub(),
       findOne: sinon.stub(),
+      // Default upsert behavior for tests
+      findOneAndUpdate: sinon.stub().returns({ exec: async () => ({ value: { _id: 'mock-k', fingerprint: 'SHA256:MOCK', userId: 'u1', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), keyName: '', publicKey: '' } }) }),
       prototype: {},
+      collection: { insertOne: sinon.stub().resolves({}) },
     }
+
     this.User = { findById: sinon.stub().resolves({ email: 'test@example.com' }) }
 
-    this.Controller = SandboxedModule.require(controllerPath, {
-      requires: {
-        [userSSHKeyModelPath]: { UserSSHKey: this.UserSSHKey },
-        [userModelPath]: { User: this.User },
-        [lookupCachePath]: { default: { set: () => {}, invalidate: () => {} } },
-        '@overleaf/logger': { info: () => {}, err: () => {} },
-      },
+    // Use dynamic import for the ESM controller and inject the mocked model via test hooks
+    const { pathToFileURL } = require('url')
+    return import(pathToFileURL(controllerPath).href).then((ControllerModule) => {
+      this.Controller = ControllerModule
+      if (ControllerModule && typeof ControllerModule.__setUserSSHKeyForTest === 'function') {
+        ControllerModule.__setUserSSHKeyForTest(this.UserSSHKey)
+      }
     })
+  })
+
+  afterEach(function () {
+    if (this.Controller && typeof this.Controller.__resetUserSSHKeyForTest === 'function') {
+      try { this.Controller.__resetUserSSHKeyForTest() } catch (e) {}
+    }
   })
 
   it('create returns 201 with fingerprint and caches', async function () {
     this.UserSSHKey.find.returns({ lean: () => ({ exec: async () => [] }) })
-    const req = { params: { userId: 'u1' }, body: { key_name: 'test', public_key: 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCy...fixture' } }
+    const req = { params: { userId: 'u1' }, body: { key_name: 'test', public_key: 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCy1234567890ABCDEFG=' } }
     const res = new MockResponse()
 
     await this.Controller.create(req, res)

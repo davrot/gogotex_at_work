@@ -12,6 +12,8 @@ jobs:
   contract-tests:
     runs-on: ubuntu-latest
     environment: ci
+    env:
+      AUTH_TOKEN_USE_WEBPROFILE_API: "true"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -27,11 +29,38 @@ jobs:
 
       - name: Start services (docker-compose)
         run: |
-          docker compose -f develop/docker-compose.yml up -d --build
+          echo "AUTH_TOKEN_USE_WEBPROFILE_API=true" > .env.ci
+          echo "AUTH_LOCAL_INTROSPECT_URL=http://webprofile-api-ci:3900" >> .env.ci
+          echo "WEBPROFILE_ADMIN_USER=overleaf" >> .env.ci
+          echo "WEBPROFILE_ADMIN_PASS=overleaf" >> .env.ci
+          docker compose --env-file .env.ci -f develop/docker-compose.yml up -d --build
 
       - name: Wait for services
         run: |
           ./develop/bin/wait 300
+
+      - name: Start Go webprofile-api in compose network
+        run: |
+          ./scripts/contract/run_webprofile_in_network.sh webprofile-api-ci
+
+      - name: Wait for webprofile-api
+        run: |
+          for i in $(seq 1 10); do
+            if curl -sS -u overleaf:overleaf -f http://webprofile-api-ci:3900/internal/api/health; then
+              echo "webprofile-api ready"
+              break
+            fi
+            sleep 1
+          done
+
+      - name: Compare Node vs Go token introspect parity
+        run: |
+          ./scripts/contract/compare_introspect.sh http://develop-web-1:3000 http://webprofile-api-ci:3900
+
+      - name: Compare Node vs Go token create/list parity
+        run: |
+          chmod +x scripts/contract/compare_tokens_parity.sh
+          ./scripts/contract/compare_tokens_parity.sh http://develop-web-1:3000 http://webprofile-api-ci:3900
 
       - name: Run contract tests
         env:

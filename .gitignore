@@ -4,10 +4,9 @@
 # user defined files
 .env
 docker-compose.override.yml
-
+other_mods
 node_modules
 services/web/node_modules
-develop_llm
 # Build and output
 dist/
 build/
@@ -24,3 +23,16 @@ services/git-bridge/target/
 *.swp
 .vscode/
 .DS_Store
+
+# Temporary parity / test artifacts
+/tmp/
+tmp/
+**/tmp/
+**/parity_results/
+services/git-bridge/cmd/webprofile-api/tmp/
+services/web/tmp/
+services/*/tmp/
+
+# Test artifacts
+services/web/test/integration/src/*.out
+services/web/test/unit/src/*.out

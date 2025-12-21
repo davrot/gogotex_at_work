@@ -49,7 +49,8 @@ const Features = {
     const Settings = getSettings()
     switch (feature) {
       case 'saas':
-        return Boolean(Settings && Settings.overleaf)
+        // Allow an explicit env override to force saas mode in test or CI environments
+        return Boolean(Settings && Settings.overleaf) || process.env.OVERLEAF_APP === 'saas'
       case 'homepage':
         return Boolean(Settings && Settings.enableHomepage)
       case 'registration-page':

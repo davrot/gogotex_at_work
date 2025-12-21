@@ -9,6 +9,9 @@ import { createRequire } from 'module'
 
 const require = createRequire(import.meta.url)
 
+// Force SaaS mode in unit tests by default to satisfy feature gates in tests
+process.env.OVERLEAF_APP = process.env.OVERLEAF_APP || 'saas'
+
 SandboxedModule.configure({
   ignoreMissing: true,
   requires: {

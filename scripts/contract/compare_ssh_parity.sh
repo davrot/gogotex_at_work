@@ -4,9 +4,9 @@ set -euo pipefail
 # compare_ssh_parity.sh <node_base_url> <go_base_url> <userId>
 # Example: ./compare_ssh_parity.sh http://develop-web-1:3000 http://localhost:3900 test-user
 
-NODE_BASE=${1:-}
-GO_BASE=${2:-}
-USER_ID=${3:-test-compare}
+NODE_BASE=${1:-${NODE_BASE:-}}
+GO_BASE=${2:-${GO_BASE:-}}
+USER_ID=${3:-${USER_ID:-test-compare}}
 
 if [ -z "$NODE_BASE" ] || [ -z "$GO_BASE" ]; then
   echo "Usage: $0 <node_base_url> <go_base_url> <userId>"
@@ -19,6 +19,9 @@ mkdir -p "$ARTIFACT_DIR"
 echo "Artifact dir: $ARTIFACT_DIR"
 trap 'rm -rf "$TMPDIR"' EXIT
 
+# Compute repository root (repo-relative paths used later) early so we can mount the correct dir into docker
+SCRIPT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+
 PUB="$(mktemp -u)"
 # generate a temporary keypair with ssh-keygen; write only public key here
 ssh-keygen -t ed25519 -f "$TMPDIR/testkey" -N '' -C "contract-compare" >/dev/null 2>&1 || true
@@ -29,7 +32,8 @@ PUB_KEY=$(cat "$PUB_FILE")
 if command -v node >/dev/null 2>&1; then
   NODE_CMD=node
 elif command -v docker >/dev/null 2>&1; then
-  NODE_CMD='docker run --rm -v "$PWD":/work -w /work node:20 node'
+  # Use repo-root mount so the seeder scripts are visible inside the container
+  NODE_CMD="docker run --rm -v \"$SCRIPT_ROOT\":/work -w /work node:20 node"
 else
   NODE_CMD=node
 fi
@@ -70,29 +74,52 @@ echo "POST -> Go ($GO_BASE)"
 GO_STATUS=$(call_post "$GO_BASE" "$USER_ID" "$GO_POST_OUT" || true)
 echo "Go POST status: $GO_STATUS"
 
-# If POSTs were not authorized (Node returned 302), fall back to seeding via seeder and compare GET outputs
-if [ "$NODE_STATUS" = "302" ] || [ "$NODE_STATUS" = "401" ] || [ "$NODE_STATUS" = "403" ]; then
+# If caller provided seed fingerprints, skip POST-based seeding and use provided values; else check POST auth and fall back to seeding
+if [ -n "${NODE_SEED_FP:-}" ] && [ -n "${GO_SEED_FP:-}" ]; then
+  echo "Using externally-provided seed fingerprints; skipping POST auth detection and seeding"
+  GO_USER_ID="${GO_USER_OVERRIDE:-${USER_ID}-go}"
+  NODE_SEED_OUT="$TMPDIR/node_seed.out"
+  GO_SEED_OUT="$TMPDIR/go_seed.out"
+  echo "{\"fingerprint\": \"$NODE_SEED_FP\"}" >"$NODE_SEED_OUT" || true
+  echo "{\"fingerprint\": \"$GO_SEED_FP\"}" >"$GO_SEED_OUT" || true
+else
+  # If POSTs were not authorized (Node returned 302), fall back to seeding via seeder and compare GET outputs
+  if [ "$NODE_STATUS" = "302" ] || [ "$NODE_STATUS" = "401" ] || [ "$NODE_STATUS" = "403" ]; then
   echo "Node POST requires auth (status $NODE_STATUS). Falling back to seeding DB and comparing GET results."
   # Seed via Node seeder (requires MONGO_URI env or default to compose mongo)
   MONGO_URI=${MONGO_URI:-mongodb://mongo:27017/sharelatex}
   echo "Seeding user $USER_ID via seeder (MONGO_URI=$MONGO_URI)"
   NODE_SEED_OUT="$TMPDIR/node_seed.out"
   GO_SEED_OUT="$TMPDIR/go_seed.out"
-  # Run seeder and capture output for fingerprint extraction
-  MONGO_URI="$MONGO_URI" $NODE_CMD services/web/tools/seed_ssh_key.mjs "$USER_ID" "$PUB_FILE" >"$NODE_SEED_OUT" 2>&1 || true
-  # For Go user, seed separate user id to avoid direct collision in same DB
-  GO_USER_ID="${USER_ID}-go"
-  MONGO_URI="$MONGO_URI" $NODE_CMD services/web/tools/seed_ssh_key.mjs "$GO_USER_ID" "$PUB_FILE" >"$GO_SEED_OUT" 2>&1 || true
-  echo "Node seeder output:"
-  sed -n '1,120p' "$NODE_SEED_OUT" || true
-  echo "Go seeder output:"
-  sed -n '1,120p' "$GO_SEED_OUT" || true
-  # Extract fingerprints from seeder outputs as fallback
-  NODE_SEED_FP=$(grep -o -E 'SHA256:[A-Za-z0-9+/=]+' "$NODE_SEED_OUT" | head -n1 || true)
-  GO_SEED_FP=$(grep -o -E 'SHA256:[A-Za-z0-9+/=]+' "$GO_SEED_OUT" | head -n1 || true)
-  if [ -n "$NODE_SEED_FP" ]; then
+
+  # Allow externally-provided seed fingerprints (NODE_SEED_FP / GO_SEED_FP) to bypass running seeders
+  if [ -n "${NODE_SEED_FP:-}" ] && [ -n "${GO_SEED_FP:-}" ]; then
+    echo "Using externally-provided seed fingerprints: node=$NODE_SEED_FP go=$GO_SEED_FP"
+    # populate minimal seed output files for downstream parsing
+    echo "{\"fingerprint\": \"$NODE_SEED_FP\"}" >"$NODE_SEED_OUT" || true
+    echo "{\"fingerprint\": \"$GO_SEED_FP\"}" >"$GO_SEED_OUT" || true
+  else
+    # Run seeder and capture output for fingerprint extraction
+    if echo "$NODE_CMD" | grep -q "docker run"; then
+      # sanity-check that seeder is visible inside docker
+      if ! docker run --rm -v "$SCRIPT_ROOT":/work -w /work node:20 node -e "console.log(require('fs').existsSync('services/web/tools/seed_ssh_key.mjs'))" 2>/dev/null | grep -q "true"; then
+        echo "Warning: seeder script not visible inside docker at services/web/tools/seed_ssh_key.mjs (mounted $SCRIPT_ROOT:/work)."
+        echo "Proceeding to run seeder to capture error output."
+      fi
+      docker run --rm -e MONGO_URI="$MONGO_URI" -v "$SCRIPT_ROOT":/work -w /work node:20 node services/web/tools/seed_ssh_key.mjs "$USER_ID" "$PUB_FILE" >"$NODE_SEED_OUT" 2>&1 || true
+    else
+      MONGO_URI="$MONGO_URI" $NODE_CMD services/web/tools/seed_ssh_key.mjs "$USER_ID" "$PUB_FILE" >"$NODE_SEED_OUT" 2>&1 || true
+    fi
+
+    # For Go user, seed separate user id to avoid direct collision in same DB
+    GO_USER_ID="${USER_ID}-go"
+    if echo "$NODE_CMD" | grep -q "docker run"; then
+      docker run --rm -e MONGO_URI="$MONGO_URI" -v "$SCRIPT_ROOT":/work -w /work node:20 node services/web/tools/seed_ssh_key.mjs "$GO_USER_ID" "$PUB_FILE" >"$GO_SEED_OUT" 2>&1 || true
+    else
+      MONGO_URI="$MONGO_URI" $NODE_CMD services/web/tools/seed_ssh_key.mjs "$GO_USER_ID" "$PUB_FILE" >"$GO_SEED_OUT" 2>&1 || true
+    fi
+
     echo "Extracted Node seed fingerprint: $NODE_SEED_FP"
-  fi
   if [ -n "$GO_SEED_FP" ]; then
     echo "Extracted Go seed fingerprint: $GO_SEED_FP"
   fi

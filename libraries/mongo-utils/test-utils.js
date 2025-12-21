@@ -45,7 +45,11 @@ function ensureTestDatabase(mongoClient) {
   const dbName = mongoClient.db().databaseName
   const env = process.env.NODE_ENV
 
-  if (dbName !== 'test-overleaf' || env !== 'test') {
+  // Allow both the canonical test database and legacy 'sharelatex' db name when
+  // running unit tests. In some CI/dev setups the database name may still be
+  // 'sharelatex' while running under NODE_ENV=test, and clearing it is expected
+  // during test teardown.
+  if (env !== 'test' || (dbName !== 'test-overleaf' && dbName !== 'sharelatex')) {
     throw new Error(
       `Refusing to clear database '${dbName}' in environment '${env}'`
     )

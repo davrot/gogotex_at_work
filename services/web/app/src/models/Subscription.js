@@ -123,5 +123,6 @@ SubscriptionSchema.method('fetchV1Data', function (callback) {
   callback(null, this)
 })
 
-exports.Subscription = mongoose.model('Subscription', SubscriptionSchema)
+// Defensive: avoid OverwriteModelError when tests re-import or mock mongoose.
 exports.SubscriptionSchema = SubscriptionSchema
+exports.Subscription = (mongoose.models && mongoose.models.Subscription) ? mongoose.models.Subscription : mongoose.model('Subscription', SubscriptionSchema)

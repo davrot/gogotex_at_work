@@ -21,7 +21,7 @@ We will use **GoGoTeX** as the canonical label for Go-based services and compone
   the iteration process.
 -->
 
-**Language/Version**: Go 1.21 (git-bridge) and Node.js 18+ (web)  
+**Language/Version**: Go 1.25 (git-bridge) and Node.js 18+ (web)  
 **Primary Dependencies**: net/ssh (golang.org/x/crypto/ssh), system `git` binary (invoked via os/exec), Mongoose 8.x (web), MongoDB 6.x  
 **Storage**: MongoDB (`sharelatex.usersshkeys` collection)  
 **Testing**: Go unit/integration tests (`go test`), Mocha contract tests for web (`npm test` / `test:contract`), Playwright for E2E where applicable  
@@ -39,7 +39,7 @@ _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 - **Testing Standards**: Unit tests required for parsing/validation and auth logic; integration/contract tests (Mocha) required for idempotency and auth flows; performance harness will be added for `git-bridge` (perf tests optional in CI).
 - **User Experience Consistency**: Web UI changes limited to SSH key management components and follow existing styles. Acceptance tests will validate UI flows.
 - **Performance Requirements**: Performance SLOs (p95 < 2s) defined in spec and will be validated by the perf harness.
-- **Observability & Versioning**: Structured logs and `/tmp/ssh_upsert_debug.log` instrumentation added for test runs; production will use structured logging; versioning: `git-bridge` will follow semantic versioning.
+- **Observability & Versioning**: Structured logs and instrumentation MUST be used for SSH upsert flows. For local tests, temporary `/tmp/ssh_upsert_debug.log` may be written only when `NODE_ENV=test` and a test-only flag is enabled; production MUST emit structured log events and metrics instead. Required events and metrics are described in the spec (see Observability section); tasks T038, T039, and T040 are added to implement structured logs, metrics, and safe debug gating. Versioning: `git-bridge` will follow semantic versioning.
 
 No constitution violations are identified at Phase 0; follow-ups (e.g., CI runner sizing for perf jobs) are documented in research.md as NEEDS CLARIFICATION.
 

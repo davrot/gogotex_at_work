@@ -173,6 +173,65 @@ if (!process.env.HTTP_TEST_HOST) {
     console.debug('[bootstrap] pre-test rebuild helper threw', e && e.message ? e.message : e)
   }
 
+  // If token delegation to a webprofile API is requested, ensure the webprofile shim
+  // is available on the compose network. This is best-effort and only runs when
+  // AUTH_TOKEN_USE_WEBPROFILE_API=true so it won't affect normal dev runs.
+  try {
+    if (process.env.AUTH_TOKEN_USE_WEBPROFILE_API === 'true') {
+      const fs = require('fs')
+      const path = require('path')
+      const { execSync } = require('child_process')
+      ;(async () => {
+        try {
+          const fetch = (await import('node-fetch')).default
+          const wp_maxAttempts = 4
+          let wp_healthy = false
+          const wp_candidates = [
+            'http://webprofile-api-ci:3900/internal/api/health',
+            'http://webprofile-api:3900/internal/api/health',
+            'http://localhost:3900/internal/api/health'
+          ]
+          for (let i = 0; i < wp_maxAttempts && !wp_healthy; i++) {
+            for (const url of wp_candidates) {
+              try {
+                const r = await fetch(url, { method: 'GET', timeout: 2000 })
+                if (r && r.status === 200) {
+                  wp_healthy = true
+                  // eslint-disable-next-line no-console
+                  console.debug(`[bootstrap] webprofile-api healthy at ${url}`)
+                  break
+                }
+              } catch (e) {
+                // ignore and try next
+              }
+            }
+            if (!wp_healthy) await new Promise(r => setTimeout(r, 300 * (i + 1)))
+          }
+
+          if (!wp_healthy) {
+            const helperScript = path.join(__dirname, '..', '..', '..', '..', 'scripts', 'contract', 'run_webprofile_in_network.sh')
+            if (fs.existsSync(helperScript)) {
+              try {
+                // eslint-disable-next-line no-console
+                console.debug('[bootstrap] Starting webprofile shim via:', helperScript)
+                execSync(`${helperScript} webprofile-api-test`, { stdio: 'inherit', env: process.env })
+              } catch (e) {
+                // eslint-disable-next-line no-console
+                console.debug('[bootstrap] Failed to start webprofile shim:', e && e.message ? e.message : e)
+              }
+            }
+          }
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.debug('[bootstrap] webprofile healthcheck failed', err && err.message ? err.message : err)
+        }
+      })().catch(() => {})
+    }
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.debug('[bootstrap] webprofile shim startup wrapper threw', e && e.message ? e.message : e)
+  }
+
 // Tests may disable rate limits when explicitly requested.
 try {
   const Settings = require('@overleaf/settings')

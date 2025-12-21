@@ -60,6 +60,12 @@ try {
 if (process.env.NODE_ENV === 'test') {
   ;(async () => {
     try {
+      // Skip dedupe if collection.aggregate is not available in this environment
+      if (!exports.UserSSHKey || !exports.UserSSHKey.collection || typeof exports.UserSSHKey.collection.aggregate !== 'function') {
+        try { console.debug('UserSSHKey startup dedupe skipped: collection.aggregate not available') } catch (e) {}
+        return
+      }
+
       // Find fingerprints with more than one document
       const pipeline = [
         { $match: { fingerprint: { $exists: true } } },

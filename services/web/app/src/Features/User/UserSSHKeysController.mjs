@@ -8,6 +8,18 @@ import { promisify } from 'node:util'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import logger from '@overleaf/logger'
+import metrics from '@overleaf/metrics'
+
+// Test-only tmp debug writes are gated behind an explicit env flag for safety
+const _USE_TMP_DEBUG = (process.env.NODE_ENV === 'test' && process.env.SSH_UPSERT_WRITE_TO_TMP === '1')
+function _debugLog(obj) {
+  if (!_USE_TMP_DEBUG) return
+  try { fs.appendFileSync('/tmp/ssh_upsert_debug.log', JSON.stringify(obj) + '\n') } catch (e) {}
+}
+function _metricInc(name, value = 1) {
+  try { metrics && metrics.increment && metrics.increment(name, value) } catch (e) {}
+}
+
 // Fallback no-op cache when app/lib/lookupCache.mjs is not present in this runtime
 const lookupCache = { get: () => undefined, set: () => {}, invalidate: () => {} }
 // Testing hook: allow tests to inject a mocked lookupCache directly
@@ -16,6 +28,10 @@ export function __setLookupCacheForTest(mock) { _testLookupCache = mock }
 export function __resetLookupCacheForTest() { _testLookupCache = null }
 import SessionManager from '../Authentication/SessionManager.mjs'
 import AdminAuthorizationHelper from '../Helpers/AdminAuthorizationHelper.mjs'
+
+// Toggle to delegate SSH key operations to the Go webprofile API when enabled
+// Default: opt-in only to avoid changing existing behavior by accident in tests/runtimes
+const USE_WEBPROFILE_SSH = process.env.AUTH_SSH_USE_WEBPROFILE_API === 'true'
 
 function _computeFingerprint(publicKey) {
   // publicKey expected in OpenSSH format: "ssh-rsa AAAAB3Nza... [comment]"
@@ -37,7 +53,7 @@ export async function list(req, res) {
   let sessionUserId = SessionManager.getLoggedInUserId(req.session)
   // Test-only fallback: allow tests to pass a dev header to bypass flaky login
   if (!sessionUserId && process.env.NODE_ENV === 'test') {
-    const devUser = (req.get && req.get('x-dev-user-id')) || req.headers['x-dev-user-id']
+    const devUser = (req.get && req.get('x-dev-user-id')) || (req.headers && req.headers['x-dev-user-id'])
     if (devUser) {
       try { console.warn('DEBUG UserSSHKeysController.list: using x-dev-user-id header (test fallback)', devUser) } catch (e) {}
       sessionUserId = devUser
@@ -69,6 +85,50 @@ export async function list(req, res) {
     }
   }
   const criteria = { userId }
+  // If configured, delegate listing to the Go webprofile API
+  if (USE_WEBPROFILE_SSH) {
+    try {
+      const client = await import(new URL('../Token/WebProfileClient.mjs', import.meta.url).href)
+      const resList = await client.listSSHKeys(userId)
+      if (Array.isArray(resList)) {
+        // Enrich with user metadata (prefer sessionUser) to mirror DB path
+        let username = null
+        let displayName = null
+        try {
+          const sessionUser = SessionManager.getSessionUser(req.session)
+          if (sessionUser && String(sessionUser._id) === String(userId) && sessionUser.email) {
+            username = sessionUser.email
+            displayName = `${sessionUser.first_name || ''}${sessionUser.first_name && sessionUser.last_name ? ' ' : ''}${sessionUser.last_name || ''}`.trim() || null
+          } else {
+            const { User } = await import('../../../models/User.js')
+            const user = await User.findById(userId).lean().exec()
+            username = user && user.email ? user.email : null
+            displayName = user
+              ? `${user.first_name || ''}${user.first_name && user.last_name ? ' ' : ''}${user.last_name || ''}`.trim() || null
+              : null
+          }
+        } catch (e) {}
+
+        const enriched = resList.map(k => ({
+          id: k.id || (k._id && k._id.toString && k._id.toString()),
+          key_name: k.key_name || k.keyName || k.label || '',
+          label: k.key_name || k.keyName || k.label || '',
+          public_key: k.public_key || k.publicKey || '',
+          fingerprint: k.fingerprint || '',
+          created_at: k.created_at || k.createdAt || null,
+          updated_at: k.updated_at || k.updatedAt || null,
+          userId: k.userId || k.user_id || userId,
+          username,
+          display_name: displayName,
+        }))
+        return res.status(200).json(enriched)
+      }
+    } catch (e) {
+      try { logger.err({ err: e }, 'webprofile ssh list delegation failed') } catch (ee) {}
+      // fall through to DB-backed listing
+    }
+  }
+
   try {
     const keys = await UserSSHKey.find(criteria).lean().exec()
     // Enrich keys with user metadata: username (email) and display_name
@@ -159,7 +219,7 @@ export async function create(req, res) {
   let sessionUserId = SessionManager.getLoggedInUserId(req.session)
   // Test-only fallback: allow tests to pass a dev header to bypass flaky login
   if (!sessionUserId && process.env.NODE_ENV === 'test') {
-    const devUser = (req.get && req.get('x-dev-user-id')) || req.headers['x-dev-user-id']
+    const devUser = (req.get && req.get('x-dev-user-id')) || (req.headers && req.headers['x-dev-user-id'])
     if (devUser) {
       try { console.warn('DEBUG UserSSHKeysController.create: using x-dev-user-id header (test fallback)', devUser) } catch (e) {}
       sessionUserId = devUser
@@ -206,12 +266,27 @@ export async function create(req, res) {
   try {
     try { console.error('DEBUG create before computeFingerprint') } catch (e) {}
     const fingerprint = _computeFingerprint(publicKey) || ''
-    try { console.error('DEBUG create after computeFingerprint fingerprint=', fingerprint) } catch (e) {}
+      _metricInc('ssh_upsert_total')
 
-    // Idempotent create: atomically upsert by fingerprint and return canonical document
+    // If configured, attempt to delegate creation to the Go webprofile API
+    if (USE_WEBPROFILE_SSH) {
+      try {
+        const client = await import(new URL('../Token/WebProfileClient.mjs', import.meta.url).href)
+        const created = await client.createSSHKey(userId, { public_key: publicKey, key_name: keyName })
+        if (created) {
+          const createdAt = created.created_at || created.createdAt || null
+          const updatedAt = created.updated_at || created.updatedAt || null
+          try { logger.info({ type: 'sshkey.added', userId, keyId: created.id, fingerprint: created.fingerprint, timestamp: new Date().toISOString() }) } catch (e) {}
+          return res.status(createdAt ? 201 : 200).json({ id: created.id || created._id || null, key_name: created.key_name || created.keyName || created.label || '', label: created.key_name || created.keyName || created.label || '', public_key: created.public_key || created.publicKey || publicKey, fingerprint: created.fingerprint || fingerprint, created_at: createdAt, updated_at: updatedAt, userId: String(created.userId || created.user_id || userId) })
+        }
+      } catch (e) {
+        try { logger.err({ err: e, userId }, 'webprofile create ssh key delegation failed, falling back to local') } catch (e2) {}
+      }
+    }
+
     try {
       const now = new Date()
-      const requestId = (req && req.get && req.get('x-request-id')) || req.headers['x-request-id'] || crypto.randomUUID()
+      const requestId = (req && req.get && req.get('x-request-id')) || (req && req.headers && req.headers['x-request-id']) || crypto.randomUUID()
       // Use native collection findOneAndUpdate to obtain upsert metadata (created vs existing)
       const filter = { fingerprint }
       const update = {
@@ -222,55 +297,91 @@ export async function create(req, res) {
         // Use Mongoose findOneAndUpdate with rawResult to get the server metadata and handle driver edge-cases
         const raw = await UserSSHKey.findOneAndUpdate(filter, update, { upsert: true, new: true, setDefaultsOnInsert: true, rawResult: true }).exec()
         let doc = raw && raw.value
-        try { fs.appendFileSync('/tmp/ssh_upsert_debug.log', JSON.stringify({ t: new Date().toISOString(), requestId, event: 'findOneAndUpdate_mongoose_raw', fingerprint, rawValueExists: !!doc, rawLastError: raw && raw.lastErrorObject }) + '\n') } catch (e) {}
+        _debugLog({ t: new Date().toISOString(), requestId, event: 'findOneAndUpdate_mongoose_raw', fingerprint, rawValueExists: !!doc, rawLastError: raw && raw.lastErrorObject })
 
         // Some driver/server combinations may return a null "value" for upsert operations while
         // still reporting an upsert via lastErrorObject.upserted. In that case fetch the doc.
         if (!doc && raw && raw.lastErrorObject && raw.lastErrorObject.upserted) {
-          try { fs.appendFileSync('/tmp/ssh_upsert_debug.log', JSON.stringify({ t: new Date().toISOString(), requestId, event: 'upsert_raw_missing_value', fingerprint, upserted: raw.lastErrorObject.upserted }) + '\n') } catch (e) {}
+          _debugLog({ t: new Date().toISOString(), requestId, event: 'upsert_raw_missing_value', fingerprint, upserted: raw.lastErrorObject.upserted })
           // Attempt to fetch the canonical document by fingerprint
           try {
             doc = await UserSSHKey.findOne({ fingerprint }).lean().exec()
-            try { fs.appendFileSync('/tmp/ssh_upsert_debug.log', JSON.stringify({ t: new Date().toISOString(), requestId, event: 'fetched_after_raw_upsert', fingerprint, docId: doc && String(doc._id) }) + '\n') } catch (e) {}
+            _debugLog({ t: new Date().toISOString(), requestId, event: 'fetched_after_raw_upsert', fingerprint, docId: doc && String(doc._id) })
           } catch (e) {
-            try { fs.appendFileSync('/tmp/ssh_upsert_debug.log', JSON.stringify({ t: new Date().toISOString(), requestId, event: 'fetch_after_raw_upsert_failed', fingerprint, err: e && e.message }) + '\n') } catch (e2) {}
+            _debugLog({ t: new Date().toISOString(), requestId, event: 'fetch_after_raw_upsert_failed', fingerprint, err: e && e.message })
           }
         }
 
         if (!doc) {
-          try { fs.appendFileSync('/tmp/ssh_upsert_debug.log', JSON.stringify({ t: new Date().toISOString(), requestId, event: 'findOneAndUpdate_no_doc_initial', fingerprint, raw: raw && raw.lastErrorObject ? raw.lastErrorObject : null }) + '\n') } catch (e) {}
+          _debugLog({ t: new Date().toISOString(), requestId, event: 'findOneAndUpdate_no_doc_initial', fingerprint, raw: raw && raw.lastErrorObject ? raw.lastErrorObject : null })
 
           // Retry fetch with exponential backoff to handle driver/server visibility delays
           const maxRetries = Number(process.env.SSH_UPSERT_RETRIES || 5)
           const baseDelayMs = Number(process.env.SSH_UPSERT_BASE_DELAY_MS || 20)
+
+          _debugLog({ t: new Date().toISOString(), requestId, event: 'findOneAndUpdate_retry_loop_start', fingerprint, maxRetries, baseDelayMs })
+          let attemptsDone = 0
           for (let attempt = 1; attempt <= maxRetries && !doc; attempt++) {
+            attemptsDone = attempt
             try {
               await new Promise(r => setTimeout(r, baseDelayMs * Math.pow(2, attempt - 1)))
             } catch (e) {}
             try {
               doc = await UserSSHKey.findOne({ fingerprint }).lean().exec()
-              try { fs.appendFileSync('/tmp/ssh_upsert_debug.log', JSON.stringify({ t: new Date().toISOString(), requestId, event: 'findOneAndUpdate_retry_fetch', fingerprint, attempt, docId: doc && String(doc._id) }) + '\n') } catch (e) {}
+              _debugLog({ t: new Date().toISOString(), requestId, event: 'findOneAndUpdate_retry_fetch', fingerprint, attempt, docId: doc && String(doc._id) })
             } catch (e) {
-              try { fs.appendFileSync('/tmp/ssh_upsert_debug.log', JSON.stringify({ t: new Date().toISOString(), requestId, event: 'findOneAndUpdate_retry_fetch_failed', fingerprint, attempt, err: e && e.message }) + '\n') } catch (e) {}
+              _debugLog({ t: new Date().toISOString(), requestId, event: 'findOneAndUpdate_retry_fetch_failed', fingerprint, attempt, err: e && e.message })
             }
           }
 
+          _debugLog({ t: new Date().toISOString(), requestId, event: 'findOneAndUpdate_retry_loop_end', fingerprint, attemptsDone, docFound: !!doc })
+          if (attemptsDone > 0) _metricInc('ssh_upsert_retry_total', attemptsDone)
+
           if (!doc) {
-            try { fs.appendFileSync('/tmp/ssh_upsert_debug.log', JSON.stringify({ t: new Date().toISOString(), requestId, event: 'findOneAndUpdate_no_doc_final', fingerprint, processUptime: process.uptime() }) + '\n') } catch (e) {}
-            return res.sendStatus(500)
+            _debugLog({ t: new Date().toISOString(), requestId, event: 'findOneAndUpdate_no_doc_final', fingerprint, processUptime: process.uptime() })
+
+            // As a last-resort recovery attempt, try an explicit insert one to
+            // ensure we create the document when upsert returned no visible value.
+            // This handles driver/visibility races where the initial upsert may
+            // have been aborted or not returned a value.
+            try {
+              _debugLog({ t: new Date().toISOString(), requestId, event: 'insert_fallback_preparing', fingerprint, insertDocSample: { fingerprint, userId, keyName: keyName || '', publicKey } })
+              const insertDoc = { fingerprint, userId, keyName: keyName || '', publicKey, createdAt: now, updatedAt: now }
+              _debugLog({ t: new Date().toISOString(), requestId, event: 'insert_fallback_attempt', fingerprint })
+              const insertResult = await UserSSHKey.collection.insertOne(insertDoc)
+              if (insertResult && insertResult.insertedId) {
+                _debugLog({ t: new Date().toISOString(), requestId, event: 'insert_fallback_succeeded', fingerprint, insertedId: String(insertResult.insertedId) })
+                _metricInc('ssh_upsert_insert_fallback_total')
+                doc = await UserSSHKey.findOne({ _id: insertResult.insertedId }).lean().exec()
+              }
+            } catch (insErr) {
+              // If the insert failed because the document already exists (duplicate key),
+              // fetch it; otherwise log and continue to return 500.
+              _debugLog({ t: new Date().toISOString(), requestId, event: 'insert_fallback_error', fingerprint, err: insErr && insErr.message, stack: insErr && insErr.stack })
+              if (insErr && (insErr.code === 11000 || /E11000|duplicate key/i.test(insErr.message || ''))) {
+                _debugLog({ t: new Date().toISOString(), requestId, event: 'insert_fallback_duplicate_key', fingerprint })
+                _metricInc('ssh_upsert_duplicate_key_total')
+                try { doc = await UserSSHKey.findOne({ fingerprint }).lean().exec() } catch (e) {}
+              }
+            }
+
+            if (!doc) return res.sendStatus(500)
           }
         }
 
         // If the canonical doc belongs to a different user, it's a conflict
         if (String(doc.userId) !== String(userId)) {
-          try { fs.appendFileSync('/tmp/ssh_upsert_debug.log', JSON.stringify({ t: new Date().toISOString(), requestId, event: 'conflict_different_user', fingerprint, docUserId: String(doc.userId), requestUserId: String(userId) }) + '\n') } catch (e) {}
+          _debugLog({ t: new Date().toISOString(), requestId, event: 'conflict_different_user', fingerprint, docUserId: String(doc.userId), requestUserId: String(userId) })
+          _metricInc('ssh_upsert_conflict_total')
           return res.status(409).json({ message: 'public_key already exists for a different user' })
         }
 
         // Determine whether this upsert created the doc or it already existed - use createdAt proximity heuristic
         const createdAt = doc && (doc.createdAt || doc.created_at)
         const createdNow = createdAt ? (Math.abs(new Date(createdAt) - now) < 2000) : false
-        try { fs.appendFileSync('/tmp/ssh_upsert_debug.log', JSON.stringify({ t: new Date().toISOString(), requestId, event: 'upsert_result_mongoose', fingerprint, createdNow, docId: doc && String(doc._id) }) + '\n') } catch (e) {}
+        _debugLog({ t: new Date().toISOString(), requestId, event: 'upsert_result_mongoose', fingerprint, createdNow, docId: doc && String(doc._id) })
+        _metricInc('ssh_upsert_success')
+        if (createdNow) _metricInc('ssh_upsert_created_total')
 
         // sync lookup cache
         try {
@@ -299,7 +410,33 @@ export async function create(req, res) {
         return res.status(createdNow ? 201 : 200).json({ id: String(doc._id), key_name: doc.keyName || doc.key_name, label: doc.keyName || doc.label || doc.key_name, public_key: doc.publicKey || doc.public_key, fingerprint: doc.fingerprint, created_at: doc.createdAt || doc.created_at, updated_at: doc.updatedAt || doc.updated_at, userId: String(doc.userId), username, display_name: displayName })
       } catch (dbErr) {
         // If duplicate index error or transient DB errors appear, log and fall back to conservative recovery path
-        try { fs.appendFileSync('/tmp/ssh_upsert_debug.log', JSON.stringify({ t: new Date().toISOString(), requestId, event: 'findOneAndUpdate_error', fingerprint, err: dbErr && dbErr.message }) + '\n') } catch (e) {}
+        _debugLog({ t: new Date().toISOString(), requestId, event: 'findOneAndUpdate_error', fingerprint, err: dbErr && dbErr.message })
+        _metricInc('ssh_upsert_error_total')
+        // Attempt an insert fallback as a last effort before declaring a conflict. This helps
+        // when the primary findOneAndUpdate call is not available (e.g., in some unit test
+        // mocks) or transient errors occur.
+        try {
+          const insertDoc = { fingerprint, userId, keyName: keyName || '', publicKey, createdAt: new Date(), updatedAt: new Date() }
+          _debugLog({ t: new Date().toISOString(), requestId, event: 'findOneAndUpdate_error_insert_fallback', fingerprint })
+          const insertResult = await UserSSHKey.collection.insertOne && UserSSHKey.collection.insertOne(insertDoc)
+          if (insertResult && insertResult.insertedId) {
+            const createdDoc = await UserSSHKey.findOne({ _id: insertResult.insertedId }).lean().exec()
+            if (createdDoc && String(createdDoc.userId) === String(userId)) {
+              return res.status(201).json({ id: String(createdDoc._id), key_name: createdDoc.keyName || createdDoc.key_name, label: createdDoc.keyName || createdDoc.label || createdDoc.key_name, public_key: createdDoc.publicKey || createdDoc.public_key, fingerprint: createdDoc.fingerprint, created_at: createdDoc.createdAt || createdDoc.created_at, updated_at: createdDoc.updatedAt || createdDoc.updated_at, userId: String(createdDoc.userId) })
+            }
+          }
+        } catch (insErr) {
+          _debugLog({ t: new Date().toISOString(), requestId, event: 'findOneAndUpdate_error_insert_fallback_failed', fingerprint, err: insErr && insErr.message })
+          if (insErr && (insErr.code === 11000 || /E11000|duplicate key/i.test(insErr.message || ''))) {
+            _debugLog({ t: new Date().toISOString(), requestId, event: 'findOneAndUpdate_error_insert_fallback_duplicate', fingerprint })
+            try {
+              const existing = await UserSSHKey.findOne({ fingerprint }).lean().exec()
+              if (existing && String(existing.userId) === String(userId)) {
+                return res.status(200).json({ id: String(existing._id), key_name: existing.keyName || existing.key_name, label: existing.keyName || existing.label, public_key: existing.publicKey || existing.public_key, fingerprint: existing.fingerprint, created_at: existing.createdAt || existing.created_at, updated_at: existing.updatedAt || existing.updated_at, userId: String(existing.userId) })
+              }
+            } catch (e) {}
+          }
+        }
         // Fallback: try to read canonical doc and determine response
         try {
           const existing = await UserSSHKey.findOne({ fingerprint }).lean().exec()
@@ -308,7 +445,7 @@ export async function create(req, res) {
           }
           return res.status(409).json({ message: 'public_key already exists for a different user' })
         } catch (e) {
-          try { fs.appendFileSync('/tmp/ssh_upsert_debug.log', JSON.stringify({ t: new Date().toISOString(), requestId, event: 'fallback_read_failed', fingerprint, err: e && e.message }) + '\n') } catch (ee) {}
+          _debugLog({ t: new Date().toISOString(), requestId, event: 'fallback_read_failed', fingerprint, err: e && e.message })
           throw dbErr
         }
       }
@@ -381,6 +518,20 @@ export async function remove(req, res) {
   }
   try {
     console.error('DEBUG remove starting userId=', userId, 'keyId=', keyId)
+
+    // If configured, attempt to delegate removal to the Go webprofile API
+    if (USE_WEBPROFILE_SSH) {
+      try {
+        const client = await import(new URL('../Token/WebProfileClient.mjs', import.meta.url).href)
+        const ok = await client.removeSSHKey(userId, keyId)
+        if (ok) {
+          try { logger.info({ type: 'sshkey.removed', userId, keyId, timestamp: new Date().toISOString() }) } catch (e) {}
+          return res.sendStatus(204)
+        }
+      } catch (e) {
+        try { console.error('DEBUG webprofile remove ssh key delegation failed', e && e.stack ? e.stack : e) } catch (e2) {}
+      }
+    }
 
     // Defensive invocation of findOneAndDelete to handle different mock shapes
     try { console.error('DEBUG findOneAndDelete typeof', typeof UserSSHKey.findOneAndDelete, 'hasMock=', !!(UserSSHKey.findOneAndDelete && UserSSHKey.findOneAndDelete.mock)) } catch (e) {}
@@ -463,6 +614,7 @@ export async function remove(req, res) {
 }
 
 export async function listForService(req, res) {
+  try { console.error('DEBUG listForService entry', { params: req.params, headers: { authorization: req && req.headers && req.headers.authorization } }) } catch (e) {}
   let userId = req.params.userId
   if (!userId) return res.status(400).json({ message: 'user id required' })
   // Basic auth check for trusted callers (dev/test convenience)
@@ -476,17 +628,45 @@ export async function listForService(req, res) {
   try {
     // Accept either an ObjectId user id (normal) or a dev-friendly username/email.
     // If userId isn't a valid ObjectId, try to resolve by email to a real user id first.
-    const { User } = await import('../../models/User.js')
     let resolvedUserId = null
     if (/^[0-9a-fA-F]{24}$/.test(userId)) {
       resolvedUserId = userId
     } else {
       // try to find a user by email matching the supplied identifier
+      const { User } = await import('../../models/User.js')
       const u = await User.findOne({ email: userId }).lean().exec()
       if (u && u._id) resolvedUserId = String(u._id)
     }
 
     let keys = []
+
+    // If configured, delegate service listing to the Go webprofile API when possible
+    if (USE_WEBPROFILE_SSH && resolvedUserId) {
+      try {
+        try { console.error('DEBUG listForService: attempting webprofile delegation for', resolvedUserId) } catch (e) {}
+        const client = await import(new URL('../Token/WebProfileClient.mjs', import.meta.url).href)
+        const resList = await client.listSSHKeys(resolvedUserId)
+        try { console.error('DEBUG listForService: webprofile returned', Array.isArray(resList) ? `array len=${resList.length}` : typeof resList) } catch (e) {}
+        if (Array.isArray(resList)) {
+          const mapped = resList.map(k => ({
+            id: String(k.id || (k._id && k._id.toString && k._id.toString())),
+            key_name: k.key_name || k.keyName || k.label || '',
+            label: k.key_name || k.keyName || k.label || '',
+            public_key: k.public_key || k.publicKey || '',
+            fingerprint: k.fingerprint || '',
+            created_at: k.created_at || k.createdAt || null,
+            updated_at: k.updated_at || k.updatedAt || null,
+            userId: k.userId || k.user_id || resolvedUserId,
+          }))
+          return res.status(200).json(mapped)
+        }
+      } catch (e) {
+        try { logger.err({ err: e, userId: resolvedUserId }, 'webprofile listForService delegation failed') } catch (ee) {}
+        try { console.error('DEBUG listForService: delegation error', e && (e.stack || e.message || e)) } catch (e2) {}
+        // fall through to DB-backed listing
+      }
+    }
+
     if (resolvedUserId) {
       keys = await UserSSHKey.find({ userId: resolvedUserId }).lean().exec()
     } else {
