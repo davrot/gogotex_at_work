@@ -86,6 +86,26 @@ async function verifyTokenAgainstHash (tokenPlain, storedHash) {
 
 export default {
   async createToken (userId, { label = '', scopes = [], expiresAt = null, replace = false } = {}) {
+    // If configured, delegate creation to the Go webprofile-api
+    if (process.env.AUTH_TOKEN_USE_WEBPROFILE_API === 'true') {
+      try {
+        const client = await import('./WebProfileClient.mjs')
+        const res = await client.createToken(userId, { label, scopes, expiresAt, replace })
+        if (!res) return null
+        // Map webprofile response to local shape
+        return {
+          token: res.token || res.plaintext || null,
+          id: res.id || res.tokenId || null,
+          hashPrefix: res.accessTokenPartial || res.hashPrefix || null,
+          createdAt: res.createdAt || null,
+          expiresAt: res.expiresAt || null,
+        }
+      } catch (e) {
+        try { const logger = require('@overleaf/logger'); logger.err({ err: e }, 'webprofile create delegation failed, falling back to local') } catch (e) {}
+        // fall through to local implementation
+      }
+    }
+
     const tokenPlain = generatePlaintextToken()
     const hashPrefix = computeHashPrefixFromPlain(tokenPlain)
     const { hash, algorithm } = await hashToken(tokenPlain)
@@ -119,6 +139,27 @@ export default {
   },
 
   async listTokens (userId) {
+    // If configured, delegate listing to the webprofile API
+    if (process.env.AUTH_TOKEN_USE_WEBPROFILE_API === 'true') {
+      try {
+        const client = await import('./WebProfileClient.mjs')
+        const res = await client.listTokens(userId)
+        if (!res) return []
+        // Map/respect returned fields (assuming webprofile returns similar docs)
+        return (Array.isArray(res) ? res : []).map(t => ({
+          id: t.id || (t._id && t._id.toString && t._id.toString()),
+          label: t.label,
+          scopes: t.scopes || [],
+          active: typeof t.active === 'boolean' ? t.active : true,
+          hashPrefix: t.hashPrefix || t.accessTokenPartial || null,
+          createdAt: t.createdAt || null,
+          expiresAt: t.expiresAt || null,
+        }))
+      } catch (e) {
+        try { const logger = require('@overleaf/logger'); logger.err({ err: e }, 'webprofile list delegation failed, falling back to local') } catch (e) {}
+      }
+    }
+
     // Defensive: if the userId isn't a valid Mongo ObjectId, return empty list
     // instead of letting Mongoose throw a CastError which results in a 500.
     try {
@@ -142,6 +183,18 @@ export default {
   },
 
   async revokeToken (userId, tokenId) {
+    // If configured, delegate revoke to webprofile API
+    if (process.env.AUTH_TOKEN_USE_WEBPROFILE_API === 'true') {
+      try {
+        const client = await import('./WebProfileClient.mjs')
+        const ok = await client.revokeToken(userId, tokenId)
+        if (ok) return true
+        return false
+      } catch (e) {
+        try { const logger = require('@overleaf/logger'); logger.err({ err: e }, 'webprofile revoke delegation failed, falling back to local') } catch (e) {}
+      }
+    }
+
     const res = await PersonalAccessToken.findOneAndUpdate({ _id: tokenId, userId }, { active: false })
     if (res) {
       try {

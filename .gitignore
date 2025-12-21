@@ -24,3 +24,16 @@ services/git-bridge/target/
 *.swp
 .vscode/
 .DS_Store
+
+# Temporary parity / test artifacts
+/tmp/
+tmp/
+**/tmp/
+**/parity_results/
+services/git-bridge/cmd/webprofile-api/tmp/
+services/web/tmp/
+services/*/tmp/
+
+# Test artifacts
+services/web/test/integration/src/*.out
+services/web/test/unit/src/*.out
