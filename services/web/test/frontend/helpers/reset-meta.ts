@@ -6,6 +6,16 @@ export function resetMeta() {
     'dropbox',
     'link-sharing',
   ])
+  // Common keys used by many modules; set safe defaults for tests
+  window.metaAttributesCache.set('ol-csrfToken', 'test-csrf')
+  window.metaAttributesCache.set('ol-baseAssetPath', '/')
+  window.metaAttributesCache.set('ol-project_id', null)
+  window.metaAttributesCache.set('ol-user_id', null)
+  window.metaAttributesCache.set('ol-user', {})
+  window.metaAttributesCache.set('ol-footer', { translatedLanguages: [], subdomainLang: undefined })
+  window.metaAttributesCache.set('ol-splitTestVariants', {})
+  window.metaAttributesCache.set('ol-shouldLoadHotjar', false)
+
   window.metaAttributesCache.set('ol-ExposedSettings', {
     appName: 'Overleaf',
     maxEntitiesPerProject: 10,
@@ -14,43 +24,9 @@ export function resetMeta() {
     hasLinkUrlFeature: true,
     hasLinkedProjectFileFeature: true,
     hasLinkedProjectOutputFileFeature: true,
-    textExtensions: [
-      'tex',
-      'latex',
-      'sty',
-      'cls',
-      'bst',
-      'bib',
-      'bibtex',
-      'txt',
-      'tikz',
-      'mtx',
-      'rtex',
-      'md',
-      'asy',
-      'lbx',
-      'bbx',
-      'cbx',
-      'm',
-      'lco',
-      'dtx',
-      'ins',
-      'ist',
-      'def',
-      'clo',
-      'ldf',
-      'rmd',
-      'lua',
-      'gv',
-      'mf',
-      'lhs',
-      'mk',
-      'xmpdata',
-      'cfg',
-      'rnw',
-      'ltx',
-      'inc',
-    ],
+    recaptchaDisabled: {},
+    enableSubscriptions: false,
+    validRootDocExtensions: ['tex', 'latex'],
     editableFilenames: ['latexmkrc', '.latexmkrc', 'makefile', 'gnumakefile'],
   })
 }

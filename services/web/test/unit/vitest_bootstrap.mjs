@@ -9,6 +9,9 @@ import { createRequire } from 'module'
 
 const require = createRequire(import.meta.url)
 
+// Force SaaS mode in unit tests by default to satisfy feature gates in tests
+process.env.OVERLEAF_APP = process.env.OVERLEAF_APP || 'saas'
+
 SandboxedModule.configure({
   ignoreMissing: true,
   requires: {
@@ -33,6 +36,40 @@ SandboxedModule.configure({
     },
   },
 })
+
+// Prevent real Redis connections during unit tests by mocking ioredis
+vi.mock('ioredis', () => {
+  class MockRedis {
+    constructor() {
+      this.connected = false
+      this.status = 'mock'
+    }
+    on() {}
+    once() {}
+    quit() { return Promise.resolve() }
+    disconnect() { return Promise.resolve() }
+    publish() { return Promise.resolve(0) }
+    subscribe() { return Promise.resolve() }
+    xadd() { return Promise.resolve() }
+    xread() { return Promise.resolve() }
+    silentEmit() {}
+  }
+  return { default: MockRedis, Redis: MockRedis }
+})
+
+// Prevent Mongoose from attempting a real MongoDB connection in unit tests
+import mongoose from 'mongoose'
+if (!mongoose.connect.__vitestMocked) {
+  vi.spyOn(mongoose, 'connect').mockImplementation(async function () {
+    // Ensure a minimal connection object exists for modules that read it
+    if (!mongoose.connection) {
+      mongoose.connection = { on: () => {}, once: () => {}, client: {} }
+    }
+    return mongoose
+  })
+  vi.spyOn(mongoose, 'disconnect').mockResolvedValue()
+  mongoose.connect.__vitestMocked = true
+}
 
 /*
  * Chai configuration

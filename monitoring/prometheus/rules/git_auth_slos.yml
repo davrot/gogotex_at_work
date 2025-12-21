@@ -1,0 +1,21 @@
+groups:
+  - name: git_auth_slos
+    rules:
+      - alert: KeyLookupLatencyP95High
+        expr: |
+          histogram_quantile(0.95, sum(rate(ssh_key_lookup_duration_seconds_bucket[5m])) by (le)) > 0.05
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: "SSH key lookup p95 latency is > 50ms"
+          description: "ssh_key_lookup p95 exceeded 50ms for 5 minutes. Investigate service, CI benchmark artifacts, and recent deploys."
+      - alert: TokenIntrospectionLatencyP95High
+        expr: |
+          histogram_quantile(0.95, sum(rate(token_introspect_duration_seconds_bucket[5m])) by (le)) > 0.1
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: "Token introspection p95 latency is > 100ms"
+          description: "token_introspect p95 exceeded 100ms for 5 minutes. Investigate service, CI benchmark artifacts, and recent deploys."

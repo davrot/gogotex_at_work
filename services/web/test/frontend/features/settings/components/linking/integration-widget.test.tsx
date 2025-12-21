@@ -1,3 +1,4 @@
+import React from 'react'
 import { expect } from 'chai'
 import sinon from 'sinon'
 import { screen, fireEvent, render, within } from '@testing-library/react'

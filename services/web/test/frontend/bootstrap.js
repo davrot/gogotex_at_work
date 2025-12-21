@@ -1,7 +1,14 @@
 // Run babel on tests to allow support for import/export statements in Node
+const path = require('path')
+// Ensure tests run with project root as cwd so module-resolver's './frontend/js' works
+process.chdir(path.resolve(__dirname, '..', '..'))
+
 require('@babel/register')({
   extensions: ['.ts', '.tsx', '.js', '.jsx', '.mjs'],
-  plugins: [['module-resolver', { alias: { '^@/(.+)': './frontend/js/\\1' } }]],
+  plugins: [
+    // Map '@' alias to the frontend JS folder so imports like '@/foo' resolve in tests
+    ['module-resolver', { alias: { '@': path.resolve(__dirname, '../../frontend/js') } }],
+  ],
 })
 
 // Load JSDOM to mock the DOM in Node
@@ -11,7 +18,6 @@ require('jsdom-global')(undefined, {
   url: 'https://www.test-overleaf.com/',
 })
 
-const path = require('path')
 process.env.OVERLEAF_CONFIG = path.resolve(
   __dirname,
   '../../config/settings.webpack.js'
@@ -23,11 +29,54 @@ const chai = require('chai')
 chai.use(require('sinon-chai'))
 chai.use(require('chai-as-promised'))
 
+// Ensure React is globally available for tests that compile JSX to React.createElement
+try {
+  const React = require('react')
+  global.React = React
+  globalThis.React = React
+} catch (e) {
+  // If React is unavailable in the test environment, proceed; tests that need it will fail accordingly
+}
+
 // Populate meta for top-level access in modules on import
 const { resetMeta } = require('./helpers/reset-meta')
 resetMeta()
-// i18n requires access to 'ol-i18n' as defined above
-require('../../frontend/js/i18n')
+// i18n requires access to 'ol-i18n' as defined above. When running isolated
+// component tests we prefer to stub it to avoid pulling in unrelated modules
+// (which can introduce many module resolution errors during test collection).
+try {
+  require('../../frontend/js/i18n')
+} catch (e) {
+  // Minimal i18n stub: provide `t` and a resolved promise to mimic the real loader
+  // so components and hooks that call `useTranslation` do not fail at import time.
+  global.__i18nStub = true
+  const prettify = key => {
+    if (!key || typeof key !== 'string') return String(key)
+    // replace common tokens with nicer human text
+    let s = key
+      .replace(/_/g, ' ')
+      .replace(/\bgithub\b/gi, 'GitHub')
+      .replace(/\bpdf\b/gi, 'PDF')
+      .replace(/\bsubmit\b/gi, 'Submit')
+    return s.charAt(0).toUpperCase() + s.slice(1)
+  }
+
+  globalThis.i18n = {
+    t: (k) => prettify(k),
+    addResourceBundle: () => {},
+    addResource: () => {},
+  }
+  // Provide a simple useTranslation hook stub for React components
+  try {
+    const React = require('react')
+    const reactI18next = require('react-i18next')
+    if (!reactI18next.useTranslation) {
+      reactI18next.useTranslation = () => ({ t: (k) => prettify(k) })
+    }
+  } catch (err) {
+    // ignore if react or react-i18next not available yet
+  }
+}
 
 const moment = require('moment')
 moment.updateLocale('en', {
@@ -105,8 +154,10 @@ require('fake-indexeddb/auto')
 
 const fetchMock = require('fetch-mock').default
 
+// Prevent accidental recursion: capture the native fetch implementation
+const _nativeFetch = global.fetch || (typeof fetch !== 'undefined' ? fetch : undefined)
+if (_nativeFetch) fetchMock.config.fetch = _nativeFetch
 fetchMock.spyGlobal()
-fetchMock.config.fetch = global.fetch
 fetchMock.config.Response = fetch.Response
 
 Object.defineProperty(navigator, 'onLine', {

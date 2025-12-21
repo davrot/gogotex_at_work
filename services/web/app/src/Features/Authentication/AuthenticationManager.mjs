@@ -61,9 +61,18 @@ const AuthenticationManager = {
     // Using Mongoose for legacy reasons here. The returned User instance
     // gets serialized into the session and there may be subtle differences
     // between the user returned by Mongoose vs mongodb (such as default values)
-    const user = await User.findOne(query).exec()
+    // If there are duplicate user docs for the same email, prefer the most-recently
+    // created one by sorting by _id desc (newer ObjectIds are larger).
+    const user = await User.findOne(query).sort({ _id: -1 }).exec()
 
-    if (!user || !user.hashedPassword) {
+    if (!user) {
+      // eslint-disable-next-line no-console
+      console.debug('[AuthenticationManager] no user found for query', query)
+      return { user: null, match: null }
+    }
+    if (!user.hashedPassword) {
+      // eslint-disable-next-line no-console
+      console.debug('[AuthenticationManager] user has no hashedPassword', { userId: user._id?.toString(), email: user.email })
       return { user: null, match: null }
     }
 
@@ -104,22 +113,47 @@ const AuthenticationManager = {
       path: rounds,
     })
 
+    try {
+      const hashInfo = typeof user.hashedPassword === 'string' ? {
+        length: user.hashedPassword.length,
+        prefix: user.hashedPassword.slice(0, 8),
+        suffix: user.hashedPassword.slice(-8),
+      } : { type: typeof user.hashedPassword }
+      console.debug('[AuthenticationManager] about to compare password', { userId: user._id?.toString(), email: user.email, passwordLength: password?.length, hashInfo })
+    } catch (e) {}
     const match = await bcrypt.compare(password, user.hashedPassword)
+    try { console.debug('[AuthenticationManager] bcrypt.compare result', { userId: user._id?.toString(), match }) } catch (e) {}
 
     if (match) {
       _metricsForSuccessfulPasswordMatch(password)
+    } else {
+      // Debug: when password checks fail often during tests, log helpful
+      // metadata to assist triage without logging the plaintext password.
+      try {
+        const hashInfo = typeof user.hashedPassword === 'string' ? {
+          length: user.hashedPassword.length,
+          prefix: user.hashedPassword.slice(0, 8),
+          suffix: user.hashedPassword.slice(-8),
+        } : { type: typeof user.hashedPassword }
+        // eslint-disable-next-line no-console
+        console.debug('[AuthenticationManager] password mismatch', { userId: user._id?.toString(), email: user.email, hashInfo })
+      } catch (e) {}
     }
 
     return { user, match }
   },
 
   async authenticate(query, password, auditLog, { enforceHIBPCheck = true }) {
+    try { console.debug('[AuthenticationManager.authenticate] entry', { query, passwordLength: password ? password.length : 0, enforceHIBPCheck }) } catch (e) {}
     const { user, match } = await AuthenticationManager._checkUserPassword(
       query,
       password
     )
 
+    try { console.debug('[AuthenticationManager.authenticate] _checkUserPassword result', { userId: user && user._id ? String(user._id) : null, match }) } catch (e) {}
+
     if (!user) {
+      try { console.debug('[AuthenticationManager.authenticate] no user found, returning null') } catch (e) {}
       return { user: null }
     }
 

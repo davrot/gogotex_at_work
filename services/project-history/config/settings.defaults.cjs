@@ -8,7 +8,7 @@ module.exports = {
   mongo: {
     url:
       process.env.MONGO_CONNECTION_STRING ||
-      `mongodb://${process.env.MONGO_HOST || '127.0.0.1'}/sharelatex`,
+      `mongodb://${process.env.MONGO_HOST || (process.env.NODE_ENV === 'test' ? 'mongo' : '127.0.0.1')}/sharelatex`,
     options: {
       monitorCommands: true,
     },
@@ -47,7 +47,7 @@ module.exports = {
   },
   redis: {
     lock: {
-      host: process.env.REDIS_HOST || '127.0.0.1',
+      host: process.env.REDIS_HOST || (process.env.NODE_ENV === 'test' ? 'redis' : '127.0.0.1'),
       password: process.env.REDIS_PASSWORD,
       port: process.env.REDIS_PORT || 6379,
       key_schema: {
@@ -58,7 +58,7 @@ module.exports = {
     },
     project_history: {
       host:
-        process.env.HISTORY_REDIS_HOST || process.env.REDIS_HOST || '127.0.0.1',
+        process.env.HISTORY_REDIS_HOST || process.env.REDIS_HOST || (process.env.NODE_ENV === 'test' ? 'redis' : '127.0.0.1'),
       port: process.env.HISTORY_REDIS_PORT || process.env.REDIS_PORT || 6379,
       password:
         process.env.HISTORY_REDIS_PASSWORD || process.env.REDIS_PASSWORD,

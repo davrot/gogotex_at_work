@@ -6,9 +6,9 @@ services:
     ports:
       - "127.0.0.1:9230:9229"
     volumes:
-      - ../services/clsi/app:/overleaf/services/clsi/app
-      - ../services/clsi/app.js:/overleaf/services/clsi/app.js
-      - ../services/clsi/config:/overleaf/services/clsi/config
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/clsi/app:/overleaf/services/clsi/app
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/clsi/app.js:/overleaf/services/clsi/app.js
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/clsi/config:/overleaf/services/clsi/config
 
   chat:
     command: ["node", "--watch", "app.js"]
@@ -17,9 +17,9 @@ services:
     ports:
       - "127.0.0.1:9231:9229"
     volumes:
-      - ../services/chat/app:/overleaf/services/chat/app
-      - ../services/chat/app.js:/overleaf/services/chat/app.js
-      - ../services/chat/config:/overleaf/services/chat/config
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/chat/app:/overleaf/services/chat/app
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/chat/app.js:/overleaf/services/chat/app.js
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/chat/config:/overleaf/services/chat/config
 
   contacts:
     command: ["node", "--watch", "app.js"]
@@ -28,9 +28,9 @@ services:
     ports:
       - "127.0.0.1:9232:9229"
     volumes:
-      - ../services/contacts/app:/overleaf/services/contacts/app
-      - ../services/contacts/app.js:/overleaf/services/contacts/app.js
-      - ../services/contacts/config:/overleaf/services/contacts/config
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/contacts/app:/overleaf/services/contacts/app
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/contacts/app.js:/overleaf/services/contacts/app.js
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/contacts/config:/overleaf/services/contacts/config
 
   docstore:
     command: ["node", "--watch", "app.js"]
@@ -39,9 +39,9 @@ services:
     ports:
       - "127.0.0.1:9233:9229"
     volumes:
-      - ../services/docstore/app:/overleaf/services/docstore/app
-      - ../services/docstore/app.js:/overleaf/services/docstore/app.js
-      - ../services/docstore/config:/overleaf/services/docstore/config
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/docstore/app:/overleaf/services/docstore/app
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/docstore/app.js:/overleaf/services/docstore/app.js
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/docstore/config:/overleaf/services/docstore/config
 
   document-updater:
     command: ["node", "--watch", "app.js"]
@@ -50,9 +50,9 @@ services:
     ports:
       - "127.0.0.1:9234:9229"
     volumes:
-      - ../services/document-updater/app:/overleaf/services/document-updater/app
-      - ../services/document-updater/app.js:/overleaf/services/document-updater/app.js
-      - ../services/document-updater/config:/overleaf/services/document-updater/config
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/document-updater/app:/overleaf/services/document-updater/app
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/document-updater/app.js:/overleaf/services/document-updater/app.js
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/document-updater/config:/overleaf/services/document-updater/config
 
   filestore:
     command: ["node", "--watch", "app.js"]
@@ -61,9 +61,9 @@ services:
     ports:
       - "127.0.0.1:9235:9229"
     volumes:
-      - ../services/filestore/app:/overleaf/services/filestore/app
-      - ../services/filestore/app.js:/overleaf/services/filestore/app.js
-      - ../services/filestore/config:/overleaf/services/filestore/config
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/filestore/app:/overleaf/services/filestore/app
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/filestore/app.js:/overleaf/services/filestore/app.js
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/filestore/config:/overleaf/services/filestore/config
 
   history-v1:
     command: ["node", "--watch", "app.js"]
@@ -72,12 +72,12 @@ services:
     ports:
       - "127.0.0.1:9239:9229"
     volumes:
-      - ../services/history-v1/api:/overleaf/services/history-v1/api
-      - ../services/history-v1/app.js:/overleaf/services/history-v1/app.js
-      - ../services/history-v1/config:/overleaf/services/history-v1/config
-      - ../services/history-v1/storage:/overleaf/services/history-v1/storage
-      - ../services/history-v1/knexfile.js:/overleaf/services/history-v1/knexfile.js
-      - ../services/history-v1/migrations:/overleaf/services/history-v1/migrations
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/history-v1/api:/overleaf/services/history-v1/api
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/history-v1/app.js:/overleaf/services/history-v1/app.js
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/history-v1/config:/overleaf/services/history-v1/config
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/history-v1/storage:/overleaf/services/history-v1/storage
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/history-v1/knexfile.js:/overleaf/services/history-v1/knexfile.js
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/history-v1/migrations:/overleaf/services/history-v1/migrations
 
   notifications:
     command: ["node", "--watch", "app.ts"]
@@ -86,9 +86,9 @@ services:
     ports:
       - "127.0.0.1:9236:9229"
     volumes:
-      - ../services/notifications/app:/overleaf/services/notifications/app
-      - ../services/notifications/app.ts:/overleaf/services/notifications/app.ts
-      - ../services/notifications/config:/overleaf/services/notifications/config
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/notifications/app:/overleaf/services/notifications/app
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/notifications/app.ts:/overleaf/services/notifications/app.ts
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/notifications/config:/overleaf/services/notifications/config
 
   project-history:
     command: ["node", "--watch", "app.js"]
@@ -97,9 +97,9 @@ services:
     ports:
       - "127.0.0.1:9240:9229"
     volumes:
-      - ../services/project-history/app:/overleaf/services/project-history/app
-      - ../services/project-history/app.js:/overleaf/services/project-history/app.js
-      - ../services/project-history/config:/overleaf/services/project-history/config
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/project-history/app:/overleaf/services/project-history/app
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/project-history/app.js:/overleaf/services/project-history/app.js
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/project-history/config:/overleaf/services/project-history/config
 
   real-time:
     command: ["node", "--watch", "app.js"]
@@ -108,9 +108,9 @@ services:
     ports:
       - "127.0.0.1:9237:9229"
     volumes:
-      - ../services/real-time/app:/overleaf/services/real-time/app
-      - ../services/real-time/app.js:/overleaf/services/real-time/app.js
-      - ../services/real-time/config:/overleaf/services/real-time/config
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/real-time/app:/overleaf/services/real-time/app
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/real-time/app.js:/overleaf/services/real-time/app.js
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/real-time/config:/overleaf/services/real-time/config
 
   web:
     command: ["node", "--watch", "app.mjs", "--watch-locales"]
@@ -119,21 +119,21 @@ services:
     ports:
       - "127.0.0.1:9229:9229"
     volumes:
-      - ../services/web/app:/overleaf/services/web/app
-      - ../services/web/app.mjs:/overleaf/services/web/app.mjs
-      - ../services/web/config:/overleaf/services/web/config
-      - ../services/web/locales:/overleaf/services/web/locales
-      - ../services/web/modules:/overleaf/services/web/modules
-      - ../services/web/public:/overleaf/services/web/public
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/app:/overleaf/services/web/app
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/app.mjs:/overleaf/services/web/app.mjs
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/config:/overleaf/services/web/config
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/locales:/overleaf/services/web/locales
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/modules:/overleaf/services/web/modules
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/public:/overleaf/services/web/public
 
   webpack:
     volumes:
-      - ../services/web/app:/overleaf/services/web/app
-      - ../services/web/config:/overleaf/services/web/config
-      - ../services/web/frontend:/overleaf/services/web/frontend
-      - ../services/web/locales:/overleaf/services/web/locales
-      - ../services/web/modules:/overleaf/services/web/modules
-      - ../services/web/public:/overleaf/services/web/public
-      - ../services/web/transform:/overleaf/services/web/transform
-      - ../services/web/types:/overleaf/services/web/types
-      - ../services/web/webpack-plugins:/overleaf/services/web/webpack-plugins
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/app:/overleaf/services/web/app
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/config:/overleaf/services/web/config
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/frontend:/overleaf/services/web/frontend
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/locales:/overleaf/services/web/locales
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/modules:/overleaf/services/web/modules
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/public:/overleaf/services/web/public
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/transform:/overleaf/services/web/transform
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/types:/overleaf/services/web/types
+      - /data_1/davrot/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/webpack-plugins:/overleaf/services/web/webpack-plugins

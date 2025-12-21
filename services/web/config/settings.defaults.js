@@ -139,13 +139,15 @@ module.exports = {
     url:
       process.env.MONGO_CONNECTION_STRING ||
       process.env.MONGO_URL ||
-      `mongodb://${process.env.MONGO_HOST || '127.0.0.1'}/sharelatex`,
+      `mongodb://${process.env.MONGO_HOST || (process.env.NODE_ENV === 'test' ? 'mongo' : '127.0.0.1')}/sharelatex`,
     hasSecondaries: process.env.MONGO_HAS_SECONDARIES === 'true',
   },
 
   redis: {
     web: {
-      host: process.env.REDIS_HOST || '127.0.0.1',
+      // When running tests inside Docker, prefer the docker-compose service name
+      // 'redis' so Redis clients connect to the containerized Redis instance.
+      host: process.env.REDIS_HOST || (process.env.NODE_ENV === 'test' ? 'redis' : '127.0.0.1'),
       port: process.env.REDIS_PORT || '6379',
       password: process.env.REDIS_PASSWORD || '',
       db: process.env.REDIS_DB,
@@ -185,7 +187,7 @@ module.exports = {
     // 	]
 
     api: {
-      host: process.env.REDIS_HOST || '127.0.0.1',
+      host: process.env.REDIS_HOST || (process.env.NODE_ENV === 'test' ? 'redis' : '127.0.0.1'),
       port: process.env.REDIS_PORT || '6379',
       password: process.env.REDIS_PASSWORD || '',
       maxRetriesPerRequest: parseInt(

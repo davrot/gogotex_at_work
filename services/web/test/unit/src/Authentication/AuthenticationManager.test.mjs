@@ -104,7 +104,7 @@ describe('AuthenticationManager', function () {
         ctx.user.hashedPassword = ctx.testPassword
         ctx.User.findOne = sinon
           .stub()
-          .returns({ exec: sinon.stub().resolves(ctx.user) })
+          .returns({ sort: sinon.stub().returns({ exec: sinon.stub().resolves(ctx.user) }) })
         ctx.metrics.inc.reset()
       })
 
@@ -226,7 +226,7 @@ describe('AuthenticationManager', function () {
         ctx.db.users.updateOne = sinon
         ctx.User.findOne = sinon
           .stub()
-          .returns({ exec: sinon.stub().resolves(ctx.user) })
+          .returns({ sort: sinon.stub().returns({ exec: sinon.stub().resolves(ctx.user) }) })
         ctx.bcrypt.compare = sinon.stub().resolves(false)
         ctx.db.users.updateOne = sinon.stub().resolves({ modifiedCount: 1 })
       })
@@ -272,7 +272,7 @@ describe('AuthenticationManager', function () {
         ctx.unencryptedPassword = 'banana'
         ctx.User.findOne = sinon
           .stub()
-          .returns({ exec: sinon.stub().resolves(ctx.user) })
+          .returns({ sort: sinon.stub().returns({ exec: sinon.stub().resolves(ctx.user) }) })
         ctx.metrics.inc.reset()
       })
 
@@ -509,7 +509,7 @@ describe('AuthenticationManager', function () {
       beforeEach(async function (ctx) {
         ctx.User.findOne = sinon
           .stub()
-          .returns({ exec: sinon.stub().resolves(null) })
+          .returns({ sort: sinon.stub().returns({ exec: sinon.stub().resolves(null) }) })
         ;({ user: ctx.result } =
           await ctx.AuthenticationManager.promises.authenticate(
             { email: ctx.email },
@@ -844,7 +844,7 @@ describe('AuthenticationManager', function () {
       ctx.bcrypt.hash = sinon.stub().resolves(ctx.hashedPassword)
       ctx.User.findOne = sinon
         .stub()
-        .returns({ exec: sinon.stub().resolves(ctx.user) })
+        .returns({ sort: sinon.stub().returns({ exec: sinon.stub().resolves(ctx.user) }) })
       ctx.db.users.updateOne = sinon.stub().resolves()
     })
 

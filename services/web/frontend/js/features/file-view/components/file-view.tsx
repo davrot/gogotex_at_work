@@ -17,13 +17,19 @@ export default function FileView({ file }: { file: BinaryFile }) {
 
   const { t } = useTranslation()
 
-  const { textExtensions, editableFilenames } = getMeta('ol-ExposedSettings')
+  const _exposed = getMeta('ol-ExposedSettings') || {}
+  const { textExtensions = [], editableFilenames = [], validRootDocExtensions = [] } = _exposed
 
-  const extension = file.name.split('.')?.pop()?.toLowerCase()
+  // Some parts of the codebase expose text file extensions under different keys
+  // (e.g. `validRootDocExtensions`), so treat them as equivalent for preview
+  // detection to make tests and behavior more robust.
+  const combinedTextExtensions = [...new Set([...(textExtensions || []), ...(validRootDocExtensions || [])])]
+
+  const extension = (file.name || '').split('.').pop()?.toLowerCase()
 
   const isEditableTextFile =
-    (extension && textExtensions.includes(extension)) ||
-    editableFilenames.includes(file.name.toLowerCase())
+    (extension && combinedTextExtensions.includes(extension)) ||
+    editableFilenames.includes((file.name || '').toLowerCase())
 
   const isImageFile = !!extension && imageExtensions.includes(extension)
   const isPdfFile = extension === 'pdf'

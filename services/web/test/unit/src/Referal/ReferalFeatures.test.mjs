@@ -40,6 +40,9 @@ describe('ReferalFeatures', function () {
 
       ctx.User.findOne = sinon.stub().returns({
         exec: sinon.stub().resolves(stubbedUser),
+        sort: sinon.stub().returns({
+          exec: sinon.stub().resolves(stubbedUser),
+        }),
       })
       ctx.features = await ctx.ReferalFeatures.promises.getBonusFeatures(
         ctx.user_id
@@ -69,6 +72,11 @@ describe('ReferalFeatures', function () {
         exec: sinon
           .stub()
           .resolves({ refered_user_count: ctx.refered_user_count }),
+        sort: sinon.stub().returns({
+          exec: sinon
+            .stub()
+            .resolves({ refered_user_count: ctx.refered_user_count }),
+        }),
       })
 
       ctx.features = await ctx.ReferalFeatures.promises.getBonusFeatures(

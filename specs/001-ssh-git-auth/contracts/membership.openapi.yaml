@@ -1,0 +1,42 @@
+openapi: 3.0.3
+info:
+  title: Membership API (internal)
+  version: 1.0.0
+paths:
+  /internal/api/projects/{projectId}/members/{userId}:
+    get:
+      summary: Check whether a given user is a member of a project
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User is a member of the project
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  member:
+                    type: boolean
+                    example: true
+        "403":
+          description: Forbidden - invalid credentials for internal API access
+        "404":
+          description: Not a member or project not found
+      security:
+        - privateApiAuth: []
+components:
+  securitySchemes:
+    privateApiAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: API-Token

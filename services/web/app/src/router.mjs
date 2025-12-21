@@ -1,4 +1,5 @@
 import AdminController from './Features/ServerAdmin/AdminController.mjs'
+import TokenReissueController from './Features/Admin/TokenReissueController.mjs'
 import ErrorController from './Features/Errors/ErrorController.mjs'
 import Features from './infrastructure/Features.js'
 import ProjectController from './Features/Project/ProjectController.mjs'
@@ -22,6 +23,7 @@ import UserInfoController from './Features/User/UserInfoController.mjs'
 import UserController from './Features/User/UserController.mjs'
 import UserEmailsController from './Features/User/UserEmailsController.mjs'
 import UserPagesController from './Features/User/UserPagesController.mjs'
+import UserSSHKeysController from './Features/User/UserSSHKeysController.mjs'
 import TutorialController from './Features/Tutorial/TutorialController.mjs'
 import DocumentController from './Features/Documents/DocumentController.mjs'
 import CompileManager from './Features/Compile/CompileManager.mjs'
@@ -51,6 +53,9 @@ import AnalyticsRouter from './Features/Analytics/AnalyticsRouter.mjs'
 import MetaController from './Features/Metadata/MetaController.mjs'
 import TokenAccessController from './Features/TokenAccess/TokenAccessController.mjs'
 import TokenAccessRouter from './Features/TokenAccess/TokenAccessRouter.mjs'
+import TokenRouter from './Features/Token/TokenRouter.mjs'
+import TokenController from './Features/Token/TokenController.mjs'
+import DiscoveryRouter from './Features/Discovery/DiscoveryRouter.mjs'
 import LinkedFilesRouter from './Features/LinkedFiles/LinkedFilesRouter.mjs'
 import TemplatesRouter from './Features/Templates/TemplatesRouter.mjs'
 import UserMembershipRouter from './Features/UserMembership/UserMembershipRouter.mjs'
@@ -193,6 +198,9 @@ const rateLimiters = {
     points: 10,
     duration: 60,
   }),
+  fingerprintLookup: new RateLimiter('fingerprint-lookup', { points: 60, duration: 60 }),
+  cacheInvalidate: new RateLimiter('cache-invalidate', { points: 60, duration: 60 }),
+
 }
 
 async function initialize(webRouter, privateApiRouter, publicApiRouter) {
@@ -279,6 +287,10 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
   TemplatesRouter.apply(webRouter)
   UserMembershipRouter.apply(webRouter)
   TokenAccessRouter.apply(webRouter)
+  // Token management (user git tokens)
+  TokenRouter.apply(webRouter)
+
+  DiscoveryRouter.apply(webRouter, privateApiRouter)
   HistoryRouter.apply(webRouter, privateApiRouter)
 
   await Modules.applyRouter(webRouter, privateApiRouter, publicApiRouter)
@@ -305,6 +317,108 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
     AuthenticationController.requireLogin(),
     UserController.updateUserSettings
   )
+
+  // User SSH Keys: list, create, delete (internal/user-facing)
+  // internal form (explicit user id) - controller enforces admin access when acting on other users
+  webRouter.get('/internal/api/users/:userId/ssh-keys', AuthenticationController.requireLogin(), UserSSHKeysController.list)
+  webRouter.post('/internal/api/users/:userId/ssh-keys', (req, res, next) => { try { console.error('[ROUTE DEBUG] /internal/api/users/:userId/ssh-keys incoming', { method: req.method, url: req.originalUrl || req.url, headers: { cookie: req.headers && req.headers.cookie, 'x-csrf-token': req.get && req.get('x-csrf-token'), 'x-dev-user-id': req.get && req.get('x-dev-user-id') }, sessionExists: !!req.session, sessionUserId: req.session && req.session.user && req.session.user._id ? req.session.user._id : null }) } catch (e) {} next() }, AuthenticationController.requireLogin(), UserSSHKeysController.create)
+
+  // Test-only: add a CSRF-exempt GET debug echo to inspect headers/session without triggering csurf
+  try {
+    webRouter.csrf && webRouter.csrf.disableDefaultCsrfProtection && webRouter.csrf.disableDefaultCsrfProtection('/internal/api/debug/echo', 'GET')
+    webRouter.get('/internal/api/debug/echo', (req, res) => {
+      try { console.error('[ROUTE DEBUG] /internal/api/debug/echo incoming', { method: req.method, url: req.originalUrl || req.url, headers: { cookie: req.headers && req.headers.cookie, 'x-csrf-token': req.get && req.get('x-csrf-token'), 'x-dev-user-id': req.get && req.get('x-dev-user-id') }, sessionExists: !!req.session, sessionUserId: req.session && req.session.user && req.session.user._id ? req.session.user._id : null }) } catch (e) {}
+      res.json({ ok: true, headers: { cookie: req.headers && req.headers.cookie, 'x-csrf-token': req.get && req.get('x-csrf-token'), 'x-dev-user-id': req.get && req.get('x-dev-user-id') }, sessionExists: !!req.session, sessionUser: req.session && req.session.user ? req.session.user : null })
+    })
+  } catch (e) {}
+  webRouter.delete('/internal/api/users/:userId/ssh-keys/:keyId', AuthenticationController.requireLogin(), UserSSHKeysController.remove)
+
+  // Test-only debug: echo headers/session for internal API triage
+  try { console.error('[ROUTER INIT] registering /internal/api/debug/echo') } catch (e) {}
+
+  // Backwards-compatible debug route to allow test harnesses to toggle rate limits
+  try { console.error('[ROUTER INIT] registering /internal/api/debug/disable-rate-limits') } catch (e) {}
+  webRouter.post('/internal/api/debug/disable-rate-limits', (req, res) => {
+    try {
+      const fs = require('fs')
+      try { fs.writeFileSync('/tmp/disable-rate-limits', '1') } catch (e) {}
+      process.env.DISABLE_RATE_LIMITS = 'true'
+      try { const Settings = require('@overleaf/settings'); Settings.disableRateLimits = true } catch (e) {}
+      try { console.debug('[ROUTER DEBUG] disabled rate limits (debug endpoint)') } catch (e) {}
+      return res.status(200).json({ ok: true })
+    } catch (err) {
+      try { console.error('[ROUTER DEBUG] disable-rate-limits error', err && err.stack ? err.stack : err) } catch (e) {}
+      return res.sendStatus(500)
+    }
+  })
+
+  webRouter.post('/internal/api/debug/echo', (req, res) => {
+    try {
+      const sessionUser = (req.session && req.session.user) ? { _id: req.session.user._id, email: req.session.user.email } : null
+      const out = {
+        headers: req.headers,
+        csrfHeader: req.get && req.get('x-csrf-token'),
+        sessionExists: !!req.session,
+        sessionUser,
+      }
+      if (process.env.NODE_ENV === 'test' || (req.get && req.get('x-debug-echo') === '1') || process.env.NODE_ENV === 'development') {
+        try { console.error('[ROUTER DEBUG ECHO] returning', out) } catch (e) {}
+        return res.status(200).json(out)
+      }
+      return res.sendStatus(404)
+    } catch (err) {
+      try { console.error('[ROUTER DEBUG ECHO] error', err && err.stack ? err.stack : err) } catch (e) {}
+      return res.sendStatus(500)
+    }
+  })
+
+  // Test-only endpoint to toggle rate limiting in the running web process. This makes
+  // it possible for the test harness to disable rate-limiting behavior even when the
+  // container was started without DISABLE_RATE_LIMITS set. Only active in test mode.
+  try { console.error('[ROUTER INIT] registering /internal/api/test/disable-rate-limits') } catch (e) {}
+  webRouter.post('/internal/api/test/disable-rate-limits', async (req, res) => {
+    // Allow tests and non-production environments to toggle rate-limits at runtime.
+    if (process.env.NODE_ENV === 'production') return res.sendStatus(404)
+    try {
+      try {
+        const fs = (await import('fs')).promises ? (await import('fs')) : await import('fs')
+        // Use synchronous write to make change visible immediately
+        const syncFs = await import('node:fs')
+        try { syncFs.writeFileSync('/tmp/disable-rate-limits', '1') } catch (e) {}
+      } catch (e) {}
+      process.env.DISABLE_RATE_LIMITS = 'true'
+      try {
+        const SettingsModule = await import('@overleaf/settings')
+        const Settings = SettingsModule && (SettingsModule.default || SettingsModule)
+        Settings.disableRateLimits = true
+      } catch (e) {}
+      try { console.debug('[ROUTER TEST] disabled rate limits (test/dev)') } catch (e) {}
+      return res.status(200).json({ ok: true })
+    } catch (err) {
+      try { console.error('[ROUTER TEST] disable-rate-limits error', err && err.stack ? err.stack : err) } catch (e) {}
+      return res.sendStatus(500)
+    }
+  })
+
+  webRouter.post('/internal/api/test/enable-rate-limits', (req, res) => {
+    if (process.env.NODE_ENV !== 'test') return res.sendStatus(404)
+    try {
+      const fs = require('fs')
+      try { fs.unlinkSync('/tmp/disable-rate-limits') } catch (e) {}
+      process.env.DISABLE_RATE_LIMITS = undefined
+      try { const Settings = require('@overleaf/settings'); Settings.disableRateLimits = false } catch (e) {}
+      try { console.debug('[ROUTER TEST] enabled rate limits (test-only)') } catch (e) {}
+      return res.status(200).json({ ok: true })
+    } catch (err) {
+      try { console.error('[ROUTER TEST] enable-rate-limits error', err && err.stack ? err.stack : err) } catch (e) {}
+      return res.sendStatus(500)
+    }
+  })
+
+  // User-facing endpoints for managing your own SSH keys (same protection as /user/settings)
+  webRouter.get('/user/ssh-keys', AuthenticationController.requireLogin(), UserSSHKeysController.list)
+  webRouter.post('/user/ssh-keys', AuthenticationController.requireLogin(), UserSSHKeysController.create)
+  webRouter.delete('/user/ssh-keys/:keyId', AuthenticationController.requireLogin(), UserSSHKeysController.remove)
   webRouter.post(
     '/user/password/update',
     AuthenticationController.requireLogin(),
@@ -771,6 +885,27 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
     AuthenticationController.requirePrivateApiAuth(),
     ProjectController.expireDeletedProjectsAfterDuration
   )
+
+  // Cache invalidation API (synchronous hook for urgent invalidation requests)
+  privateApiRouter.post(
+    '/internal/api/cache/invalidate',
+    AuthenticationController.requirePrivateApiAuth(),
+    RateLimiterMiddleware.rateLimit(rateLimiters.cacheInvalidate),
+    (await import('./routes/cacheInvalidate.mjs')).default
+  )
+
+  privateApiRouter.get(
+    '/internal/api/admin/personal-access-token-reissues/:id',
+    AuthenticationController.requirePrivateApiAuth(),
+    TokenReissueController.get
+  )
+
+  // Token introspection for other services (private API)
+  privateApiRouter.post(
+    '/internal/api/tokens/introspect',
+    AuthenticationController.requirePrivateApiAuth(),
+    TokenController.introspect
+  )
   privateApiRouter.post(
     '/internal/expire-deleted-users-after-duration',
     AuthenticationController.requirePrivateApiAuth(),
@@ -875,6 +1010,13 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
     '/internal/project/:project_id',
     AuthenticationController.requirePrivateApiAuth(),
     ProjectApiController.getProjectDetails
+  )
+
+  // Service-facing route for internal lookups (Basic auth protected)
+  privateApiRouter.get(
+    '/internal/api/service/users/:userId/ssh-keys',
+    AuthenticationController.requirePrivateApiAuth(),
+    UserSSHKeysController.listForService
   )
   privateApiRouter.get(
     '/internal/project/:Project_id/zip',

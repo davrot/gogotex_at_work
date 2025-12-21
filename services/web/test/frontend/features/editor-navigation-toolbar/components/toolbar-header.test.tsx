@@ -106,7 +106,7 @@ describe('<ToolbarHeader />', function () {
   describe('Publish button', function () {
     it('is displayed by default', function () {
       renderWithEditorContext(<ToolbarHeader {...defaultProps} />)
-      screen.getByText('Submit')
+      screen.getByText(/submit/i)
     })
 
     it('is not displayed for users with no publish permissions', function () {
@@ -115,7 +115,7 @@ describe('<ToolbarHeader />', function () {
         hasPublishPermissions: false,
       }
       renderWithEditorContext(<ToolbarHeader {...props} />)
-      expect(screen.queryByText('Submit')).to.not.exist
+      expect(screen.queryByText(/submit/i)).to.not.exist
     })
   })
 })

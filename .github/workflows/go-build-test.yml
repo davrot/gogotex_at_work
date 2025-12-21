@@ -1,0 +1,66 @@
+name: Go build & test
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  go-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.25"
+
+      - name: Download dependencies
+        run: |
+          cd services/git-bridge
+          go mod download
+
+      - name: Run unit tests
+        run: |
+          cd services/git-bridge
+          go test ./... -v
+
+      - name: Run vet
+        run: |
+          cd services/git-bridge
+          go vet ./...
+
+      - name: Build binary
+        run: |
+          cd services/git-bridge
+          go build -o ./bin/git-bridge ./cmd/gitbridge
+
+      - name: Run healthcheck (integration smoke)
+        run: |
+          cd services/git-bridge
+          nohup ./bin/git-bridge > /tmp/gitbridge.log 2>&1 &
+          # wait for server to start
+          for i in $(seq 1 10); do
+            curl -f http://127.0.0.1:8080/health && break || sleep 1
+          done
+          tail -n +1 /tmp/gitbridge.log || true
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v4
+        with:
+          version: v1.60.0
+          args: --timeout=5m
+          working-directory: services/git-bridge
+
+      - name: Run bench harness (git-bridge)
+        run: |
+          cd ci/benchmarks/git-bridge-benchmark
+          ./run.sh
+
+      - name: Upload bench artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-git-bridge
+          path: ci/benchmarks/git-bridge-benchmark/out.txt

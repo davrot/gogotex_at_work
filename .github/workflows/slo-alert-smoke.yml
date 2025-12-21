@@ -1,0 +1,51 @@
+name: SLO alert smoke
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  slo-alert-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Create breach bench output and run alert (expect exit 1)
+        run: |
+          echo '{"p95":150,"p50":20,"p99":300}' > out-breach.json
+          node ci/alerts/check_slo_alert.js out-breach.json 100 introspection-breach
+        continue-on-error: true
+
+      - name: Verify breach case returned non-zero
+        run: |
+          rc=$?
+          if [ "$rc" -eq "0" ]; then
+            echo "SLO smoke: expected non-zero exit on breach, got 0" >&2
+            exit 1
+          fi
+
+      - name: Create ok bench output and run alert (expect exit 0)
+        run: |
+          echo '{"p95":80,"p50":10,"p99":120}' > out-ok.json
+          node ci/alerts/check_slo_alert.js out-ok.json 100 introspection-ok
+
+      - name: Verify ok case returned zero
+        run: |
+          rc=$?
+          if [ "$rc" -ne "0" ]; then
+            echo "SLO smoke: expected zero exit on OK, got $rc" >&2
+            exit 1
+          fi
+
+      - name: Upload test outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: slo-smoke-artifacts
+          path: out-*.json

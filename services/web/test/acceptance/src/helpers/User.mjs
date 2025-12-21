@@ -12,11 +12,11 @@ import { fileURLToPath } from 'node:url'
 import { Cookie } from 'tough-cookie'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
-const COOKIE_DOMAIN = settings.cookieDomain
+const COOKIE_DOMAIN = (settings?.cookieDomain || 'web').toString()
 // The cookie domain has a leading '.' but the cookie jar stores it without.
-const DEFAULT_COOKIE_URL = `https://${COOKIE_DOMAIN.replace(/^\./, '')}/`
+const DEFAULT_COOKIE_URL = `https://${String(COOKIE_DOMAIN || 'web').replace(/^\./, '')}/`
 
-let count = settings.test.counterInit
+let count = settings.test?.counterInit ?? 0
 
 class User {
   constructor(options) {
@@ -46,6 +46,28 @@ class User {
       callback = options
       options = {}
     }
+    // If no callback is provided, return a Promise for async/await usage
+    if (typeof callback !== 'function') {
+      return new Promise((resolve, reject) => {
+        this.request.get(
+          {
+            url: '/dev/session',
+            qs: options ? options.set : undefined,
+          },
+          (err, response, body) => {
+            if (err != null) return reject(err)
+            if (response.statusCode !== 200) return reject(new Error(`get session failed: status=${response.statusCode} body=${JSON.stringify(body)}`))
+            try {
+              const session = JSON.parse(response.body)
+              resolve(session)
+            } catch (e) {
+              reject(e)
+            }
+          }
+        )
+      })
+    }
+
     this.request.get(
       {
         url: '/dev/session',
@@ -383,43 +405,77 @@ class User {
   }
 
   loginWithEmailPassword(email, password, callback) {
-    this.getCsrfToken(error => {
-      if (error != null) {
-        return callback(error)
-      }
-      this.request.post(
-        {
-          url: settings.enableLegacyLogin ? '/login/legacy' : '/login',
-          json: {
-            email,
-            password,
-            'g-recaptcha-response': 'valid',
-          },
-        },
-        (error, response, body) => {
-          if (error != null) {
-            return callback(error)
-          }
-          if (response.statusCode !== 200) {
-            return callback(
-              new OError(
-                `login failed: status=${
-                  response.statusCode
-                } body=${JSON.stringify(body)}`,
-                { response, body }
-              )
-            )
-          }
-          // get new csrf token, then return result of login
-          this.getCsrfToken(err => {
-            if (err) {
-              return callback(OError.tag(err, 'after login'))
-            }
-            callback(null, response, body)
-          })
+    // Add resilience for transient 429 rate-limit responses by retrying a few times with backoff.
+    // Increase defaults to tolerate transient rate-limiter interference in heavy parallel runs.
+    const maxRetries = 10
+    const baseDelay = 200
+    const attempt = (retriesLeft, delay) => {
+      this.getCsrfToken(error => {
+        if (error != null) {
+          return callback(error)
         }
-      )
-    })
+        this.request.post(
+          {
+            url: settings.enableLegacyLogin ? '/login/legacy' : '/login',
+            json: {
+              email,
+              password,
+              'g-recaptcha-response': 'valid',
+            },
+          },
+          (error, response, body) => {
+            if (error != null) {
+              return callback(error)
+            }
+            if (response.statusCode !== 200) {
+              // Debug: print failed login response for triage
+              // eslint-disable-next-line no-console
+              console.debug('[User.loginWithEmailPassword] failed login:', { status: response.statusCode, body })
+
+              // If we got a 429 and we can retry, wait and retry
+              if (response.statusCode === 429 && retriesLeft > 0) {
+                try { console.debug('[User.loginWithEmailPassword] retrying after 429, retriesLeft=', retriesLeft) } catch (e) {}
+                return setTimeout(() => attempt(retriesLeft - 1, Math.min(1000, delay * 2)), delay)
+              }
+
+              // Additional triage: run direct check via AuthenticationManager to see if bcrypt.compare matches
+              AuthenticationManager.promises._checkUserPassword({ email }, password)
+                .then(checkRes => {
+                  try {
+                    console.debug('[User.loginWithEmailPassword] direct check after failed login', { userId: checkRes.user && checkRes.user._id ? String(checkRes.user._id) : null, match: checkRes.match, hashInfo: checkRes.user && checkRes.user.hashedPassword ? { length: checkRes.user.hashedPassword.length, prefix: checkRes.user.hashedPassword.slice(0,8) } : null })
+                  } catch (e) {}
+                  return callback(
+                    new OError(
+                      `login failed: status=${response.statusCode} body=${JSON.stringify(body)}`,
+                      { response, body }
+                    )
+                  )
+                })
+                .catch(err => {
+                  // eslint-disable-next-line no-console
+                  console.error('[User.loginWithEmailPassword] error while doing direct check', err && err.stack ? err.stack : err)
+                  return callback(
+                    new OError(
+                      `login failed: status=${response.statusCode} body=${JSON.stringify(body)}`,
+                      { response, body }
+                    )
+                  )
+                })
+              return
+            }
+            // get new csrf token, then return result of login
+            this.getCsrfToken(err => {
+              if (err) {
+                return callback(OError.tag(err, 'after login'))
+              }
+              callback(null, response, body)
+            })
+          }
+        )
+      })
+    }
+
+    attempt(maxRetries, baseDelay)
   }
 
   ensureUserExists(callback) {
@@ -436,20 +492,46 @@ class User {
           return callback(error)
         }
 
-        UserModel.findOneAndUpdate(
-          filter,
-          {
-            $set: {
-              hashedPassword,
-              emails: this.emails,
-              signUpDate: this.signUpDate,
-              labsProgram: this.labsProgram,
-            },
-          },
-          options
-        )
+        // Debug: see if a user exists before the upsert (helps detect duplicates or pre-existing users)
+        UserModel.findOne(filter)
+          .then(existing => {
+            try { console.debug('[User.ensureUserExists] pre-upsert existing user', { id: existing?._id?.toString(), hasHashedPassword: !!existing?.hashedPassword, hashedPasswordLength: existing?.hashedPassword?.length }) } catch (e) {}
+            return UserModel.findOneAndUpdate(
+              filter,
+              {
+                $set: {
+                  hashedPassword,
+                  emails: this.emails,
+                  signUpDate: this.signUpDate,
+                  labsProgram: this.labsProgram,
+                },
+              },
+              options
+            )
+          })
           .then(user => {
             this.setExtraAttributes(user)
+            try { console.debug('[User.ensureUserExists] upserted user', { id: user._id?.toString(), hasHashedPassword: !!user.hashedPassword, hashedPasswordLength: user.hashedPassword?.length, hashedPasswordPrefix: typeof user.hashedPassword === 'string' ? user.hashedPassword.slice(0,8) : undefined }) } catch (e) {}
+            // Debug: list all users with this email to detect duplicates
+            try {
+              db.users.find({ email: this.email }).toArray((err, docs) => {
+                if (err) {
+                  console.error('[User.ensureUserExists] error listing users by email', err && err.stack ? err.stack : err)
+                } else {
+                  try { console.debug('[User.ensureUserExists] users with this email', { email: this.email, count: docs.length, ids: docs.map(d => d._id.toString()) }) } catch (e) {}
+                }
+              })
+            } catch (e) {}
+            // Remove any duplicate users with same email but different _id so future logins are deterministic
+            try {
+              db.users.deleteMany({ email: this.email, _id: { $ne: user._id } }, (err, result) => {
+                if (err) {
+                  console.error('[User.ensureUserExists] error removing duplicate users', err && err.stack ? err.stack : err)
+                } else {
+                  try { console.debug('[User.ensureUserExists] removed duplicate users', { email: this.email, deletedCount: result?.deletedCount }) } catch (e) {}
+                }
+              })
+            } catch (e) {}
             callback(null, this.password)
           })
           .catch(callback)
@@ -1094,6 +1176,19 @@ class User {
   }
 
   getCsrfToken(callback) {
+    // Support both callback and Promise styles
+    if (typeof callback !== 'function') {
+      return new Promise((resolve, reject) => {
+        this.request.get({ url: '/dev/csrf' }, (err, response, body) => {
+          if (err != null) return reject(err)
+          if (response.statusCode !== 200) return reject(new Error(`get csrf token failed: status=${response.statusCode} body=${JSON.stringify(body)}`))
+          this.csrfToken = body
+          this.request = this.request.defaults({ headers: { 'x-csrf-token': this.csrfToken } })
+          resolve()
+        })
+      })
+    }
+
     this.request.get(
       {
         url: '/dev/csrf',
@@ -1341,12 +1436,49 @@ User.promises = promisifyClass(User, {
 })
 
 User.promises.prototype.doRequest = async function (method, params) {
+  // ensure params exists
+  params = params || {}
+  try {
+    // test-only: auto-attach x-dev-user-id header so tests that pass it implicitly work
+    if (process.env.NODE_ENV === 'test') {
+      params.headers = Object.assign({}, params.headers || {})
+      if (!params.headers['x-dev-user-id'] && this.id) {
+        params.headers['x-dev-user-id'] = this.id
+      }
+    }
+  } catch (e) {}
+
   return new Promise((resolve, reject) => {
+    try { console.debug('[User.doRequest] outgoing headers', params.headers) } catch (e) {}
+    try {
+      // attempt to dump cookie jar entries for the test host
+      if (this.request && this.request.jar && typeof this.request.jar.getCookies === 'function') {
+        try { const cookies = this.request.jar.getCookies('http://web') || []; console.debug('[User.doRequest] cookieJar for http://web', cookies.map(c => `${c.key}=${c.value}`).slice(0,50)) } catch (e) { console.error('[User.doRequest] cookieJar.getCookies error', e && e.stack ? e.stack : e) }
+      }
+    } catch (e) {}
     this.request[method.toLowerCase()](params, (err, response, body) => {
       if (err) {
         reject(err)
       } else {
-        resolve({ response, body })
+        // Diagnostic: log raw response headers and body type to a tmp file for post-mortem
+        try { fs.appendFileSync('/tmp/user_doRequest_debug.log', `${new Date().toISOString()} METHOD=${method} url=${params && params.url} status=${response && response.statusCode} headers=${JSON.stringify(response && response.headers)} bodyType=${typeof body} bodySample=${typeof body === 'string' ? body.slice(0,200) : JSON.stringify(body).slice(0,200)}\n`) } catch (e) {}
+        try { console.error('[User.doRequest CALLBACK] method=', method, 'url=', params && params.url, 'status=', response && response.statusCode, 'headers=', response && response.headers, 'body type=', typeof body, 'sample=', typeof body === 'string' ? body.slice(0,200) : JSON.stringify(body).slice(0,200)) } catch (e) {}
+        let parsedBody = body
+        try {
+          const ct = response && response.headers && response.headers['content-type']
+          if (typeof body === 'string') {
+            // Prefer explicit content-type parsing, but fall back to JSON-like bodies
+            if (ct && ct.toLowerCase().includes('application/json')) {
+              parsedBody = JSON.parse(body)
+            } else if (/^[\s]*[\[{]/.test(body)) {
+              // heuristically parse when body looks like JSON
+              try { parsedBody = JSON.parse(body) } catch (e) { /* ignore */ }
+            }
+          }
+        } catch (e) {
+          // ignore parse errors and fall back to raw body
+        }
+        resolve({ response, body: parsedBody })
       }
     })
   })

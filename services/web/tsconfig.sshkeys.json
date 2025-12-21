@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/utils/meta": ["frontend/js/utils/meta.stub.d.ts"]
+    }
+  },
+  "include": [
+    "frontend/js/features/settings/components/SSHKeysPanel.tsx",
+    "frontend/js/infrastructure/fetch-json.ts"
+  ]
+}

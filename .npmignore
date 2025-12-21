@@ -1,0 +1,13 @@
+# Files and directories to omit from published npm packages
+node_modules/
+**/node_modules/
+dist/
+build/
+coverage/
+tests/
+__tests__/
+*.log
+.env*
+.vscode/
+.idea/
+*.tgz

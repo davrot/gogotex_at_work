@@ -4,3 +4,35 @@
 # user defined files
 .env
 docker-compose.override.yml
+other_mods
+node_modules
+services/web/node_modules
+# Build and output
+dist/
+build/
+coverage/
+# Java/Maven build artifacts for git-bridge (archived)
+services/git-bridge/target/
+
+# Playwright screenshots
+/services/web/test/e2e/playwright/out/
+
+# Logs and misc
+*.log
+*.tmp
+*.swp
+.vscode/
+.DS_Store
+
+# Temporary parity / test artifacts
+/tmp/
+tmp/
+**/tmp/
+**/parity_results/
+services/git-bridge/cmd/webprofile-api/tmp/
+services/web/tmp/
+services/*/tmp/
+
+# Test artifacts
+services/web/test/integration/src/*.out
+services/web/test/unit/src/*.out

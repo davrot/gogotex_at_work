@@ -73,12 +73,18 @@ describe('ThirdPartyIdentityManager', function () {
       beforeEach(function (ctx) {
         ctx.User.findOne.returns({
           exec: sinon.stub().resolves(ctx.user),
+          sort: sinon.stub().returns({
+            exec: sinon.stub().resolves(ctx.user),
+          }),
         })
       })
 
       it('should return the user', async function (ctx) {
         ctx.User.findOne.returns({
           exec: sinon.stub().resolves(ctx.user),
+          sort: sinon.stub().returns({
+            exec: sinon.stub().resolves(ctx.user),
+          }),
         })
         const user = await ctx.ThirdPartyIdentityManager.promises.getUser(
           'google',

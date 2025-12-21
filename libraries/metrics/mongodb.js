@@ -1,6 +1,11 @@
 const { Gauge, Summary } = require('prom-client')
 
 function monitor(mongoClient) {
+  const { register } = require('prom-client')
+  // Avoid registering duplicate metrics if monitor() is called multiple times
+  if (register.getSingleMetric && register.getSingleMetric('mongo_connection_pool_size')) {
+    return
+  }
   const labelNames = ['mongo_server']
   const poolSize = new Gauge({
     name: 'mongo_connection_pool_size',

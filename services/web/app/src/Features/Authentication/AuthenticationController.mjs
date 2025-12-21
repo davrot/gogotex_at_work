@@ -266,6 +266,8 @@ const AuthenticationController = {
 
     let user, isPasswordReused
     try {
+      // Debug: log attempt to authenticate and observe returned data
+      try { console.debug('[AuthenticationController._doPassportLogin] attempting authenticate for email', email, { fromKnownDevice }) } catch (e) {}
       ;({ user, isPasswordReused } =
         await AuthenticationManager.promises.authenticate(
           { email },
@@ -275,7 +277,9 @@ const AuthenticationController = {
             enforceHIBPCheck: !fromKnownDevice,
           }
         ))
+      try { console.debug('[AuthenticationController._doPassportLogin] authenticate result', { userId: user && user._id ? user._id.toString() : null, isPasswordReused }) } catch (e) {}
     } catch (error) {
+      try { console.debug('[AuthenticationController._doPassportLogin] authenticate threw error', error && (error.message || error)) } catch (e) {}
       return {
         user: false,
         info: handleAuthenticateErrors(error, req),
@@ -309,7 +313,7 @@ const AuthenticationController = {
     } else {
       Metrics.inc('login_failure_reason', 1, { status: 'password_invalid' })
       AuthenticationController._recordFailedLogin()
-      logger.debug({ email }, 'failed log in')
+      logger.debug({ email, reason: 'password_invalid', fromKnownDevice }, 'failed log in')
       return {
         user: false,
         info: {
@@ -364,15 +368,19 @@ const AuthenticationController = {
 
   requireLogin() {
     const doRequest = function (req, res, next) {
+      try { console.error('[requireLogin] invoked', { url: req.url, method: req.method, headers: { cookie: req.headers && req.headers.cookie, 'x-service-origin': req.headers && req.headers['x-service-origin'] }, sessionExists: !!req.session }) } catch (e) {}
       if (next == null) {
         next = function () {}
       }
       if (!SessionManager.isUserLoggedIn(req.session)) {
+        try { console.error('DEBUG requireLogin - user not logged in', { url: req.url, method: req.method, headers: req.headers, csrf: req.get && req.get('x-csrf-token'), cookies: req.cookies || null, signedCookies: req.signedCookies || null, sessionExists: !!req.session }) } catch (e) {}
+        try { console.error(new Error('requireLogin - not logged in stack').stack) } catch (e) {}
         if (acceptsJson(req)) return send401WithChallenge(res)
         return AuthenticationController._redirectToLoginOrRegisterPage(req, res)
       } else {
         req.user = SessionManager.getSessionUser(req.session)
         req.logger?.addFields({ userId: req.user._id })
+        try { console.error('DEBUG requireLogin - logged in', { userId: req.user && req.user._id ? req.user._id : null, session: { id: req.session && (req.session.id || req.sessionID), user: req.session && req.session.user ? { _id: req.session.user._id, email: req.session.user.email } : null } }) } catch (e) {}
         return next()
       }
     }

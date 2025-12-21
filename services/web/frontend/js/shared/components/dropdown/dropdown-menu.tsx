@@ -79,6 +79,7 @@ function DropdownItem(
       active={active}
       className={className}
       role="menuitem"
+      aria-selected={active ? 'true' : 'false'}
       {...props}
       ref={ref}
     >
@@ -87,6 +88,7 @@ function DropdownItem(
         className={classnames({
           'dropdown-item-description-container': description,
         })}
+        aria-selected={active ? 'true' : 'false'}
       >
         {children}
         {trailingIconComponent}

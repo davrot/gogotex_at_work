@@ -33,6 +33,9 @@ describe('ReferalAllocator', function () {
     })
     ctx.User.findOne = sinon.stub().returns({
       exec: sinon.stub().resolves({ _id: ctx.user_id }),
+      sort: sinon.stub().returns({
+        exec: sinon.stub().resolves({ _id: ctx.user_id }),
+      }),
     })
   })
 
@@ -85,6 +88,9 @@ describe('ReferalAllocator', function () {
         ctx.referal_id = 'wombat'
         ctx.User.findOne = sinon.stub().returns({
           exec: sinon.stub().resolves(null),
+          sort: sinon.stub().returns({
+            exec: sinon.stub().resolves(null),
+          }),
         })
         await ctx.ReferalAllocator.promises.allocate(
           ctx.referal_id,

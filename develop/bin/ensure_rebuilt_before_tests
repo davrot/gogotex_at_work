@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ensure_rebuilt_before_tests
+#  - capture current image id for each service container
+#  - run `./bin/build` (rebuild images)
+#  - recapture image ids
+#  - for each service whose image id changed, recreate the service container
+
+COMPOSE_FILES=( -f docker-compose.yml -f docker-compose.dev.yml )
+COMPOSE_CMD=(docker compose "${COMPOSE_FILES[@]}")
+BUILD_CMD=("$(pwd)/bin/build")
+
+print() { printf '%s\n' "$*"; }
+err() { >&2 printf '%s\n' "$*"; }
+
+get_service_images() {
+  # Output: service<TAB>name<TAB>imageId
+  "${COMPOSE_CMD[@]}" ps --format '{{.Service}}\t{{.Name}}' 2>/dev/null | while IFS=$'\t' read -r service name; do
+    if [ -n "$name" ]; then
+      imageId=$(docker inspect --format='{{.Image}}' "$name" 2>/dev/null || true)
+      printf '%s\t%s\t%s\n' "$service" "$name" "$imageId"
+    fi
+  done
+}
+
+main() {
+  workdir=$(pwd)
+  cd "$(dirname "$0")/.." || exit 1
+
+  tmp_pre=$(mktemp)
+  tmp_post=$(mktemp)
+
+  print "Capturing pre-build service images..."
+  get_service_images > "$tmp_pre" || true
+
+  print "Running build: ./bin/build (this may be fast if nothing changed)"
+  if ! ./bin/build "$@"; then
+    err "Build failed"
+    rm -f "$tmp_pre" "$tmp_post"
+    exit 2
+  fi
+
+  print "Capturing post-build service images..."
+  get_service_images > "$tmp_post" || true
+
+  restarted=()
+  while IFS=$'\t' read -r service name preImage; do
+    # find matching post line
+    postImage=$(awk -F"\t" -v s="$service" '$1==s{print $3}' "$tmp_post" || true)
+    if [ -z "$postImage" ]; then
+      # Service no longer present in compose ps — skip
+      continue
+    fi
+    if [ "$preImage" != "$postImage" ]; then
+      print "Image changed for service '$service' (container: $name): recreating..."
+      # Recreate specific service to pick up new image. Use --no-deps so we don't start dependencies.
+      if "${COMPOSE_CMD[@]}" up --no-deps --detach --force-recreate "$service"; then
+        restarted+=("$service")
+      else
+        err "Failed to recreate service $service"
+      fi
+    fi
+  done < "$tmp_pre"
+
+  # Also handle services that did not exist before but exist now
+  while IFS=$'\t' read -r service name postImage; do
+    preImage=$(awk -F"\t" -v s="$service" '$1==s{print $3}' "$tmp_pre" || true)
+    if [ -z "$preImage" ] && [ -n "$postImage" ]; then
+      print "New service detected: $service — starting..."
+      if "${COMPOSE_CMD[@]}" up --no-deps --detach "$service"; then
+        restarted+=("$service")
+      else
+        err "Failed to start new service $service"
+      fi
+    fi
+  done < "$tmp_post"
+
+  if [ ${#restarted[@]} -gt 0 ]; then
+    print "Recreated services: ${restarted[*]}"
+  else
+    print "No services needed recreation."
+  fi
+
+  rm -f "$tmp_pre" "$tmp_post"
+  cd "$workdir" || true
+}
+
+main "$@"

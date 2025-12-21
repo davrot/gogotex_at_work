@@ -1,0 +1,15 @@
+name: Check Constitution Compliance
+
+on:
+  pull_request:
+
+jobs:
+  check-constitution:
+    name: Check Constitution Compliance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run constitution check script
+        run: |
+          chmod +x scripts/ci/check_constitution.sh
+          ./scripts/ci/check_constitution.sh

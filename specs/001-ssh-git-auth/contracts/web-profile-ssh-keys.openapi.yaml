@@ -1,0 +1,125 @@
+openapi: 3.0.3
+info:
+  title: Web-profile SSH Keys API (internal)
+  version: 1.0.0
+  description: |
+    Minimal contract describing the internal authenticated API used by `git-bridge`
+    to retrieve and manage users' SSH public keys. This API is internal-only and
+    requires an internal API token header `X-Internal-API-Token`.
+servers:
+  - url: https://web-profile.internal
+paths:
+  /internal/api/users/{userId}/ssh-keys:
+    get:
+      summary: List SSH public keys for a user
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Array of SSH key objects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  keys:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SSHKey'
+        '404':
+          description: User not found
+        '401':
+          description: Unauthorized
+    post:
+      summary: Add a new SSH public key for a user
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [key_name, public_key]
+              properties:
+                key_name:
+                  type: string
+                public_key:
+                  type: string
+                  description: OpenSSH public key string
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SSHKey'
+        '400':
+          description: Validation error (malformed key)
+        '401':
+          description: Unauthorized
+  /internal/api/users/{userId}/ssh-keys/{keyId}:
+    delete:
+      summary: Revoke/delete an SSH public key
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: keyId
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '204':
+          description: Deleted
+        '404':
+          description: Key not found
+        '401':
+          description: Unauthorized
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-Internal-API-Token
+  schemas:
+    SSHKey:
+      type: object
+      properties:
+        id:
+          type: string
+        key_name:
+          type: string
+        public_key:
+          type: string
+          description: OpenSSH formatted public key
+        private_key_hash:
+          type: string
+          description: Optional non-reversible metadata, not a private key
+        fingerprint:
+          type: string
+          description: SHA-256 fingerprint of the public key (base64 or hex)
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required: [id, key_name, public_key]

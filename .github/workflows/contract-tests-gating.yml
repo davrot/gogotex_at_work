@@ -1,0 +1,126 @@
+name: Contract tests gating
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  contract-tests:
+    runs-on: ubuntu-latest
+    environment: ci
+    env:
+      AUTH_TOKEN_USE_WEBPROFILE_API: "true"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Install dependencies
+        run: |
+          npm ci --legacy-peer-deps
+
+      - name: Start services (docker-compose)
+        run: |
+          echo "AUTH_TOKEN_USE_WEBPROFILE_API=true" > .env.ci
+          echo "AUTH_LOCAL_INTROSPECT_URL=http://webprofile-api-ci:3900" >> .env.ci
+          echo "WEBPROFILE_ADMIN_USER=overleaf" >> .env.ci
+          echo "WEBPROFILE_ADMIN_PASS=overleaf" >> .env.ci
+          docker compose --env-file .env.ci -f develop/docker-compose.yml up -d --build
+
+      - name: Wait for services
+        run: |
+          ./develop/bin/wait 300
+
+      - name: Start Go webprofile-api in compose network
+        run: |
+          ./scripts/contract/run_webprofile_in_network.sh webprofile-api-ci
+
+      - name: Wait for webprofile-api
+        run: |
+          for i in $(seq 1 10); do
+            if curl -sS -u overleaf:overleaf -f http://webprofile-api-ci:3900/internal/api/health; then
+              echo "webprofile-api ready"
+              break
+            fi
+            sleep 1
+          done
+
+      - name: Compare Node vs Go token introspect parity
+        run: |
+          ./scripts/contract/compare_introspect.sh http://develop-web-1:3000 http://webprofile-api-ci:3900
+
+      - name: Compare Node vs Go token create/list parity
+        run: |
+          chmod +x scripts/contract/compare_tokens_parity.sh
+          ./scripts/contract/compare_tokens_parity.sh http://develop-web-1:3000 http://webprofile-api-ci:3900
+
+      - name: Run contract tests
+        env:
+          AUDIT_LOG_RETENTION_DAYS: ${{ secrets.AUDIT_LOG_RETENTION_DAYS }}
+        run: |
+          mkdir -p services/web/data/reports
+          npm run --prefix services/web test:contract -- --reporter mocha-junit-reporter || exit 1
+
+      - name: Run key-lookup micro-benchmark
+        run: |
+          mkdir -p ci/benchmarks/key-lookup-benchmark
+          BENCH_OUTPUT=ci/benchmarks/key-lookup-benchmark/out.json BENCH_ITER=${BENCH_ITER:-200} BENCH_CONCURRENCY=${BENCH_CONCURRENCY:-20} BENCH_URL=${BENCH_URL:-http://127.0.0.1:3000/internal/api/ssh-keys/SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA} node ci/benchmarks/key-lookup-benchmark/bench.js
+          node ci/benchmarks/check-bench-slo.js ci/benchmarks/key-lookup-benchmark/out.json 50
+
+      - name: Upload key-lookup artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-key-lookup
+          path: ci/benchmarks/key-lookup-benchmark/out.json
+
+      - name: Run introspection micro-benchmark
+        run: |
+          mkdir -p ci/benchmarks/introspection-benchmark
+          BENCH_OUTPUT=ci/benchmarks/introspection-benchmark/out.json BENCH_ITER=${BENCH_ITER:-200} BENCH_CONCURRENCY=${BENCH_CONCURRENCY:-20} BENCH_URL=${BENCH_URL:-http://127.0.0.1:3000/internal/api/tokens/introspect} BENCH_TOKEN=${BENCH_TOKEN:-invalid-token} node ci/benchmarks/introspection-benchmark/bench.js
+          node ci/benchmarks/check-bench-slo.js ci/benchmarks/introspection-benchmark/out.json 100
+
+      - name: Upload introspection artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-introspection
+          path: ci/benchmarks/introspection-benchmark/out.json
+
+      - name: Upload contract test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: contract-test-results
+          path: services/web/data/reports/**
+
+      - name: Check retention configuration
+        run: |
+          # If the contract test skipped the retention test (exit 0 with skip), ensure the env var is set in CI
+          if [ -z "${{ secrets.AUDIT_LOG_RETENTION_DAYS }}" ] && [ -z "${AUDIT_LOG_RETENTION_DAYS}" ]; then
+            echo "ERROR: AUDIT_LOG_RETENTION_DAYS not set in CI environment. Set the secret to an integer >= 90 to satisfy policy" >&2
+            exit 1
+          fi
+          # If set as secret, ensure it's >= 90
+          if [ -n "${{ secrets.AUDIT_LOG_RETENTION_DAYS }}" ]; then
+            val=${{ secrets.AUDIT_LOG_RETENTION_DAYS }}
+          else
+            val=${AUDIT_LOG_RETENTION_DAYS}
+          fi
+          if ! echo "$val" | grep -E '^[0-9]+$' >/dev/null; then
+            echo "ERROR: AUDIT_LOG_RETENTION_DAYS must be an integer" >&2
+            exit 1
+          fi
+          if [ "$val" -lt 90 ]; then
+            echo "ERROR: AUDIT_LOG_RETENTION_DAYS is set to $val which is less than 90" >&2
+            exit 1
+          fi
+          echo "Audit log retention verified: $val days"

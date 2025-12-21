@@ -1,0 +1,13 @@
+# Common folders to ignore for formatting
+node_modules
+**/node_modules
+dist
+build
+coverage
+coverage/**/*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+*.min.js
+**/*.min.js
+assets/**/*

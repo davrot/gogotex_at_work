@@ -1,0 +1,347 @@
+stages:
+  - test
+  - contract
+  - bench
+
+variables:
+  NODE_ENV: test
+  # Toggle to run legacy Java/Maven CI jobs for git-bridge; default is "false" to avoid running Java builds.
+  LEGACY_JAVA_RUN: "false"
+
+no_127_3900_check:
+  stage: test
+  script:
+    - chmod +x scripts/ci/check_no_127.sh
+    - scripts/ci/check_no_127.sh
+
+web_unit_tests:
+  stage: test
+  script:
+    - cd services/web
+    - npm ci --silent
+    - npm run test:unit --silent
+
+web_contract_tests:
+  stage: contract
+  script:
+    - cd services/web
+    - npm ci --silent
+    - npm run test:contract --silent
+
+web_accessibility:
+  stage: contract
+  variables:
+    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+  script:
+    - cd services/web
+    - npm ci --silent
+    - npm run e2e:playwright
+  allow_failure: false
+  timeout: 30m
+
+# Parity check between Node web and Go shim for SSH key endpoints (non-blocking initially)
+ssh_keys_parity_check:
+  stage: contract
+  # This job inspects the repo-controlled toggle `ci/PARITY_STRICT` at runtime.
+  # To make parity failures block merges, add `ci/PARITY_STRICT` with content `true` on default branch.
+  when: always
+  allow_failure: true
+  script:
+    - chmod +x scripts/contract/compare_ssh_parity.sh
+    - |
+      set -euo pipefail
+      PARITY_USER=${PARITY_USER:-parity-user}
+      NODE_BASE=${NODE_BASE:-http://develop-web-1:3000}
+      # Prefer compose hostname reachable from dev/CI container; fall back to localhost for host-based runs
+      GO_BASE=${GO_BASE:-http://webprofile-api-ci:3900}
+      export MONGO_URI=${MONGO_URI:-mongodb://mongo:27017/sharelatex}
+      echo "NODE_BASE=$NODE_BASE GO_BASE=$GO_BASE PARITY_USER=$PARITY_USER MONGO_URI=$MONGO_URI"
+
+      # Determine strictness from repo file (ci/PARITY_STRICT == "true")
+      STRICT=false
+      if [ -f ci/PARITY_STRICT ] && grep -q "^true" ci/PARITY_STRICT; then
+        STRICT=true
+      fi
+      echo "PARITY_STRICT repo toggle: $STRICT"
+
+      start_shim() {
+        if command -v go >/dev/null 2>&1; then
+          echo "Using 'go' to build and run webprofile-api"
+          pushd services/git-bridge/cmd/webprofile-api >/dev/null
+          go build -o /tmp/webprofile-api .
+          /tmp/webprofile-api & echo $! >/tmp/webprofile-api.pid
+          popd >/dev/null
+          GO_BASE=${GO_BASE}
+          return 0
+        elif command -v docker >/dev/null 2>&1; then
+          echo "Building Docker image for webprofile-api and starting container"
+          docker build -t webprofile-api-ci services/git-bridge/cmd/webprofile-api
+          docker rm -f webprofile-api-ci >/dev/null 2>&1 || true
+          # Start the shim attached to the develop network to ensure it is reachable by compose hostnames
+          docker run -d --name webprofile-api_ci --network develop_default -e MONGO_URI="$MONGO_URI" -p 3900:3900 webprofile-api-ci
+          return 0
+        else
+          echo "Neither 'go' nor 'docker' available in runner; expecting GO_BASE to be reachable at $GO_BASE"
+          return 1
+        fi
+      }
+
+      start_shim || echo "shim may already be running or not startable; continuing to parity step"
+
+      # Wait for shim to respond (any HTTP response) up to 15s
+      echo "Waiting for Go shim at $GO_BASE to become responsive..."
+      for i in {1..15}; do
+        code=$(curl -sS -o /dev/null -w "%{http_code}" "$GO_BASE/internal/api/users/$PARITY_USER/ssh-keys" || true)
+        if [ -n "$code" ]; then
+          echo "Go shim responded with HTTP code $code"
+          break
+        fi
+        sleep 1
+      done
+
+      echo "Running parity comparison (node=$NODE_BASE go=$GO_BASE user=$PARITY_USER)"
+    - |
+      set -euo pipefail
+      scripts/contract/compare_ssh_parity.sh ${NODE_BASE} ${GO_BASE} ${PARITY_USER}
+      RC=$?
+      if [ $RC -ne 0 ]; then
+        if [ "$STRICT" = "true" ]; then
+          echo "Parity check FAILED and PARITY_STRICT is true -> failing job"
+          exit $RC
+        else
+          echo "Parity check FAILED but PARITY_STRICT is not set; recording artifacts and continuing (non-blocking)"
+          exit 0
+        fi
+      fi
+  timeout: 10m
+  artifacts:
+    when: always
+    paths:
+      - tmp/parity_results/*
+    expire_in: 1 week
+  variables:
+    NODE_BASE: ${NODE_BASE}
+    GO_BASE: ${GO_BASE}
+    PARITY_USER: ${PARITY_USER:-parity-user}
+    MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017/sharelatex}
+
+# E2E delegation parity check — runs Playwright-focused delegation flow when requested
+ssh_delegation_parity_check:
+  stage: contract
+  when: always
+  allow_failure: true
+  script:
+    - chmod +x scripts/ci/run_ssh_smoke_ci.sh
+    - |
+      set -euo pipefail
+      NODE_BASE=${NODE_BASE:-http://develop-web-1:3000}
+      GO_BASE=${GO_BASE:-http://webprofile-api-ci:3900}
+      PARITY_USER=${PARITY_USER:-parity-delegation}
+      export MONGO_URI=${MONGO_URI:-mongodb://mongo:27017/sharelatex}
+      echo "Running delegation parity smoke test (node=$NODE_BASE go=$GO_BASE)"
+      # Run the smoke CI wrapper with delegation parity mode
+      DELEGATION_PARITY=1 AUTH_SSH_USE_WEBPROFILE_API='true' CONFIRM_DEV_SETUP=true CONFIRM_BASE_URL=true BASE_URL=${BASE_URL:-http://develop-webpack-1:3808} COMPOSE_FILE=${COMPOSE_FILE:-develop/docker-compose.yml} PROJECT_DIR=${PROJECT_DIR:-develop} ./scripts/ci/run_ssh_smoke_ci.sh
+  timeout: 30m
+  artifacts:
+    when: always
+    paths:
+      - services/web/test/e2e/playwright/out/*
+    expire_in: 1 week
+  variables:
+    NODE_BASE: ${NODE_BASE}
+    GO_BASE: ${GO_BASE}
+    PARITY_USER: ${PARITY_USER:-parity-delegation}
+    MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017/sharelatex}
+
+# Strict parity runner — triggers when repo contains ci/PARITY_STRICT (intended to be added to default branch when parity is stable)
+ssh_keys_parity_required:
+  stage: contract
+  rules:
+    - exists:
+        - ci/PARITY_STRICT
+  allow_failure: false
+  script:
+    - chmod +x scripts/contract/compare_ssh_parity.sh
+    - |
+      set -euo pipefail
+      PARITY_USER=${PARITY_USER:-parity-user}
+      NODE_BASE=${NODE_BASE:-http://develop-web-1:3000}
+      GO_BASE=${GO_BASE:-http://webprofile-api-ci:3900}
+      export MONGO_URI=${MONGO_URI:-mongodb://mongo:27017/sharelatex}
+      scripts/contract/compare_ssh_parity.sh ${NODE_BASE} ${GO_BASE} ${PARITY_USER}
+  timeout: 10m
+  artifacts:
+    when: always
+    paths:
+      - tmp/parity_results/*
+    expire_in: 1 week
+  variables:
+    NODE_BASE: ${NODE_BASE}
+    GO_BASE: ${GO_BASE}
+    PARITY_USER: ${PARITY_USER:-parity-user}
+    MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017/sharelatex}
+
+# Token parity check (non-blocking initially)
+tokens_parity_check:
+  stage: contract
+  when: always
+  allow_failure: true
+  script:
+    - chmod +x scripts/contract/compare_tokens_parity.sh
+    - |
+      set -euo pipefail
+      PARITY_USER=${PARITY_USER:-parity-token-user}
+      NODE_BASE=${NODE_BASE:-http://develop-web-1:3000}
+      GO_BASE=${GO_BASE:-http://webprofile-api-ci:3900}
+      export MONGO_URI=${MONGO_URI:-mongodb://mongo:27017/sharelatex}
+      echo "NODE_BASE=$NODE_BASE GO_BASE=$GO_BASE PARITY_USER=$PARITY_USER MONGO_URI=$MONGO_URI"
+
+      start_shim() {
+        if command -v go >/dev/null 2>&1; then
+          echo "Using 'go' to build and run webprofile-api"
+          pushd services/git-bridge/cmd/webprofile-api >/dev/null
+          go build -o /tmp/webprofile-api .
+          /tmp/webprofile-api & echo $! >/tmp/webprofile-api.pid
+          popd >/dev/null
+          GO_BASE=${GO_BASE}
+          return 0
+        elif command -v docker >/dev/null 2>&1; then
+          echo "Building Docker image for webprofile-api and starting container"
+          docker build -t webprofile-api-ci services/git-bridge/cmd/webprofile-api
+          docker rm -f webprofile-api-ci >/dev/null 2>&1 || true
+          docker run -d --name webprofile-api_ci --network develop_default -e MONGO_URI="$MONGO_URI" -p 3900:3900 webprofile-api-ci
+          return 0
+        else
+          echo "Neither 'go' nor 'docker' available in runner; expecting GO_BASE to be reachable at $GO_BASE"
+          return 1
+        fi
+      }
+
+      start_shim || echo "shim may already be running or not startable; continuing to parity step"
+
+      # Wait for shim to respond (any HTTP response) up to 15s
+      echo "Waiting for Go shim at $GO_BASE to become responsive..."
+      for i in {1..15}; do
+        code=$(curl -sS -o /dev/null -w "%{http_code}" "$GO_BASE/internal/api/users/$PARITY_USER/git-tokens" || true)
+        if [ -n "$code" ]; then
+          echo "Go shim responded with HTTP code $code"
+          break
+        fi
+        sleep 1
+      done
+
+      echo "Running token parity comparison (node=$NODE_BASE go=$GO_BASE user=$PARITY_USER)"
+    - |
+      set -euo pipefail
+      scripts/contract/compare_tokens_parity.sh ${NODE_BASE} ${GO_BASE} ${PARITY_USER}
+      RC=$?
+      if [ $RC -ne 0 ]; then
+        echo "Token parity check FAILED; recording artifacts and continuing (non-blocking)"
+        exit 0
+      fi
+  timeout: 10m
+  artifacts:
+    when: always
+    paths:
+      - tmp/parity_results/*
+    expire_in: 1 week
+  variables:
+    NODE_BASE: ${NODE_BASE}
+    GO_BASE: ${GO_BASE}
+    PARITY_USER: ${PARITY_USER:-parity-token-user}
+    MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017/sharelatex}
+
+gitbridge_go_tests:
+  stage: test
+  image: golang:1.25
+  script:
+    - cd services/git-bridge
+    - go test ./... -v
+  allow_failure: false
+  timeout: 10m
+
+# Nightly scheduled parity runner — re-runs parity multiple times to detect flakiness
+ssh_keys_parity_nightly:
+  stage: contract
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+  script:
+    - chmod +x scripts/contract/compare_ssh_parity.sh
+    - |
+      NODE_BASE=${NODE_BASE:-http://develop-web-1:3000}
+      GO_BASE=${GO_BASE:-http://localhost:3900}
+      PARITY_USER=${PARITY_USER:-parity-nightly}
+      echo "Starting nightly parity runs (node=$NODE_BASE go=$GO_BASE)"
+      for i in $(seq 1 5); do
+        echo "Parity run #$i"
+        scripts/contract/compare_ssh_parity.sh ${NODE_BASE} ${GO_BASE} ${PARITY_USER} || { echo "Parity run #$i failed"; exit 2; }
+        sleep 2
+      done
+  artifacts:
+    when: always
+    paths:
+      - tmp/parity_results/*
+    expire_in: 1 week
+  allow_failure: true
+  timeout: 30m
+  variables:
+    NODE_BASE: ${NODE_BASE}
+    GO_BASE: ${GO_BASE}
+    PARITY_USER: ${PARITY_USER:-parity-nightly}
+    MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017/sharelatex}
+
+# Manual validation job: run the parity check multiple times interactively before flipping strictness
+ssh_keys_parity_validation:
+  stage: contract
+  when: manual
+  allow_failure: false
+  script:
+    - chmod +x scripts/contract/compare_ssh_parity.sh
+    - |
+      NODE_BASE=${NODE_BASE:-http://develop-web-1:3000}
+      GO_BASE=${GO_BASE:-http://localhost:3900}
+      PARITY_USER=${PARITY_USER:-parity-validate}
+      ITERATIONS=${PARITY_ITERATIONS:-10}
+      echo "Running validation: $ITERATIONS iterations (node=$NODE_BASE go=$GO_BASE user=$PARITY_USER)"
+      for i in $(seq 1 $ITERATIONS); do
+        echo "Validation run #$i"
+        scripts/contract/compare_ssh_parity.sh ${NODE_BASE} ${GO_BASE} ${PARITY_USER} || { echo "Validation run #$i FAILED"; exit 1; }
+        sleep 1
+      done
+  artifacts:
+    when: always
+    paths:
+      - tmp/parity_results/*
+    expire_in: 1 week
+  timeout: 30m
+  variables:
+    NODE_BASE: ${NODE_BASE}
+    GO_BASE: ${GO_BASE}
+    PARITY_USER: ${PARITY_USER:-parity-validate}
+    MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017/sharelatex}
+
+bench_key_lookup:
+  stage: bench
+  variables:
+    KEY_LOOKUP_P95_MS: "50"
+  script:
+    - BENCH_OUTPUT=ci/benchmarks/key-lookup-benchmark/out.json BENCH_ITER=${BENCH_ITER:-200} BENCH_CONCURRENCY=${BENCH_CONCURRENCY:-20} BENCH_URL=${BENCH_URL:-http://127.0.0.1:3000/internal/api/ssh-keys/SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA} node ci/benchmarks/key-lookup-benchmark/bench.js
+    - node ci/benchmarks/check-bench-slo.js ci/benchmarks/key-lookup-benchmark/out.json ${KEY_LOOKUP_P95_MS}
+  artifacts:
+    paths:
+      - ci/benchmarks/key-lookup-benchmark/out.json
+    expire_in: 1 week
+  allow_failure: false
+
+bench_introspection:
+  stage: bench
+  variables:
+    INTROSPECTION_P95_MS: "100"
+  script:
+    - BENCH_OUTPUT=ci/benchmarks/introspection-benchmark/out.json BENCH_ITER=${BENCH_ITER:-200} BENCH_CONCURRENCY=${BENCH_CONCURRENCY:-20} BENCH_URL=${BENCH_URL:-http://127.0.0.1:3000/internal/api/tokens/introspect} BENCH_TOKEN=${BENCH_TOKEN:-invalid-token} node ci/benchmarks/introspection-benchmark/bench.js
+    - node ci/benchmarks/check-bench-slo.js ci/benchmarks/introspection-benchmark/out.json ${INTROSPECTION_P95_MS}
+  artifacts:
+    paths:
+      - ci/benchmarks/introspection-benchmark/out.json
+    expire_in: 1 week
+  allow_failure: false

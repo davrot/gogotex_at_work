@@ -8,5 +8,20 @@ ROOT_DIR="${GIT_BRIDGE_ROOT_DIR:-/tmp/wlgb}"
 mkdir -p "$ROOT_DIR"
 chown node:node "$ROOT_DIR"
 
-# Drop privileges using setpriv to avoid spawning a new process
-exec setpriv --reuid=node --regid=node --init-groups /start.sh
+# If running as root, drop privileges using setpriv (preferred) else just exec /start.sh
+if [ "$(id -u)" -eq 0 ]; then
+  if command -v setpriv >/dev/null 2>&1; then
+    # Verify setpriv supports --reuid by testing a no-op invocation
+    if setpriv --reuid 1 --regid 1 true >/dev/null 2>&1; then
+      exec setpriv --reuid=node --regid=node --init-groups /start.sh
+    fi
+  fi
+  if command -v su-exec >/dev/null 2>&1; then
+    exec su-exec node /start.sh
+  else
+    # Fallback: run start.sh as-is (the process may continue as root)
+    exec /start.sh
+  fi
+else
+  exec /start.sh
+fi

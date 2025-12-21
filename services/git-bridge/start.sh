@@ -12,4 +12,9 @@ if [ "$ENABLE_PROFILE_AGENT" = "true" ]; then
   GIT_BRIDGE_JVM_ARGS="-agentpath:/opt/cprof/profiler_java_agent.so=-cprof_service=git-bridge,-cprof_service_version=${VERSION},-cprof_enable_heap_sampling=true ${GIT_BRIDGE_JVM_ARGS}"
 fi
 
-exec java $GIT_BRIDGE_JVM_ARGS -jar /git-bridge.jar /conf/runtime.json
+# If a Go binary is present (migration mode), run it; otherwise fall back to the Java jar
+if [ -x "/git-bridge" ]; then
+  exec /git-bridge -config /conf/runtime.json
+else
+  exec java $GIT_BRIDGE_JVM_ARGS -jar /git-bridge.jar /conf/runtime.json
+fi

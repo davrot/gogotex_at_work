@@ -12,6 +12,8 @@ import LabsProgramSection from './labs-program-section'
 import SessionsSection from './sessions-section'
 import NewsletterSection from './newsletter-section'
 import LeaveSection from './leave-section'
+import SSHKeysPanel from './SSHKeysPanel'
+import GitTokensPanel from './GitTokensPanel'
 import * as eventTracking from '../../../infrastructure/event-tracking'
 import { UserProvider } from '../../../shared/context/user-context'
 import { SSOProvider } from '../context/sso-context'
@@ -83,6 +85,12 @@ function SettingsPageContent() {
             </>
           ) : null}
           <SessionsSection />
+
+          <hr />
+          <SSHKeysPanel />
+          <hr />
+          <GitTokensPanel />
+
           {isOverleaf ? (
             <>
               <hr />

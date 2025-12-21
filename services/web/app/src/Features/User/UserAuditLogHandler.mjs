@@ -29,6 +29,8 @@ function _canHaveNoInitiatorId(operation, info) {
   if (operation === 'must-reset-password-unset') return true
   if (operation === 'account-suspension' && info.script) return true
   if (operation === 'release-managed-user' && info.script) return true
+  // allow non-user-initiated audit entries for service-origin actions like token introspection
+  if (operation === 'token.introspect') return true
 }
 
 // events that are visible to managed user admins in Group Audit Logs view
@@ -81,6 +83,11 @@ async function addEntry(userId, operation, initiatorId, ipAddress, info = {}) {
     initiatorId,
     info,
     ipAddress,
+  }
+
+  // Support optional top-level resourceId (used for logging hashPrefix/ids)
+  if (info && info.resourceId) {
+    entry.resourceId = info.resourceId
   }
 
   if (MANAGED_GROUP_USER_EVENTS.includes(operation)) {

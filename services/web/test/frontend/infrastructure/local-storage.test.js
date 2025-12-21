@@ -32,7 +32,9 @@ describe('localStorage', function () {
 
   afterEach(function () {
     spyOnDebugConsoleError.restore()
-    Object.defineProperty(global, 'localStorage', { value: undefined })
+    // Restore the original localStorage so later tests that rely on the
+    // real `window.localStorage` or its prototype spies continue to work.
+    Object.defineProperty(global, 'localStorage', { value: originalLocalStorage })
   })
 
   it('getItem', function () {

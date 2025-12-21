@@ -28,7 +28,7 @@ module.exports = {
   redis: {
     pubsub: {
       host:
-        process.env.PUBSUB_REDIS_HOST || process.env.REDIS_HOST || '127.0.0.1',
+        process.env.PUBSUB_REDIS_HOST || process.env.REDIS_HOST || (process.env.NODE_ENV === 'test' ? 'redis' : '127.0.0.1'),
       port: process.env.PUBSUB_REDIS_PORT || process.env.REDIS_PORT || '6379',
       password:
         process.env.PUBSUB_REDIS_PASSWORD || process.env.REDIS_PASSWORD || '',
@@ -40,7 +40,7 @@ module.exports = {
     history: {
       port: process.env.HISTORY_REDIS_PORT || process.env.REDIS_PORT || '6379',
       host:
-        process.env.HISTORY_REDIS_HOST || process.env.REDIS_HOST || '127.0.0.1',
+        process.env.HISTORY_REDIS_HOST || process.env.REDIS_HOST || (process.env.NODE_ENV === 'test' ? 'redis' : '127.0.0.1'),
       password:
         process.env.HISTORY_REDIS_PASSWORD || process.env.REDIS_PASSWORD || '',
       maxRetriesPerRequest: parseInt(
@@ -51,7 +51,7 @@ module.exports = {
     project_history: {
       port: process.env.HISTORY_REDIS_PORT || process.env.REDIS_PORT || '6379',
       host:
-        process.env.HISTORY_REDIS_HOST || process.env.REDIS_HOST || '127.0.0.1',
+        process.env.HISTORY_REDIS_HOST || process.env.REDIS_HOST || (process.env.NODE_ENV === 'test' ? 'redis' : '127.0.0.1'),
       password:
         process.env.HISTORY_REDIS_PASSWORD || process.env.REDIS_PASSWORD || '',
       maxRetriesPerRequest: parseInt(
@@ -70,7 +70,7 @@ module.exports = {
     lock: {
       port: process.env.LOCK_REDIS_PORT || process.env.REDIS_PORT || '6379',
       host:
-        process.env.LOCK_REDIS_HOST || process.env.REDIS_HOST || '127.0.0.1',
+        process.env.LOCK_REDIS_HOST || process.env.REDIS_HOST || (process.env.NODE_ENV === 'test' ? 'redis' : '127.0.0.1'),
       password:
         process.env.LOCK_REDIS_PASSWORD || process.env.REDIS_PASSWORD || '',
       maxRetriesPerRequest: parseInt(
@@ -173,7 +173,7 @@ module.exports = {
   mongo: {
     url:
       process.env.MONGO_CONNECTION_STRING ||
-      `mongodb://${process.env.MONGO_HOST || '127.0.0.1'}/sharelatex`,
+      `mongodb://${process.env.MONGO_HOST || (process.env.NODE_ENV === 'test' ? 'mongo' : '127.0.0.1')}/sharelatex`,
     options: {
       monitorCommands: true,
     },

@@ -7,6 +7,8 @@
   "apiBaseUrl": "${GIT_BRIDGE_API_BASE_URL:-https://localhost/api/v0}",
   "postbackBaseUrl": "${GIT_BRIDGE_POSTBACK_BASE_URL:-https://localhost}",
   "serviceName": "${GIT_BRIDGE_SERVICE_NAME:-Overleaf}",
+  "webProfileApiUrl": "${GIT_BRIDGE_WEB_PROFILE_API_URL:-https://web-profile.internal}",
+  "webProfileApiToken": "${GIT_BRIDGE_WEB_PROFILE_API_TOKEN:-}",
   "oauth2Server": "${GIT_BRIDGE_OAUTH2_SERVER:-https://localhost}",
   "userPasswordEnabled": ${GIT_BRIDGE_USER_PASSWORD_ENABLED:-false},
   "repoStore": {
@@ -27,5 +29,9 @@
     "intervalMillis": ${GIT_BRIDGE_SWAPJOB_INTERVAL_MILLIS:-3600000},
     "compressionMethod": "${GIT_BRIDGE_SWAPJOB_COMPRESSION_METHOD:-gzip}"
   },
-  "sqliteHeapLimitBytes": ${GIT_BRIDGE_SQLITE_HEAP_LIMIT_BYTES:-0}
+  "sqliteHeapLimitBytes": ${GIT_BRIDGE_SQLITE_HEAP_LIMIT_BYTES:-0},
+
+  "sshOnly": ${GIT_BRIDGE_SSH_ONLY_FLAG:-false},
+  "sshEnabled": ${GIT_BRIDGE_SSH_ENABLED:-false},
+  "sshPort": ${GIT_BRIDGE_SSH_PORT:-22}
 }

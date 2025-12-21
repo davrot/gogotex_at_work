@@ -1,0 +1,21 @@
+module.exports = {
+  localizedPlanPricing: {
+    AUD: { plans: [{ id: 'basic', price: 10 }] },
+    BRL: { plans: [{ id: 'basic', price: 10 }] },
+    CAD: { plans: [{ id: 'basic', price: 10 }] },
+    CHF: { plans: [{ id: 'basic', price: 10 }] },
+    CLP: { plans: [{ id: 'basic', price: 10 }] },
+    COP: { plans: [{ id: 'basic', price: 10 }] },
+    DKK: { plans: [{ id: 'basic', price: 10 }] },
+    EUR: { plans: [{ id: 'basic', price: 10 }] },
+    GBP: { plans: [{ id: 'basic', price: 10 }] },
+    INR: { plans: [{ id: 'basic', price: 10 }] },
+    MXN: { plans: [{ id: 'basic', price: 10 }] },
+    NOK: { plans: [{ id: 'basic', price: 10 }] },
+    NZD: { plans: [{ id: 'basic', price: 10 }] },
+    PEN: { plans: [{ id: 'basic', price: 10 }] },
+    SEK: { plans: [{ id: 'basic', price: 10 }] },
+    SGD: { plans: [{ id: 'basic', price: 10 }] },
+    USD: { plans: [{ id: 'basic', price: 10 }] },
+  },
+}

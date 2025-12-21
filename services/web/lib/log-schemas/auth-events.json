@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Auth Event Schema",
+  "type": "object",
+  "required": ["event","service","level","timestamp","action","outcome"],
+  "properties": {
+    "event": { "type": "string", "description": "e.g. ssh_key.create, token.create, token.introspect, auth.ssh_attempt" },
+    "service": { "type": "string" },
+    "level": { "type": "string", "enum": ["info","warn","error"] },
+    "userId": { "type": ["string","null"] },
+    "actorId": { "type": ["string","null"] },
+    "actorIp": { "type": ["string","null"] },
+    "resourceType": { "type": ["string","null"], "description": "ssh_key | personal_access_token | membership" },
+    "resourceId": { "type": ["string","null"], "description": "Use token id or key id; for tokens log hashPrefix` (first 8 hex chars) instead of full hash" },
+    "fingerprint": { "type": ["string","null"], "description": "SSH fingerprint base64 SHA256" },
+    "action": { "type": "string", "description": "create, delete, use, introspect" },
+    "outcome": { "type": "string", "enum": ["success","failure"] },
+    "reason": { "type": ["string","null"] },
+    "requestId": { "type": ["string","null"] },
+    "traceId": { "type": ["string","null"] },
+    "hashPrefix": { "type": ["string","null"], "description": "First 8 hex chars for tokens" },
+    "timestamp": { "type": "string", "format": "date-time" }
+  }
+}

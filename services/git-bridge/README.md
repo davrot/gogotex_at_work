@@ -3,7 +3,9 @@
 ## Docker
 
 The `Dockerfile` contains all the requirements for building and running the
- writelatex-git-bridge.
+writelatex-git-bridge.
+
+Note: In production the service is expected to be fronted by the common nginx proxy/load-balancer which handles TLS termination (HTTPS). The `git-bridge` process listens on an internal HTTP port and relies on the proxy for HTTPS exposure; in local dev you may run the service directly and use the develop network or a local reverse-proxy for HTTPS emulation.
 
 ```bash
 # build the image
@@ -17,50 +19,51 @@ docker run -v `pwd`/conf/local.json:/conf/runtime.json writelatex-git-bridge
 
 ### Required packages
 
-  * `maven` (for building, running tests and packaging)
-  * `jdk-8` (for compiling and running)
+- `go` 1.25+ (for Go-based development)
+
+> **Note**: The legacy Java/Maven build for `git-bridge` has been deprecated and removed from primary CI. If you need to run old Java tests or builds, you should do so from an archived branch or by reverting the deprecation PR.
 
 ### Commands
 
 To be run from the base directory:
 
-**Build jar**:
-`mvn package`
+**Build Go binary**:
+`make go-build`
 
-**Run tests**:
-`mvn test`
-
-**Clean**:
-`mvn clean`
+**Run Go tests**:
+`make go-test`
 
 To be run from the dev-environment:
 
-**Build jar**:
-`bin/run git-bridge make package`
+**Build Go binary**:
+`bin/run git-bridge make go-build`
 
-**Run tests**:
-`bin/run git-bridge make test`
-
-**Clean**:
-`bin/run git-bridge make clean`
+**Run Go tests**:
+`bin/run git-bridge make go-test`
 
 ### Installation
 
-Install dependencies:
+Install Go (for Go-based development):
 
-```
+- Recommended: **Go 1.25.x** (tested with **1.25.5**). If you can, install the latest Go 1.25 patch release.
+
+Native install example (Ubuntu):
+
+```bash
 sudo apt-get update
-sudo apt-get install -y maven
-sudo apt-get install -y openjdk-8-jdk
-sudo update-alternatives --set java /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java
-sudo update-alternatives --set javac /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/javac
+sudo apt-get install -y golang-go
+# or download from https://go.dev/dl/ (choose 1.25.x)
 ```
+
+If you cannot or prefer not to install Go locally, use the Docker-backed make targets provided in the `Makefile`:
+
+- Build with Docker: `make docker-go-build` (uses `golang:1.25` by default)
+- Run tests with Docker: `make docker-go-test`
+- Run benchmarks with Docker: `make docker-go-bench`
 
 Create a config file according to the format below.
 
-Run `mvn package` to build, test, and package it into a jar at `target/writelatex-git-bridge-1.0-SNAPSHOT-jar-with-dependencies.jar`.
-
-Use `java -jar <path_to_jar> <path_to_config_file>` to run the server.
+Run `make go-build` to build the Go binary and use the included `start.sh` (it will run the Go binary if present).
 
 ## Runtime Configuration
 
@@ -77,9 +80,12 @@ The configuration file is in `.json` format.
         "serviceName" (string): current name of writeLaTeX
                                 in case it ever changes,
         "oauth2Server" (string): oauth2 server,
-                                 with protocol and
-                                 without trailing slash,
-                                 null or missing if oauth2 shouldn't be used
+               with protocol and
+               without trailing slash,
+               null or missing if oauth2 shouldn't be used
+        "webProfileApiUrl" (string, optional): internal web-profile API base URL for SSH key retrieval (recommended),
+        "webProfileApiToken" (string, optional): bearer token for internal web-profile API calls,
+        "sshOnly" (boolean, optional): if true, only SSH-based Git authentication is enabled and legacy HTTP/OAuth2 methods are rejected (default: false),
         },
         "repoStore" (object, optional): { configure the repo store
             "maxFileSize" (long, optional): maximum size of a file, inclusive
@@ -114,6 +120,19 @@ The configuration file is in `.json` format.
 
 You have to restart the server for configuration changes to take effect.
 
+## Developer quickstart: rebuild & restart
+
+When making changes that affect configuration or embedded services, ensure you rebuild and restart the dev environment before running contract or integration tests:
+
+```bash
+cd develop
+./bin/build
+./bin/up
+# or from repo root:
+# develop/bin/build && ./bin/up
+```
+
+This helps ensure that `envsubst` and compose config changes are applied and containers are restarted with the updated config.
 
 ## Creating OAuth app
 

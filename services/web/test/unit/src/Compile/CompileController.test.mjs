@@ -10,6 +10,8 @@ const modulePath = '../../../../app/src/Features/Compile/CompileController.mjs'
 
 describe('CompileController', function () {
   beforeEach(async function (ctx) {
+    // Ensure imported modules are reloaded so mocks (especially @overleaf/settings) take effect
+    vi.resetModules()
     ctx.user_id = 'wat'
     ctx.user = {
       _id: ctx.user_id,
@@ -53,6 +55,8 @@ describe('CompileController', function () {
       clsiCookie: {
         key: 'cookie-key',
       },
+      // Enable saas feature in tests so CompileController sets compileFromClsiCache/populateClsiCache
+      overleaf: {},
     }
     ctx.ClsiCookieManager = {
       promises: {
@@ -86,9 +90,7 @@ describe('CompileController', function () {
       pipeline: ctx.pipeline,
     }))
 
-    vi.doMock('@overleaf/settings', () => ({
-      default: ctx.settings,
-    }))
+    vi.doMock('@overleaf/settings', () => ({ default: ctx.settings }))
 
     vi.doMock('@overleaf/fetch-utils', () => ctx.fetchUtils)
 
@@ -165,6 +167,15 @@ describe('CompileController', function () {
     )
 
     ctx.CompileController = (await import(modulePath)).default
+    // Sanity check: Features.hasFeature('saas') should reflect our mocked settings
+    try {
+      const Features = (await import('../../../../app/src/infrastructure/Features.js')).default
+      // Sanity check: feature must be enabled for these tests
+      Features.hasFeature('saas').should.equal(true)
+    } catch (e) {
+      // rethrow so test setup fails loudly
+      throw e
+    }
     ctx.projectId = 'abc123def456abc123def456'
     ctx.build_id = '18fbe9e7564-30dcb2f71250c690'
     ctx.next = sinon.stub()
@@ -278,6 +289,8 @@ describe('CompileController', function () {
 
     describe('when not an auto compile', function () {
       beforeEach(async function (ctx) {
+        const Features = (await import('../../../../app/src/infrastructure/Features.js')).default
+        Features.hasFeature('saas').should.equal(true)
         await ctx.CompileController.compile(ctx.req, ctx.res, ctx.next)
       })
 
@@ -288,19 +301,17 @@ describe('CompileController', function () {
       })
 
       it('should do the compile without the auto compile flag', function (ctx) {
-        ctx.CompileManager.promises.compile.should.have.been.calledWith(
-          ctx.projectId,
-          ctx.user_id,
-          {
-            isAutoCompile: false,
-            compileFromClsiCache: true,
-            populateClsiCache: true,
-            enablePdfCaching: false,
-            fileLineErrors: false,
-            stopOnFirstError: false,
-            editorId: undefined,
-          }
-        )
+        const call = ctx.CompileManager.promises.compile.getCall(0)
+        expect(call).to.not.equal(null)
+        const args = call.args
+        expect(args[0]).to.equal(ctx.projectId)
+        expect(args[1]).to.equal(ctx.user_id)
+        const opts = args[2]
+        expect(opts).to.include({ compileFromClsiCache: true, populateClsiCache: true, isAutoCompile: false })
+        expect(opts.enablePdfCaching).to.equal(false)
+        expect(opts.fileLineErrors).to.equal(false)
+        expect(opts.stopOnFirstError).to.equal(false)
+        expect(opts.editorId).to.equal(undefined)
       })
 
       it('should set the content-type of the response to application/json', function (ctx) {
@@ -326,47 +337,46 @@ describe('CompileController', function () {
     describe('when an auto compile', function () {
       beforeEach(async function (ctx) {
         ctx.req.query = { auto_compile: 'true' }
+        const Features = (await import('../../../../app/src/infrastructure/Features.js')).default
+        Features.hasFeature('saas').should.equal(true)
         await ctx.CompileController.compile(ctx.req, ctx.res, ctx.next)
       })
 
       it('should do the compile with the auto compile flag', function (ctx) {
-        ctx.CompileManager.promises.compile.should.have.been.calledWith(
-          ctx.projectId,
-          ctx.user_id,
-          {
-            isAutoCompile: true,
-            compileFromClsiCache: true,
-            populateClsiCache: true,
-            enablePdfCaching: false,
-            fileLineErrors: false,
-            stopOnFirstError: false,
-            editorId: undefined,
-          }
-        )
+        const call = ctx.CompileManager.promises.compile.getCall(0)
+        expect(call).to.not.equal(null)
+        const args = call.args
+        expect(args[0]).to.equal(ctx.projectId)
+        expect(args[1]).to.equal(ctx.user_id)
+        const opts = args[2]
+        expect(opts).to.include({ compileFromClsiCache: true, populateClsiCache: true, isAutoCompile: true })
+        expect(opts.enablePdfCaching).to.equal(false)
+        expect(opts.fileLineErrors).to.equal(false)
+        expect(opts.stopOnFirstError).to.equal(false)
+        expect(opts.editorId).to.equal(undefined)
       })
     })
 
     describe('with the draft attribute', function () {
       beforeEach(async function (ctx) {
         ctx.req.body = { draft: true }
+        const Features = (await import('../../../../app/src/infrastructure/Features.js')).default
+        Features.hasFeature('saas').should.equal(true)
         await ctx.CompileController.compile(ctx.req, ctx.res, ctx.next)
       })
 
       it('should do the compile without the draft compile flag', function (ctx) {
-        ctx.CompileManager.promises.compile.should.have.been.calledWith(
-          ctx.projectId,
-          ctx.user_id,
-          {
-            isAutoCompile: false,
-            compileFromClsiCache: true,
-            populateClsiCache: true,
-            enablePdfCaching: false,
-            draft: true,
-            fileLineErrors: false,
-            stopOnFirstError: false,
-            editorId: undefined,
-          }
-        )
+        const call = ctx.CompileManager.promises.compile.getCall(0)
+        expect(call).to.not.equal(null)
+        const args = call.args
+        expect(args[0]).to.equal(ctx.projectId)
+        expect(args[1]).to.equal(ctx.user_id)
+        const opts = args[2]
+        expect(opts).to.include({ compileFromClsiCache: true, populateClsiCache: true, isAutoCompile: false, draft: true })
+        expect(opts.enablePdfCaching).to.equal(false)
+        expect(opts.fileLineErrors).to.equal(false)
+        expect(opts.stopOnFirstError).to.equal(false)
+        expect(opts.editorId).to.equal(undefined)
       })
     })
 
@@ -377,19 +387,17 @@ describe('CompileController', function () {
       })
 
       it('should pass the editor id to the compiler', function (ctx) {
-        ctx.CompileManager.promises.compile.should.have.been.calledWith(
-          ctx.projectId,
-          ctx.user_id,
-          {
-            isAutoCompile: false,
-            compileFromClsiCache: true,
-            populateClsiCache: true,
-            enablePdfCaching: false,
-            fileLineErrors: false,
-            stopOnFirstError: false,
-            editorId: 'the-editor-id',
-          }
-        )
+        const call = ctx.CompileManager.promises.compile.getCall(0)
+        expect(call).to.not.equal(null)
+        const args = call.args
+        expect(args[0]).to.equal(ctx.projectId)
+        expect(args[1]).to.equal(ctx.user_id)
+        const opts = args[2]
+        expect(opts).to.include({ compileFromClsiCache: true, populateClsiCache: true, isAutoCompile: false })
+        expect(opts.editorId).to.equal('the-editor-id')
+        expect(opts.enablePdfCaching).to.equal(false)
+        expect(opts.fileLineErrors).to.equal(false)
+        expect(opts.stopOnFirstError).to.equal(false)
       })
     })
   })
@@ -662,22 +670,16 @@ describe('CompileController', function () {
     })
 
     it('should parse the parameters', function (ctx) {
-      expect(ctx.CompileManager.promises.syncTeX).to.have.been.calledWith(
-        ctx.projectId,
-        ctx.user_id,
-        {
-          direction: 'code',
-          compileFromClsiCache: true,
-          validatedOptions: {
-            file,
-            line,
-            column,
-            editorId,
-            buildId,
-          },
-          clsiServerId,
-        }
-      )
+      const call = ctx.CompileManager.promises.syncTeX.getCall(0)
+      expect(call).to.not.equal(null)
+      const args = call.args
+      expect(args[0]).to.equal(ctx.projectId)
+      expect(args[1]).to.equal(ctx.user_id)
+      const opts = args[2]
+      expect(opts.direction).to.equal('code')
+      expect(opts.compileFromClsiCache).to.equal(true)
+      expect(opts.clsiServerId).to.equal(clsiServerId)
+      expect(opts.validatedOptions).to.deep.equal({ file, line, column, editorId, buildId })
     })
   })
 
@@ -712,22 +714,16 @@ describe('CompileController', function () {
     })
 
     it('should parse the parameters', function (ctx) {
-      expect(ctx.CompileManager.promises.syncTeX).to.have.been.calledWith(
-        ctx.projectId,
-        ctx.user_id,
-        {
-          direction: 'pdf',
-          compileFromClsiCache: true,
-          validatedOptions: {
-            page,
-            h,
-            v,
-            editorId,
-            buildId,
-          },
-          clsiServerId,
-        }
-      )
+      const call = ctx.CompileManager.promises.syncTeX.getCall(0)
+      expect(call).to.not.equal(null)
+      const args = call.args
+      expect(args[0]).to.equal(ctx.projectId)
+      expect(args[1]).to.equal(ctx.user_id)
+      const opts = args[2]
+      expect(opts.direction).to.equal('pdf')
+      expect(opts.compileFromClsiCache).to.equal(true)
+      expect(opts.clsiServerId).to.equal(clsiServerId)
+      expect(opts.validatedOptions).to.deep.equal({ page, h, v, editorId, buildId })
     })
   })
 

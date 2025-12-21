@@ -2,7 +2,8 @@ import { expect } from 'chai'
 import fetch from 'node-fetch'
 import Settings from '@overleaf/settings'
 
-const BASE_URL = `http://${process.env.HTTP_TEST_HOST || '127.0.0.1'}:23000`
+import UserHelper from './helpers/UserHelper.mjs'
+const BASE_URL = UserHelper.baseUrl()
 
 describe('HttpPermissionsPolicy', function () {
   it('should have permissions-policy header on user-facing pages', async function () {
