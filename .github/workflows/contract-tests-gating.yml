@@ -39,6 +39,13 @@ jobs:
         run: |
           ./develop/bin/wait 300
 
+      - name: Run migration dry-runs (non-mutating checks)
+        run: |
+          echo "Running migration dry-runs"
+          node services/web/migrations/backfill-token-algorithm.js dryrun
+          node services/web/migrations/backfill-token-expiry.js dryrun 90
+          node services/web/migrations/rewrite-token-hashing.js dryrun bcrypt argon2id || true
+
       - name: Start Go webprofile-api in compose network
         run: |
           ./scripts/contract/run_webprofile_in_network.sh webprofile-api-ci

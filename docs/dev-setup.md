@@ -387,6 +387,32 @@ docker compose -f develop/docker-compose.yml down -v
 docker compose -f develop/docker-compose.yml up -d mongo
 ```
 
+### Running migrations (host vs in-container)
+
+When running migration scripts, be explicit about which Mongo host you target to avoid `127.0.0.1` pitfalls.
+
+- From the **host** (when mongo is published to the host):
+
+```bash
+# mongo published on host as 127.0.0.1:27017
+MONGO_CONNECTION_STRING='mongodb://127.0.0.1:27017/sharelatex' node services/web/migrations/backfill-token-expiry.js dryrun 90
+```
+
+- From **inside a container or a compose network** (use the service hostname `mongo`):
+
+```bash
+# run inside a container on the compose network (example uses a one-off node container)
+docker run --rm --network develop_default -v "$(pwd)":/workspace -w /workspace node:22 bash -lc "export MONGO_CONNECTION_STRING='mongodb://mongo:27017/sharelatex'; node services/web/migrations/backfill-token-expiry.js dryrun 90"
+```
+
+- If you're **connected to the mongo container** itself you can run equivalent operations directly with `mongosh` (no host binding required):
+
+```bash
+docker exec -it $(docker ps -qf 'name=mongo') mongosh /docker-entrypoint-initdb.d/backfill-token-algorithm.js --eval '...' # or run inline JS for small migrations
+```
+
+**Tip:** When running inside containers, _do not_ use `127.0.0.1` to refer to other services — use the compose service name (e.g., `mongo`) or connect through the host (127.0.0.1) only when running on the host itself.
+
 Notes:
 
 - The `mongo` service exposes port `27017` on the host for debugging (`127.0.0.1:27017` in the compose file). Use `mongodb://localhost:27017` when connecting from your host.
