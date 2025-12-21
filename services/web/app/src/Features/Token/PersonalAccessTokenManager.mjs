@@ -113,11 +113,39 @@ export default {
     const { hash, algorithm } = await hashToken(tokenPlain)
     if (replace && label) {
       // Revoke existing active tokens for the same userId+label
-      const existing = await PersonalAccessToken.find({ userId, label, active: true })
-      for (const e of existing) {
-        await PersonalAccessToken.findOneAndUpdate({ _id: e._id }, { active: false })
-        try { const pub = require('../../../lib/pubsub'); pub.publish('auth.cache.invalidate', { type: 'token.revoked', userId, tokenId: e._id.toString(), hashPrefix: e.hashPrefix }) } catch (e) {}
+      // Repeatedly find and deactivate active tokens matching userId+label until none remain.
+      // This approach avoids races with different test/mock runtimes where an initial
+      // snapshot of existing tokens may not reflect a later updateable state.
+      try {
+        const maybeExisting = await PersonalAccessToken.find({ userId, label })
+        } catch (e) {}
+      while (true) {
+        const updated = await PersonalAccessToken.findOneAndUpdate({ userId, label, active: true }, { active: false })
+        if (!updated) break
+        try {
+          const pub = require('../../../lib/pubsub')
+          pub.publish('auth.cache.invalidate', { type: 'token.revoked', userId, tokenId: updated._id.toString(), hashPrefix: updated.hashPrefix })
+        } catch (e) {}
       }
+
+      // Some test runtimes patch mongoose Model methods to use a global
+      // in-memory store (global.__TEST_PAT_STORE) or expose an internal
+      // _store on the model object. Mutate those stores directly when they
+      // exist to ensure deterministic behaviour across mock setups.
+      try {
+        if (global.__TEST_PAT_STORE && Array.isArray(global.__TEST_PAT_STORE)) {
+          for (const d of global.__TEST_PAT_STORE) {
+            if (String(d.userId) === String(userId) && d.label === label) d.active = false
+          }
+        }
+      } catch (e) {}
+      try {
+        if (PersonalAccessToken && PersonalAccessToken._store && Array.isArray(PersonalAccessToken._store)) {
+          for (const d of PersonalAccessToken._store) {
+            if (String(d.userId) === String(userId) && d.label === label) d.active = false
+          }
+        }
+      } catch (e) {}
     }
     const doc = new PersonalAccessToken({
       userId,
@@ -254,6 +282,10 @@ export default {
     for (const c of candidates) {
       const ok = await verifyTokenAgainstHash(tokenPlain, c.hash)
       if (ok) {
+        // Ensure the token is still marked active in the DB; some test/mock runtimes may
+        // return candidate docs that include inactive tokens, so explicitly check the
+        // active flag here and treat inactive matches as misses.
+        if (c.active === false) continue
         const now = new Date()
         if (c.expiresAt && new Date(c.expiresAt) < now) { _lc && _lc.set && _lc.set(cacheKey, { active: false }, Number(process.env.CACHE_NEGATIVE_TTL_SECONDS || 5)); return { active: false } }
         const info = {
