@@ -1,0 +1,26 @@
+#!/bin/bash
+
+NODE_PARAMS=""
+if [ "$DEBUG_NODE" == "true" ]; then
+    echo "running debug - clsi"
+    NODE_PARAMS="--inspect=0.0.0.0:30130"
+fi
+
+# Set permissions on docker.sock if present,
+# To enable sibling-containers (see entrypoint.sh in clsi project)
+if [ -e '/var/run/docker.sock' ]; then
+  echo ">> Setting permissions on docker socket"
+  DOCKER_GROUP=$(stat -c '%g' /var/run/docker.sock)
+  # Only create dockeronhost group if it doesn't already exist. This prevents
+  # noisy errors like "group 'dockeronhost' already exists" during container
+  # restarts. Use getent to check for an existing group name.
+  if ! getent group dockeronhost >/dev/null 2>&1; then
+    groupadd --non-unique --gid "${DOCKER_GROUP}" dockeronhost
+  fi
+  usermod -aG dockeronhost www-data
+fi
+
+source /etc/overleaf/env.sh
+export LISTEN_ADDRESS=127.0.0.1
+
+exec /sbin/setuser www-data /usr/bin/node $NODE_PARAMS /overleaf/services/clsi/app.js >> /var/log/overleaf/clsi.log 2>&1
