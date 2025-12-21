@@ -43,7 +43,7 @@ This runs `ssh_delegation_parity.mjs` in Playwright and collects `services/web/t
 
 - When parity is stable, flip `ci/PARITY_STRICT` in the default branch to make these checks required in CI.
 - Consider migrating other internal endpoints if a Go-side implementation exists or if cross-service ownership changes. Current ownership and parity: tokens and SSH keys are covered and tested.
-- If you need me to flip the opt-in to opt-out (i.e., enable `AUTH_SSH_USE_WEBPROFILE_API` by default) for a canary environment, I can prepare that change and the required rollout steps.
+- I have enabled `AUTH_SSH_USE_WEBPROFILE_API=true` by default in `develop/dev.env` for dev/canary testing; when CI proves stable across environments I can prepare a PR to enable this by default in staging/production manifests.
 
 ---
 
