@@ -173,58 +173,33 @@ if (!process.env.HTTP_TEST_HOST) {
     console.debug('[bootstrap] pre-test rebuild helper threw', e && e.message ? e.message : e)
   }
 
-  // If token delegation to a webprofile API is requested, ensure the webprofile shim
-  // is available on the compose network. Try a few healthcheck endpoints and
-  // fall back to running the helper script to start it in the develop network.
-  if (process.env.AUTH_TOKEN_USE_WEBPROFILE_API === 'true') {
-    try {
-      const fs = require('fs')
-      const path = require('path')
-      const { execSync } = require('child_process')
-      const fetch = (await import('node-fetch')).default
-      const maxAttempts = 4
-      let healthy = false
-      const candidates = [
-        'http://webprofile-api-ci:3900/internal/api/health',
-        'http://webprofile-api:3900/internal/api/health',
-        'http://localhost:3900/internal/api/health'
-      ]
-      for (let i = 0; i < maxAttempts && !healthy; i++) {
-        for (const url of candidates) {
-          try {
-            const r = await fetch(url, { method: 'GET', timeout: 2000 })
-            if (r && r.status === 200) {
-              healthy = true
-              // eslint-disable-next-line no-console
-              console.debug(`[bootstrap] webprofile-api healthy at ${url}`)
-              break
-            }
-          } catch (e) {
-            // ignore and try next
-          }
-        }
-        if (!healthy) await new Promise(r => setTimeout(r, 300 * (i + 1)))
-      }
+// Tests may disable rate limits when explicitly requested.
+try {
+  const Settings = require('@overleaf/settings')
+  // disable rate limits only when test runner requests it
+  if (process.env.TEST_DISABLE_RATE_LIMITS === 'true') {
+    // Ensure both the runtime Settings and process env used by rate limiter modules
+    // reflect the test intent. Some modules read env vars on import, so setting the
+    // env here avoids ordering issues in tests that require rate limits to be off.
+    process.env.DISABLE_RATE_LIMITS = 'true'
+    Settings.disableRateLimits = true
+    // eslint-disable-next-line no-console
+    console.debug('[bootstrap] TEST_DISABLE_RATE_LIMITS requested - disabled rate limits')
 
-      if (!healthy) {
-        // Attempt to run local helper to start a webprofile container attached to the compose network
-        const helperScript = path.join(__dirname, '..', '..', '..', '..', 'scripts', 'contract', 'run_webprofile_in_network.sh')
-        if (fs.existsSync(helperScript)) {
-          try {
-            // eslint-disable-next-line no-console
-            console.debug('[bootstrap] Starting webprofile shim via:', helperScript)
-            execSync(`${helperScript} webprofile-api-test`, { stdio: 'inherit', env: process.env })
-          } catch (e) {
-            // eslint-disable-next-line no-console
-            console.debug('[bootstrap] Failed to start webprofile shim:', e && e.message ? e.message : e)
-          }
-        }
-      }
-    } catch (e) {
-      // eslint-disable-next-line no-console
-      console.debug('[bootstrap] webprofile shim startup check threw', e && e.message ? e.message : e)
-    }
-  }
+    // Also attempt to notify the running web process (if any) to disable rate limits
+    // by calling the test-only admin route. This handles cases where the web service
+    // was started without DISABLE_RATE_LIMITS set in its environment.
+    try {
+      (async () => {
+        try {
+          const fetch = (await import('node-fetch')).default
+          const base = process.env.WEB_BASE_URL || (process.env.HTTP_TEST_HOST ? `http://${process.env.HTTP_TEST_HOST}:${process.env.HTTP_TEST_PORT || 3000}` : 'http://127.0.0.1:3000')
+          const healthUrl = `${base.replace(/\/$/, '')}/health`
+          const targetUrl = `${base.replace(/\/$/, '')}/internal/api/test/disable-rate-limits`
+          const sleep = ms => new Promise(r => setTimeout(r, ms))
+          let healthy = false
+          let attempts = 0
+          const maxHealthAttempts = 8
           while (attempts < maxHealthAttempts) {
             attempts++
             try {
