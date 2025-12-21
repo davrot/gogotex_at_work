@@ -125,6 +125,34 @@ ssh_keys_parity_check:
     PARITY_USER: ${PARITY_USER:-parity-user}
     MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017/sharelatex}
 
+# Strict parity runner — triggers when repo contains ci/PARITY_STRICT (intended to be added to default branch when parity is stable)
+ssh_keys_parity_required:
+  stage: contract
+  rules:
+    - exists:
+        - ci/PARITY_STRICT
+  allow_failure: false
+  script:
+    - chmod +x scripts/contract/compare_ssh_parity.sh
+    - |
+      set -euo pipefail
+      PARITY_USER=${PARITY_USER:-parity-user}
+      NODE_BASE=${NODE_BASE:-http://develop-web-1:3000}
+      GO_BASE=${GO_BASE:-http://webprofile-api-ci:3900}
+      export MONGO_URI=${MONGO_URI:-mongodb://mongo:27017/sharelatex}
+      scripts/contract/compare_ssh_parity.sh ${NODE_BASE} ${GO_BASE} ${PARITY_USER}
+  timeout: 10m
+  artifacts:
+    when: always
+    paths:
+      - tmp/parity_results/*
+    expire_in: 1 week
+  variables:
+    NODE_BASE: ${NODE_BASE}
+    GO_BASE: ${GO_BASE}
+    PARITY_USER: ${PARITY_USER:-parity-user}
+    MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017/sharelatex}
+
 # Token parity check (non-blocking initially)
 tokens_parity_check:
   stage: contract
