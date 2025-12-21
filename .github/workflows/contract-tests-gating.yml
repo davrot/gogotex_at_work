@@ -12,6 +12,8 @@ jobs:
   contract-tests:
     runs-on: ubuntu-latest
     environment: ci
+    env:
+      AUTH_TOKEN_USE_WEBPROFILE_API: "true"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -27,7 +29,8 @@ jobs:
 
       - name: Start services (docker-compose)
         run: |
-          docker compose -f develop/docker-compose.yml up -d --build
+          echo "AUTH_TOKEN_USE_WEBPROFILE_API=true" > .env.ci
+          docker compose --env-file .env.ci -f develop/docker-compose.yml up -d --build
 
       - name: Wait for services
         run: |

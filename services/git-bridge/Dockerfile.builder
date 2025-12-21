@@ -1,5 +1,5 @@
 # Build small Go-based git-bridge image
-FROM golang:1.24 as builder
+FROM golang:1.25 as builder
 WORKDIR /build
 COPY go.mod go.sum ./
 RUN go mod download
