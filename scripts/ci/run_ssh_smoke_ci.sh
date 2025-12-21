@@ -126,6 +126,8 @@ else
   else
     if run_cmd_with_timeout "CONFIRM_DEV_SETUP=true CONFIRM_BASE_URL=true BASE_URL='$BASE_URL' COMPOSE_FILE='$COMPOSE_FILE' PROJECT_DIR='$PROJECT_DIR' node services/web/test/e2e/playwright/git_roundtrip_ssh.mjs" "$SMOKE_TIMEOUT"; then rc=0; else rc=$?; fi
   fi
+fi
+
 if [ "$rc" -ne 0 ]; then
   # If the command was terminated by a signal it will have an exit code > 128
   if [ $rc -gt 128 ]; then
