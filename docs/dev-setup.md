@@ -314,6 +314,16 @@ When enabled, `web` will call the Go shim for `introspect` and token create/list
 
 If the Node web instance requires authentication for POSTs, the script will seed keys directly into MongoDB (using `services/web/tools/seed_ssh_key.mjs`) and compare GET responses instead.
 
+Note: when a `develop` compose stack is running, the parity script prefers to run the seeder inside the running `web` container so the seeder runs on the compose network and can reach Mongo via the service hostname (avoids `127.0.0.1`/`localhost` pitfalls). Example:
+
+```bash
+# From the repository root (when the develop stack is up):
+# copies the public key into the `web` container and runs the seeder there
+docker compose -f develop/docker-compose.yml exec -T web sh -lc "cat > /tmp/seed_pub && MONGO_URI='mongodb://mongo:27017/sharelatex' node tools/seed_ssh_key.mjs \"<userId>\" /tmp/seed_pub && rm -f /tmp/seed_pub" < /path/to/testkey.pub
+```
+
+If compose is not available the script falls back to running the seeder in a dockerized node container or via the local `node` binary.
+
 CI behaviour: The `ssh_keys_parity_check` job will try to start the Go shim automatically in one of three ways (in order):
 
 - If `go` is installed in the runner, it builds and runs the binary locally.

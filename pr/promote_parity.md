@@ -22,7 +22,6 @@ Next steps after approval:
 2. Monitor CI and triage any flakiness. If stable for several runs, prepare to flip the default to `true` in staging/production manifests and coordinate rollout.
 3. Close migration todos and update release notes.
 
-
 Validation performed by automation:
 
 - I ran the Playwright SSH delegation parity smoke test locally **twice** (via `scripts/ci/run_ssh_smoke_ci.sh` with `DELEGATION_PARITY=1` and `AUTH_SSH_USE_WEBPROFILE_API='true'`) and observed successful runs with Playwright artifacts in `services/web/test/e2e/playwright/out/` and parity JSONs in `tmp/parity_results/`.

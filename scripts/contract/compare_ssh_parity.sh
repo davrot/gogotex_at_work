@@ -100,8 +100,12 @@ else
     echo "{\"fingerprint\": \"$GO_SEED_FP\"}" >"$GO_SEED_OUT" || true
   else
     # Run seeder and capture output for fingerprint extraction
-    if echo "$NODE_CMD" | grep -q "docker run"; then
-      # sanity-check that seeder is visible inside docker
+    # Prefer to run the seeder inside the running `web` service (compose network)
+    # so the seeder can reach Mongo by service hostname (avoids localhost pitfalls).
+    if command -v docker >/dev/null 2>&1 && docker compose -f develop/docker-compose.yml ps web >/dev/null 2>&1 && docker compose -f develop/docker-compose.yml ps web | grep -q 'Up'; then
+      docker compose -f develop/docker-compose.yml exec -T web sh -lc "cat > /tmp/seed_pub && MONGO_URI='$MONGO_URI' node tools/seed_ssh_key.mjs \"$USER_ID\" /tmp/seed_pub && rm -f /tmp/seed_pub" < "$PUB_FILE" >"$NODE_SEED_OUT" 2>&1 || true
+    elif echo "$NODE_CMD" | grep -q "docker run"; then
+      # sanity-check that seeder script is visible inside docker
       if ! docker run --rm -v "$SCRIPT_ROOT":/work -w /work node:20 node -e "console.log(require('fs').existsSync('services/web/tools/seed_ssh_key.mjs'))" 2>/dev/null | grep -q "true"; then
         echo "Warning: seeder script not visible inside docker at services/web/tools/seed_ssh_key.mjs (mounted $SCRIPT_ROOT:/work)."
         echo "Proceeding to run seeder to capture error output."
@@ -113,15 +117,26 @@ else
 
     # For Go user, seed separate user id to avoid direct collision in same DB
     GO_USER_ID="${USER_ID}-go"
-    if echo "$NODE_CMD" | grep -q "docker run"; then
+    if command -v docker >/dev/null 2>&1 && docker compose -f develop/docker-compose.yml ps web >/dev/null 2>&1 && docker compose -f develop/docker-compose.yml ps web | grep -q 'Up'; then
+      docker compose -f develop/docker-compose.yml exec -T web sh -lc "cat > /tmp/seed_pub && MONGO_URI='$MONGO_URI' node tools/seed_ssh_key.mjs \"$GO_USER_ID\" /tmp/seed_pub && rm -f /tmp/seed_pub" < "$PUB_FILE" >"$GO_SEED_OUT" 2>&1 || true
+    elif echo "$NODE_CMD" | grep -q "docker run"; then
       docker run --rm -e MONGO_URI="$MONGO_URI" -v "$SCRIPT_ROOT":/work -w /work node:20 node services/web/tools/seed_ssh_key.mjs "$GO_USER_ID" "$PUB_FILE" >"$GO_SEED_OUT" 2>&1 || true
     else
       MONGO_URI="$MONGO_URI" $NODE_CMD services/web/tools/seed_ssh_key.mjs "$GO_USER_ID" "$PUB_FILE" >"$GO_SEED_OUT" 2>&1 || true
     fi
 
-    echo "Extracted Node seed fingerprint: $NODE_SEED_FP"
-  if [ -n "$GO_SEED_FP" ]; then
-    echo "Extracted Go seed fingerprint: $GO_SEED_FP"
+    # Extract fingerprint strings from seeder outputs (if seeder wrote them)
+    if [ -s "$NODE_SEED_OUT" ]; then
+      NODE_SEED_FP=$(grep -oE 'SHA256:[A-Za-z0-9+/=]+' "$NODE_SEED_OUT" 2>/dev/null | head -n1 || true)
+    fi
+    if [ -s "$GO_SEED_OUT" ]; then
+      GO_SEED_FP=$(grep -oE 'SHA256:[A-Za-z0-9+/=]+' "$GO_SEED_OUT" 2>/dev/null | head -n1 || true)
+    fi
+
+    echo "Extracted Node seed fingerprint: ${NODE_SEED_FP:-}"
+    if [ -n "${GO_SEED_FP:-}" ]; then
+      echo "Extracted Go seed fingerprint: ${GO_SEED_FP:-}"
+    fi
   fi
 else
   # If POSTs succeeded (e.g. Go accepted unauthenticated POST), proceed to GET check using same users
@@ -151,10 +166,10 @@ GO_FP_POST=$(jq -r '.fingerprint // empty' "$GO_POST_OUT" || true)
 GO_FP_GET=$(jq -r '.[0].fingerprint // empty' "$GO_GET_OUT" || true)
 
 # Fallback: use seeder-extracted fingerprints when Node APIs are authenticated/redirecting
-NODE_FP_POST=${NODE_FP_POST:-$NODE_SEED_FP}
-NODE_FP_GET=${NODE_FP_GET:-$NODE_SEED_FP}
-GO_FP_POST=${GO_FP_POST:-$GO_SEED_FP}
-GO_FP_GET=${GO_FP_GET:-$GO_SEED_FP}
+NODE_FP_POST=${NODE_FP_POST:-${NODE_SEED_FP:-}}
+NODE_FP_GET=${NODE_FP_GET:-${NODE_SEED_FP:-}}
+GO_FP_POST=${GO_FP_POST:-${GO_SEED_FP:-}}
+GO_FP_GET=${GO_FP_GET:-${GO_SEED_FP:-}}
 
 echo "Node POST fingerprint: $NODE_FP_POST"
 echo "Node GET fingerprint:  $NODE_FP_GET"
@@ -164,22 +179,22 @@ echo "Go GET fingerprint:    $GO_FP_GET"
 # Compare outcomes
 FAIL=0
 # Allow POST to be non-2xx if we seeded the DB directly (node/go may be auth-protected)
-if [ -z "$NODE_SEED_FP" ]; then
+if [ -z "${NODE_SEED_FP:-}" ]; then
   if [ "$NODE_STATUS" != "201" ] && [ "$NODE_STATUS" != "200" ]; then
     echo "Node POST returned unexpected status $NODE_STATUS"
     FAIL=1
   fi
 else
-  echo "Node POST unauthenticated; using seeder fingerprint: $NODE_SEED_FP"
+  echo "Node POST unauthenticated; using seeder fingerprint: ${NODE_SEED_FP:-}"
 fi
 
-if [ -z "$GO_SEED_FP" ]; then
+if [ -z "${GO_SEED_FP:-}" ]; then
   if [ "$GO_STATUS" != "201" ] && [ "$GO_STATUS" != "200" ]; then
     echo "Go POST returned unexpected status $GO_STATUS"
     FAIL=1
   fi
 else
-  echo "Go POST unauthenticated; using seeder fingerprint: $GO_SEED_FP"
+  echo "Go POST unauthenticated; using seeder fingerprint: ${GO_SEED_FP:-}"
 fi
 if [ -z "$NODE_FP_POST" ] && [ -z "$NODE_FP_GET" ]; then
   echo "Node did not return a fingerprint in POST or GET outputs"
@@ -191,8 +206,8 @@ if [ -z "$GO_FP_POST" ] && [ -z "$GO_FP_GET" ]; then
 fi
 
 # Normalize fingerprints to compare
-NODE_FP=${NODE_FP_POST:-${NODE_FP_GET:-$NODE_SEED_FP}}
-GO_FP=${GO_FP_POST:-${GO_FP_GET:-$GO_SEED_FP}}
+NODE_FP=${NODE_FP_POST:-${NODE_FP_GET:-${NODE_SEED_FP:-}}}
+GO_FP=${GO_FP_POST:-${GO_FP_GET:-${GO_SEED_FP:-}}}
 
 # Helper: check if a fingerprint exists anywhere in a GET JSON array file
 contains_fp() {
@@ -207,7 +222,7 @@ contains_fp() {
   return 1
 }
 
-# Allow success when either fingerprint matches the other's GET list, or they are equal
+# Allow success when either fingerprint matches the others GET list, or they are equal
 if [ "$NODE_FP" = "$GO_FP" ]; then
   echo "Fingerprints equal: $NODE_FP"
 else
@@ -241,8 +256,12 @@ if [ $FAIL -ne 0 ]; then
   cat "$GO_GET_OUT"
   echo "Saving artifacts to $ARTIFACT_DIR"
   cp -v "$NODE_POST_OUT" "$NODE_GET_OUT" "$GO_POST_OUT" "$GO_GET_OUT" "$ARTIFACT_DIR/" || true
+  # Also save seeder outputs (if present) for debugging auth/seed issues
+  cp -v "${NODE_SEED_OUT:-}" "${GO_SEED_OUT:-}" "$ARTIFACT_DIR/" || true
   ls -la "$ARTIFACT_DIR" || true
   exit 3
+fi
+
 fi
 
 echo "Parity check PASSED: fingerprints match and both services returned expected codes"
