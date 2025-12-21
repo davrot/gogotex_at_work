@@ -1,7 +1,10 @@
-# git-bridge makefile
+# git-bridge Makefile — Java/Maven targets removed
 
-MVN_OPTS := --no-transfer-progress
-MVN_TARGET := target/writelatex-git-bridge-1.0-SNAPSHOT-jar-with-dependencies.jar
+# NOTE: The legacy Java/Maven build and test targets have been removed as part
+# of the Go migration. Use the Go targets below (go-build, go-test, etc.) or the
+# Docker-backed Go targets (docker-go-build, docker-go-test) to build and test
+# the service. If you need to run Java builds temporarily, re-enable them via
+# a separate revertible PR.
 
 export BUILD_NUMBER ?= local
 export BRANCH_NAME ?= $(shell git rev-parse --abbrev-ref HEAD)
@@ -18,54 +21,7 @@ IMAGE_REPO_FINAL ?= $(IMAGE_REPO_BRANCH)-$(BUILD_NUMBER)
 runtime-conf:
 	/opt/envsubst < conf/envsubst_template.json > conf/runtime.json
 
-
-run: $(MVN_TARGET) runtime-conf
-	java $(GIT_BRIDGE_JVM_ARGS) -jar $(MVN_TARGET) conf/runtime.json
-
-
-$(MVN_TARGET): $(shell find src -type f) pom.xml
-	mvn $(MVN_OPTS) package -DskipTests
-
-build: $(MVN_TARGET)
-
-docker_build_base:
-	docker build --pull \
-		--build-arg BUILDKIT_INLINE_CACHE=1 \
-		--cache-from $(IMAGE_REPO_BRANCH) \
-		--cache-from $(IMAGE_REPO_MAIN) \
-		--tag $(IMAGE_CI) \
-		--target base \
-	.
-
-docker_build:
-	docker build --pull \
-		--build-arg BUILDKIT_INLINE_CACHE=1 \
-		--cache-from $(IMAGE_REPO_BRANCH) \
-		--cache-from $(IMAGE_REPO_MAIN) \
-		--tag $(IMAGE_REPO_BRANCH) \
-		--tag $(IMAGE_REPO_FINAL) \
-	.
-
-format:
-	mvn $(MVN_OPTS) com.spotify.fmt:fmt-maven-plugin:check
-
-docker_format:
-	docker run --rm -v $(PWD):$(PWD) -w $(PWD) --user node $(IMAGE_CI) make format
-
-format_fix:
-	mvn $(MVN_OPTS) com.spotify.fmt:fmt-maven-plugin:format
-
-
-test:
-	mvn $(MVN_OPTS) test
-
-docker_test:
-	docker run --rm -v $(PWD):$(PWD) -w $(PWD) --user node $(IMAGE_CI) make test
-
-clean:
-	mvn $(MVN_OPTS) clean
-
-# --- Go build/test targets (migration skeleton) ---
+# --- Go build/test targets (primary) ---
 GO ?= go
 GOBIN ?= $(PWD)/bin
 
@@ -96,8 +52,8 @@ docker-go-test:
 docker-go-bench:
 	docker run --rm -v $(PWD):/app -w /app/services/git-bridge $(DOCKER_GO_IMAGE) sh -c "go test -bench=. ./... -run=^$"
 
-package: clean
-	mvn $(MVN_OPTS) package -DskipTests
+package: go-build
+	@echo "Packaging via Go build (use 'make go-build'). Legacy Maven packaging removed."
 
 refresh_cache: refresh_cache_branch
 refresh_cache_branch:

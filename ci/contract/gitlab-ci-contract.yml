@@ -5,6 +5,8 @@ stages:
 
 variables:
   NODE_ENV: test
+  # Toggle to run legacy Java/Maven CI jobs for git-bridge; default is "false" to avoid running Java builds.
+  LEGACY_JAVA_RUN: "false"
 
 no_127_3900_check:
   stage: test
@@ -123,12 +125,6 @@ ssh_keys_parity_check:
     PARITY_USER: ${PARITY_USER:-parity-user}
     MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017/sharelatex}
 
-gitbridge_maven_tests:
-  stage: test
-  script:
-    - cd services/git-bridge
-    - mvn -B -q -DskipTests=false test
-
 gitbridge_go_tests:
   stage: test
   image: golang:1.21
@@ -197,15 +193,6 @@ ssh_keys_parity_validation:
     GO_BASE: ${GO_BASE}
     PARITY_USER: ${PARITY_USER:-parity-validate}
     MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017/sharelatex}
-
-# End-to-end SSH tests that exercise WebProfile -> Mongo -> SSH end-to-end behaviour
-gitbridge_ssh_e2e:
-  stage: test
-  script:
-    - cd services/git-bridge
-    - mvn -B -q -DskipTests=false -Dtest=WebProfileSSHServerE2ETest,WebProfileSSHServerMembershipE2ETest test
-  allow_failure: false
-  timeout: 10m
 
 bench_key_lookup:
   stage: bench

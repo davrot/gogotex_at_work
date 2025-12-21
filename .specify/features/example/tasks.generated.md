@@ -21,7 +21,7 @@
 - [ ] T044 Migrate benchmarks & harness to target Go binary — ensure `ci/benchmarks` can invoke the Go binary in dev and CI to produce p50/p95/p99 artifacts.
   - Acceptance: Bench harness produces artifacts and meets gating requirements in CI.
 
-- [ ] T045 Remove Java sources and Maven configs after successful migration — deprecate and remove `pom.xml`, `src/main/java`, and Java test directories when CI shows parity.
+- [x] T045 Remove Java sources and Maven configs after successful migration — deprecate and remove `pom.xml`, `src/main/java`, and Java test directories when CI shows parity.
   - Acceptance: No Java build steps remain in CI and Java sources removed from repo.
 
 - [ ] T046 Update docs, `spec.md`, `plan.md`, and README to describe Go-based development and testing instructions.

@@ -29,11 +29,25 @@ npx playwright install
 npx playwright install-deps
 ```
 
-- Java & Maven (required by some services/build tasks):
+- Go (required for git-bridge now):
 
-Install OpenJDK 21 (or newer) and Maven 3.8+ on Linux or macOS. Several git-bridge tests and builds target Java 21, so please prefer a Java 21 JDK for local development.
+Install Go 1.25+ on Linux or macOS. The `git-bridge` service now uses a Go implementation; please prefer Go 1.25+ for local development.
 
-Debian/Ubuntu (apt; Corretto/Temurin examples):
+Debian/Ubuntu (apt example):
+
+Option A — Install Go via apt (example):
+
+```bash
+sudo apt-get update
+sudo apt-get install -y golang-go
+```
+
+If you cannot (or prefer not to) install Go locally, you can use the Docker-backed Makefile targets provided in `services/git-bridge`:
+
+- Build with Docker: `make docker-go-build` (uses `golang:1.25` by default)
+- Run tests with Docker: `make docker-go-test`
+
+> **Note**: The legacy Java/Maven instructions have been deprecated and removed from the primary workflows. If you require Java-based builds, use an archived branch or request a temporary re-enable.
 
 Option A — Amazon Corretto 21 (apt):
 
@@ -42,7 +56,7 @@ Option A — Amazon Corretto 21 (apt):
 sudo curl -fsSL https://apt.corretto.aws/corretto.key | sudo apt-key add -
 echo "deb https://apt.corretto.aws stable main" | sudo tee /etc/apt/sources.list.d/corretto.list
 sudo apt-get update
-sudo apt-get install -y java-21-amazon-corretto-jdk maven
+sudo apt-get install -y golang-go
 ```
 
 Option B — Temurin 21 (if available for your distro):
@@ -69,8 +83,8 @@ macOS (Homebrew):
 
 ```bash
 brew update
-brew install temurin21 maven
-# follow any post-install instructions to set JAVA_HOME if shown
+brew install golang
+# follow any post-install instructions to set GOPATH/GOROOT if shown
 ```
 
 Verify the installations:
@@ -90,30 +104,26 @@ If your environment uses the VS Code dev container, install Java/Maven on the ho
 
 Running Maven tests without host JDK 21:
 
-If you cannot (or prefer not to) install JDK 21 on your host, you can run Maven in a container that provides Java 21:
+If you cannot (or prefer not to) install Go on your host, you can use the Docker-backed make targets which run Go inside a container (see above), or use the `golang:1.25` container directly for temporary builds/tests:
 
 ```bash
-docker run --rm -v /absolute/path/to/services/git-bridge:/app -w /app maven:3-amazoncorretto-21-debian mvn -Dtest=WebProfileUserKeysAuthContractTest test
+docker run --rm -v /absolute/path/to/services/git-bridge:/app -w /app golang:1.25 sh -c "go test ./... -v"
 ```
 
 This is a convenient fallback for CI-like test runs or temporary verification.
 
 ### Running integration (E2E) tests locally
 
-Integration and end-to-end tests have their own Maven profile named `integration-tests` which uses the Failsafe plugin. To run all integration tests locally:
+Integration and end-to-end tests were previously implemented in Java/Maven. For the Go migration, prefer running the Go-based integration tests and the contract tests against the Go shim. If you need to run the archived Java integration tests, run them from the archived branch or re-enable the legacy job temporarily via the `LEGACY_JAVA_RUN` toggle in CI.
+
+For Go-based tests run locally:
 
 ```bash
-# Run all integration tests (may take longer)
-mvn -Pintegration-tests -DskipTests=false verify
+cd services/git-bridge
+make go-test
+# or (Docker-backed)
+make docker-go-test
 ```
-
-To run a single integration test class:
-
-```bash
-mvn -Pintegration-tests -DskipTests=false -Dit.test=WebProfileSSHServerE2ETest verify
-```
-
-Note: The CI configuration already runs the SSH E2E tests in the `gitbridge_ssh_e2e` job defined in `ci/contract/gitlab-ci-contract.yml`.
 
 ## Build & Start Services
 

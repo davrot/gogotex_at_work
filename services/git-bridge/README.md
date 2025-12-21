@@ -19,36 +19,21 @@ docker run -v `pwd`/conf/local.json:/conf/runtime.json writelatex-git-bridge
 
 ### Required packages
 
-- `maven` (for building, running tests and packaging)
-- `jdk-8` (for compiling and running)
-- `go` 1.21+ (for Go-based development; only required once you opt into the Go migration)
+- `go` 1.25+ (for Go-based development)
+
+> **Note**: The legacy Java/Maven build for `git-bridge` has been deprecated and removed from primary CI. If you need to run old Java tests or builds, you should do so from an archived branch or by reverting the deprecation PR.
 
 ### Commands
 
 To be run from the base directory:
 
-**Build jar** (Java):
-`mvn package`
-
-**Run Java tests**:
-`mvn test`
-
-**Clean**:
-`mvn clean`
-
-**Build Go binary** (Go migration):
+**Build Go binary**:
 `make go-build`
 
 **Run Go tests**:
 `make go-test`
 
 To be run from the dev-environment:
-
-**Build jar**:
-`bin/run git-bridge make package`
-
-**Run tests**:
-`bin/run git-bridge make test`
 
 **Build Go binary**:
 `bin/run git-bridge make go-build`
@@ -58,23 +43,13 @@ To be run from the dev-environment:
 
 ### Installation
 
-Install dependencies (Java-based build):
-
-```
-sudo apt-get update
-sudo apt-get install -y maven
-sudo apt-get install -y openjdk-8-jdk
-sudo update-alternatives --set java /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java
-sudo update-alternatives --set javac /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/javac
-```
-
 Install Go (for Go-based development):
 
 - Recommended: **Go 1.25.x** (tested with **1.25.5**). If you can, install the latest Go 1.25 patch release.
 
 Native install example (Ubuntu):
 
-```
+```bash
 sudo apt-get update
 sudo apt-get install -y golang-go
 # or download from https://go.dev/dl/ (choose 1.25.x)
@@ -88,9 +63,7 @@ If you cannot or prefer not to install Go locally, use the Docker-backed make ta
 
 Create a config file according to the format below.
 
-Run `mvn package` to build, test, and package it into a jar at `target/writelatex-git-bridge-1.0-SNAPSHOT-jar-with-dependencies.jar`.
-
-Use `java -jar <path_to_jar> <path_to_config_file>` to run the server.
+Run `make go-build` to build the Go binary and use the included `start.sh` (it will run the Go binary if present).
 
 ## Runtime Configuration
 
