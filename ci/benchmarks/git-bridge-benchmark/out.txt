@@ -1,0 +1,21 @@
+PASS
+ok  	github.com/overleaf/git-bridge/cmd/gitbridge	0.005s
+PASS
+ok  	github.com/overleaf/git-bridge/internal/lookup	0.006s
+PASS
+ok  	github.com/overleaf/git-bridge/internal/membership	0.006s
+goos: linux
+goarch: amd64
+pkg: github.com/overleaf/git-bridge/internal/repo
+cpu: 12th Gen Intel(R) Core(TM) i9-12900K
+BenchmarkSlugFromPath-24    	10558393	       129.9 ns/op
+PASS
+ok  	github.com/overleaf/git-bridge/internal/repo	1.503s
+PASS
+ok  	github.com/overleaf/git-bridge/internal/ssh	0.003s
+PASS
+ok  	github.com/overleaf/git-bridge/internal/token	0.003s
+PASS
+ok  	github.com/overleaf/git-bridge/internal/webprofile	0.005s
+PASS
+ok  	github.com/overleaf/git-bridge/test/contract	0.005s

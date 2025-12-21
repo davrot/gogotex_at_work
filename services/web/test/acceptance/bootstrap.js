@@ -173,6 +173,18 @@ if (!process.env.HTTP_TEST_HOST) {
     console.debug('[bootstrap] pre-test rebuild helper threw', e && e.message ? e.message : e)
   }
 
+  // Default testing behavior: unless we're explicitly running the delegation parity
+  // tests (DELEGATION_PARITY=1), prefer the local Node implementations to avoid
+  // brittle external dependencies. Only set these defaults if not already specified.
+  if (process.env.DELEGATION_PARITY !== '1') {
+    if (typeof process.env.AUTH_SSH_USE_WEBPROFILE_API === 'undefined') process.env.AUTH_SSH_USE_WEBPROFILE_API = 'false'
+    if (typeof process.env.AUTH_TOKEN_USE_WEBPROFILE_API === 'undefined') process.env.AUTH_TOKEN_USE_WEBPROFILE_API = 'false'
+  }
+
+  // Allow bcrypt as a test-time fallback when argon2 isn't available to avoid
+  // 500s in environments without the native argon2 module (CI/dev images).
+  if (typeof process.env.AUTH_TOKEN_ALLOW_BCRYPT_FALLBACK === 'undefined') process.env.AUTH_TOKEN_ALLOW_BCRYPT_FALLBACK = 'true'
+
   // If token delegation to a webprofile API is requested, ensure the webprofile shim
   // is available on the compose network. This is best-effort and only runs when
   // AUTH_TOKEN_USE_WEBPROFILE_API=true so it won't affect normal dev runs.

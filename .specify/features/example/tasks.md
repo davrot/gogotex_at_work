@@ -16,7 +16,7 @@
 - [x] T041a Add CI parity job to run SSH key endpoint parity between Node and Go — implement a contract-stage job that builds/starts the Go `webprofile-api` shim, runs `scripts/contract/compare_ssh_parity.sh`, and fails the job on divergence. Initially mark `allow_failure: true` until parity is stable; flip to required when tests are reliable. — **Status: completed**
 
 - [x] T041b Add validation job and run-book to validate parity stability before flipping strictness — implement `ssh_keys_parity_validation` (manual job) that runs parity multiple times and fails on any mismatch; document run-book and flip criteria (e.g., 10 consecutive passes). — **Status: completed**
-  - Acceptance: `ci/contract/gitlab-ci-contract.yml` includes `ssh_keys_parity_check` job; job builds `services/git-bridge/cmd/webprofile-api` if `go` is available and runs the parity script; job exits non-zero on fingerprint mismatch.
+  - Acceptance: `ci/contract` configuration includes an `ssh_keys_parity_check` job; the job builds `services/git-bridge/cmd/webprofile-api` if `go` is available, runs the parity script, and exits non-zero on fingerprint mismatch.
 
 - [ ] T042 Port `git-bridge` code from Java to Go — implement SSH server, fingerprint→user lookup, introspection client, membership checks, audit logging, and existing feature contracts in Go.
   - Acceptance: `go test ./...` covers ported unit tests and passes. **Status:** initial skeleton (health endpoint, repo-path parsing, auth manager stub) added; basic lookup client implemented; further porting required.
@@ -92,8 +92,8 @@
 - [x] T014 [P] [US2] Verify Token model includes `hash`, `hashPrefix`, `algorithm`, `scopes`, `expiresAt` — services/web/app/src/models/PersonalAccessToken.js
 - [x] T015 [P] [US2] Unit tests for token lifecycle & `replace=true` semantics — services/web/test/unit/src/Features/Token/Rotation.test.mjs
   - Acceptance: Unit tests must assert that when `replace=true` is passed on create, the previous token is marked inactive (introspection returns `active: false`), the new token is active, and stored metadata includes `algorithm` and `hashPrefix`. Tests should be deterministically runnable in CI and avoid DB casting issues (use in-memory model mocks or valid ObjectId fixtures). Include negative tests for malformed token input.
-- [x] T016 [P] [US2] Integration tests for TokenController create/list/remove endpoints — services/web/test/integration/src/TokenControllerTests.mjs
-- [x] T017 [US2] [P] Frontend: ensure `GitTokensPanel` lists tokens, shows plaintext on create, supports copy-to-clipboard, and handles network errors gracefully — services/web/frontend/js/features/settings/components/GitTokensPanel.tsx, services/web/test/frontend/features/settings/components/git-tokens.test.tsx
+- [x] T016 [P] [US2] Integration tests for TokenController create/list/remove endpoints — services/web/test/integration/src/TokenControllerTests.mjs- [ ] T016a [US3] Implement Redis PubSub cache invalidation integration — services/web/app/src/lib/pubsub.js and cache purge hooks for fingerprint/token changes.
+- [ ] T016b [US3] Add integration tests for cache invalidation — services/web/test/integration/cache-invalidation/\*\*- [x] T017 [US2] [P] Frontend: ensure `GitTokensPanel` lists tokens, shows plaintext on create, supports copy-to-clipboard, and handles network errors gracefully — services/web/frontend/js/features/settings/components/GitTokensPanel.tsx, services/web/test/frontend/features/settings/components/git-tokens.test.tsx
   - Acceptance: Plaintext token material is displayed only once on creation (UI must not store or show full hashes afterwards), copy-to-clipboard is accessible (with an ARIA live region announcing copy success), and automated frontend tests include axe accessibility checks and run in CI. The list view must show `accessTokenPartial` (masked) after creation and when re-fetching the token list.
 - [x] T018 [US2] Add contract & service-origin rate-limit tests for token creation/listing — services/web/test/contract/src/ServiceOriginRateLimitTests.mjs
   - Contract test: services/web/test/contract/src/HashPrefixFormatContractTest.mjs — assert `hashPrefix` is 8 lowercase hex characters
@@ -101,6 +101,7 @@
   - Acceptance: Playwright run (RESET_DB=true BASE_URL=...) shows no 404 for token list and UI shows token list or empty state instead of generic error.
 
 - [x] T019b Negative auth tests for fingerprint lookup — services/web/test/unit/src/Features/SSHKey/SSHKeyLookupAuth.test.mjs
+- [ ] T019c [CI] Constitution gate verification — add CI job that asserts required constitution checks run in CI: lint, unit tests, contract tests, and benchmark SLO checks; produce a consolidated report artifact
   - Acceptance: Unit and contract tests assert that `GET /internal/api/ssh-keys/:fingerprint` rejects unauthorized calls (401/403) via `AuthenticationController.requirePrivateApiAuth()` and that rate-limits are enforced (429 returned when over limit). Include both positive and negative auth cases.
 
 ---
@@ -212,7 +213,7 @@ Generated by: speckit task generator — source: .specify/features/example/{plan
 - [ ] T028 Security review & privacy checklist — docs/logging-policy.md
 - [ ] T029 Accessibility & frontend e2e screens — services/web/test/e2e/\*\*
 - [x] T030 Add membership OpenAPI contract — specs/001-ssh-git-auth/contracts/membership.openapi.yaml (implemented)
-- [x] T031 Add contract test for membership endpoint — services/git-bridge/test/contract/membership_contract_test.go (Go) - Status: test added; documented in the Spec Kit (see `.specify/features/example/ci.md`) with local run instructions and CI job guidance (no GitLab-specific job enforced).
+- [x] T031 Add contract test for membership endpoint — services/git-bridge/test/contract/membership_contract_test.go (Go) - Status: test added; documented in the Spec Kit (see `.specify/features/example/ci.md`) with local run instructions and CI job guidance (adapt to your CI provider).
 - [ ] T032 Security review checklist & retention policy verification tests — test/contract/logging/\*\*
 - [x] T033 CI micro-benchmark gating & contract validation (parallel) — .github/workflows/contract-tests-gating.yml (implemented)
 - [ ] T034 Accessibility tests & frontend e2e (parallel) — services/web/test/e2e/\*\*

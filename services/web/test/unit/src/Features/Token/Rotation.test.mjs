@@ -59,13 +59,19 @@ vi.doMock('bcrypt', () => ({ hash: async () => '$2$mock', compare: async () => t
 // Mock pubsub used by the manager to avoid external side-effects/slowness
 vi.doMock('../../../../../app/src/lib/pubsub.js', () => ({ publish: () => {} }))
 
-// Ensure module picks up local DB behavior (opt out of WebProfile delegation)
-const _origUseWebprofile = process.env.AUTH_TOKEN_USE_WEBPROFILE_API
-process.env.AUTH_TOKEN_USE_WEBPROFILE_API = 'false'
-import * as PAMod from '../../../../../app/src/Features/Token/PersonalAccessTokenManager.mjs'
-const PersonalAccessTokenManager = PAMod.default || PAMod
-if (_origUseWebprofile === undefined) delete process.env.AUTH_TOKEN_USE_WEBPROFILE_API
-else process.env.AUTH_TOKEN_USE_WEBPROFILE_API = _origUseWebprofile
+// We will import PersonalAccessTokenManager inside the test after resetting module cache
+let PersonalAccessTokenManager = null
+async function getPersonalAccessTokenManagerWithLocalLogic() {
+  // Reset module cache to ensure module picks up current env vars
+  vi.resetModules()
+  const _origUseWebprofile = process.env.AUTH_TOKEN_USE_WEBPROFILE_API
+  process.env.AUTH_TOKEN_USE_WEBPROFILE_API = 'false'
+  const PAMod = await import('../../../../../app/src/Features/Token/PersonalAccessTokenManager.mjs')
+  const Mod = PAMod.default || PAMod
+  if (_origUseWebprofile === undefined) delete process.env.AUTH_TOKEN_USE_WEBPROFILE_API
+  else process.env.AUTH_TOKEN_USE_WEBPROFILE_API = _origUseWebprofile
+  return Mod
+}
 
 describe('PersonalAccessToken rotation behavior', function () {
   beforeAll(async function () { /* DB connection provided by test harness; skip if not present */ })
@@ -116,6 +122,7 @@ describe('PersonalAccessToken rotation behavior', function () {
     }
 
     try {
+      PersonalAccessTokenManager = await getPersonalAccessTokenManagerWithLocalLogic()
       const res1 = await PersonalAccessTokenManager.createToken(userId, { label: 'rot-label' })
       expect(res1).to.have.property('token')
       const res2 = await PersonalAccessTokenManager.createToken(userId, { label: 'rot-label', replace: true })

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document describes how to run the membership contract test and the `webprofile-api` integration check locally or in CI in a provider-agnostic way (the Spec Kit). Do not hard-code provider-specific CI jobs in feature docs — instead document the required steps, runner requirements, and example snippets so maintainers can adapt them to GitLab/GitHub/others.
+This document describes how to run the membership contract test and the `webprofile-api` integration check locally or in CI in a provider-agnostic way (the Spec Kit). Do not hard-code provider-specific CI jobs in feature docs — instead document the required steps, runner requirements, and example snippets so maintainers can adapt them to their CI provider (e.g., GitHub Actions).
 
 ## Host vs Container networking note
 
@@ -89,7 +89,7 @@ This document describes how to run the membership contract test and the `webprof
 
 ## Notes
 
-- This Spec Kit doc intentionally avoids prescribing a GitLab-specific job; project maintainers should adapt the steps to their CI provider (GitLab CI, GitHub Actions, etc.) and runner pool.
+- This Spec Kit doc intentionally avoids prescribing a provider-specific job; project maintainers should adapt the steps to their CI provider (e.g., GitHub Actions) and runner pool.
 - For reproducible benchmarking, maintain the runner profile guidance in `spec.md` (2 vCPU, 4GB RAM) and document how to assert runner equivalence in your CI provider.
 
 ## Docker Compose example (provider-neutral)

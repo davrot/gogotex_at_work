@@ -1,6 +1,6 @@
 These are contract tests for the services/web APIs.
 
-They are intended to run in CI via `ci/contract/gitlab-ci-contract.yml`.
+They are intended to run in CI via the `ci/contract` configuration; adapt the provided job snippets to your CI provider.
 
 Tests included:
 

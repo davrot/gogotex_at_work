@@ -14,6 +14,7 @@ export async function create(req, res) {
     return res.status(201).json({ id: result.id, token: result.token, accessTokenPartial: result.hashPrefix })
   } catch (err) {
     logger.err({ err, userId }, 'error creating personal access token')
+    try { console.error('[TokenController.create] error', err && (err.stack || err)) } catch (e) {}
     return res.sendStatus(500)
   }
 }

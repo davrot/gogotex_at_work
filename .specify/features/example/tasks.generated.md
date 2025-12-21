@@ -120,7 +120,7 @@
 - [ ] T030 Documentation & rollout notes (feature flag `feature.git_auth.local_token_manager`) — docs/tokens.md, FEATURE_BRANCH_NOTES.md
 - [ ] T031 Accessibility audits & frontend E2E screenshots (Playwright) — services/web/test/e2e/playwright/, services/web/test/frontend/\*\*
 - [ ] T032 Security review & retention policy verification — docs/logging-policy.md, services/web/test/contract/\*\*
-- [ ] T033 CI gating: add micro-benchmark gating and contract validation to pipeline — .gitlab-ci.yml, ci/benchmarks/
+- [ ] T033 CI gating: add micro-benchmark gating and contract validation to pipeline — CI configuration (e.g., `.github/workflows/*` or `ci/contract/`), ci/benchmarks/
 
 ---
 

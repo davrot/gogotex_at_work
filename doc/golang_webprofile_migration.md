@@ -31,7 +31,7 @@ Summary of the recent migration tasks to delegate SSH and token-related internal
 
 ## CI integration
 
-- The CI job `ssh_delegation_parity_check` was added to `ci/contract/gitlab-ci-contract.yml` and invokes the smoke wrapper script:
+- The CI job `ssh_delegation_parity_check` was added to the `ci/contract` configuration and invokes the smoke wrapper script; adapt the job to your CI provider for execution.
 
 ```
 DELEGATION_PARITY=1 AUTH_SSH_USE_WEBPROFILE_API='true' ./scripts/ci/run_ssh_smoke_ci.sh

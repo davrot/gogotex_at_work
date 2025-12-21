@@ -27,6 +27,11 @@ jobs:
         run: |
           npm ci --legacy-peer-deps
 
+      - name: Run token hash & config unit checks
+        run: |
+          echo "Running token/hash config unit tests"
+          npm --prefix services/web run test:unit:run_dir -- test/unit/src/Features/Token test/unit/src/Config || (echo "Unit tests failed" && exit 1)
+
       - name: Start services (docker-compose)
         run: |
           echo "AUTH_TOKEN_USE_WEBPROFILE_API=true" > .env.ci
