@@ -4,6 +4,17 @@ import * as PAMod from '../../../../../app/src/Features/Token/PersonalAccessToke
 const PersonalAccessTokenManager = PAMod.default || PAMod
 
 describe('PersonalAccessTokenManager', function () {
+  let origEnv
+  before(function () {
+    origEnv = process.env.AUTH_TOKEN_USE_WEBPROFILE_API
+    // Tests in this file assume local DB behavior; opt out of delegation explicitly
+    process.env.AUTH_TOKEN_USE_WEBPROFILE_API = 'false'
+  })
+  after(function () {
+    if (origEnv === undefined) delete process.env.AUTH_TOKEN_USE_WEBPROFILE_API
+    else process.env.AUTH_TOKEN_USE_WEBPROFILE_API = origEnv
+  })
+
   describe('listTokens', function () {
     it('returns an empty list for an invalid userId', async function () {
       const res = await PersonalAccessTokenManager.listTokens('u1')

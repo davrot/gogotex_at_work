@@ -84,10 +84,12 @@ async function verifyTokenAgainstHash (tokenPlain, storedHash) {
   return false
 }
 
+const USE_WEBPROFILE = process.env.AUTH_TOKEN_USE_WEBPROFILE_API !== 'false'
+
 export default {
   async createToken (userId, { label = '', scopes = [], expiresAt = null, replace = false } = {}) {
     // If configured, delegate creation to the Go webprofile-api
-    if (process.env.AUTH_TOKEN_USE_WEBPROFILE_API === 'true') {
+    if (USE_WEBPROFILE) {
       try {
         const client = await import('./WebProfileClient.mjs')
         const res = await client.createToken(userId, { label, scopes, expiresAt, replace })
@@ -140,7 +142,7 @@ export default {
 
   async listTokens (userId) {
     // If configured, delegate listing to the webprofile API
-    if (process.env.AUTH_TOKEN_USE_WEBPROFILE_API === 'true') {
+    if (USE_WEBPROFILE) {
       try {
         const client = await import('./WebProfileClient.mjs')
         const res = await client.listTokens(userId)
@@ -184,7 +186,7 @@ export default {
 
   async revokeToken (userId, tokenId) {
     // If configured, delegate revoke to webprofile API
-    if (process.env.AUTH_TOKEN_USE_WEBPROFILE_API === 'true') {
+    if (USE_WEBPROFILE) {
       try {
         const client = await import('./WebProfileClient.mjs')
         const ok = await client.revokeToken(userId, tokenId)
@@ -212,7 +214,7 @@ export default {
   // Introspect by plain token value. Returns null if not found/invalid.
   async introspect (tokenPlain) {
     // If configured, delegate introspection to the Go webprofile-api via HTTP client
-    if (process.env.AUTH_TOKEN_USE_WEBPROFILE_API === 'true') {
+    if (USE_WEBPROFILE) {
       try {
         const { introspect } = await import('./WebProfileClient.mjs')
         const res = await introspect(tokenPlain)
