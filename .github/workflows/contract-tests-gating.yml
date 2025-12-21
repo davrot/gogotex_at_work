@@ -30,6 +30,9 @@ jobs:
       - name: Start services (docker-compose)
         run: |
           echo "AUTH_TOKEN_USE_WEBPROFILE_API=true" > .env.ci
+          echo "AUTH_LOCAL_INTROSPECT_URL=http://webprofile-api-ci:3900" >> .env.ci
+          echo "WEBPROFILE_ADMIN_USER=overleaf" >> .env.ci
+          echo "WEBPROFILE_ADMIN_PASS=overleaf" >> .env.ci
           docker compose --env-file .env.ci -f develop/docker-compose.yml up -d --build
 
       - name: Wait for services
