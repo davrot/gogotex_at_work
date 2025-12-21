@@ -1,16 +1,20 @@
 import { expect } from 'chai'
 
-import * as PAMod from '../../../../../app/src/Features/Token/PersonalAccessTokenManager.mjs'
-const PersonalAccessTokenManager = PAMod.default || PAMod
+let PersonalAccessTokenManager
 
 describe('PersonalAccessTokenManager', function () {
+  beforeEach(async function () {
+    // Import after env manipulation so module picks up AUTH_TOKEN_USE_WEBPROFILE_API
+    const PAMod = await import('../../../../../app/src/Features/Token/PersonalAccessTokenManager.mjs')
+    PersonalAccessTokenManager = PAMod.default || PAMod
+  })
   let origEnv
-  before(function () {
+  beforeEach(function () {
     origEnv = process.env.AUTH_TOKEN_USE_WEBPROFILE_API
     // Tests in this file assume local DB behavior; opt out of delegation explicitly
     process.env.AUTH_TOKEN_USE_WEBPROFILE_API = 'false'
   })
-  after(function () {
+  afterEach(function () {
     if (origEnv === undefined) delete process.env.AUTH_TOKEN_USE_WEBPROFILE_API
     else process.env.AUTH_TOKEN_USE_WEBPROFILE_API = origEnv
   })
