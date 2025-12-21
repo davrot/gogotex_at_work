@@ -119,10 +119,13 @@ run_cmd_with_timeout() {
 if [ "${VERIFY_HANG:-0}" = "1" ]; then
   if run_cmd_with_timeout "sleep 10" "$SMOKE_TIMEOUT"; then rc=0; else rc=$?; fi
 else
-  if run_cmd_with_timeout "CONFIRM_DEV_SETUP=true CONFIRM_BASE_URL=true BASE_URL='$BASE_URL' COMPOSE_FILE='$COMPOSE_FILE' PROJECT_DIR='$PROJECT_DIR' node services/web/test/e2e/playwright/git_roundtrip_ssh.mjs" "$SMOKE_TIMEOUT"; then rc=0; else rc=$?; fi
-fi
-
-echo "DEBUG: timeout exit code captured: $rc" >&2
+  # If delegation parity check requested, and delegation enabled in the environment, run the dedicated delegation test
+  if [ "${DELEGATION_PARITY:-0}" = "1" ] && [ "$AUTH_SSH_USE_WEBPROFILE_API" = "true" ]; then
+    echo "Running SSH delegation parity Playwright test"
+    if run_cmd_with_timeout "CONFIRM_DEV_SETUP=true CONFIRM_BASE_URL=true BASE_URL='$BASE_URL' COMPOSE_FILE='$COMPOSE_FILE' PROJECT_DIR='$PROJECT_DIR' AUTH_SSH_USE_WEBPROFILE_API='true' node services/web/test/e2e/playwright/ssh_delegation_parity.mjs" "$SMOKE_TIMEOUT"; then rc=0; else rc=$?; fi
+  else
+    if run_cmd_with_timeout "CONFIRM_DEV_SETUP=true CONFIRM_BASE_URL=true BASE_URL='$BASE_URL' COMPOSE_FILE='$COMPOSE_FILE' PROJECT_DIR='$PROJECT_DIR' node services/web/test/e2e/playwright/git_roundtrip_ssh.mjs" "$SMOKE_TIMEOUT"; then rc=0; else rc=$?; fi
+  fi
 if [ "$rc" -ne 0 ]; then
   # If the command was terminated by a signal it will have an exit code > 128
   if [ $rc -gt 128 ]; then
