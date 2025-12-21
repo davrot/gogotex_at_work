@@ -1,6 +1,6 @@
 import { expect } from 'chai'
 import UserHelper from '../../acceptance/src/helpers/UserHelper.mjs'
-import { vi } from 'vitest'
+import sinon from 'sinon'
 
 describe('Token delegation integration (webprofile)', function () {
   this.timeout(60 * 1000)
@@ -8,12 +8,11 @@ describe('Token delegation integration (webprofile)', function () {
   beforeEach(() => {
     // enable delegation for this test process
     process.env.AUTH_TOKEN_USE_WEBPROFILE_API = 'true'
+    sinon.restore()
   })
   afterEach(() => {
     delete process.env.AUTH_TOKEN_USE_WEBPROFILE_API
-    vi.unstubAllGlobals()
-    vi.resetModules()
-    vi.restoreAllMocks()
+    sinon.restore()
   })
 
   it('creates, lists and revokes tokens via webprofile delegation', async function () {
@@ -23,7 +22,7 @@ describe('Token delegation integration (webprofile)', function () {
 
     // stub global fetch that WebProfileClient uses
     let createdId = 'd1'
-    vi.stubGlobal('fetch', async (url, opts) => {
+    sinon.stub(global, 'fetch').callsFake(async (url, opts) => {
       if (opts && opts.method === 'POST') {
         return { status: 201, async json () { return { token: 'delegated-t', id: createdId, accessTokenPartial: 'hp' } } }
       }
