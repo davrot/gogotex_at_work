@@ -127,10 +127,11 @@ export async function getSSHKeyByFingerprint(fingerprint) {
   try {
     const res = await fetch(url, { method: 'GET', headers: { Authorization: authHeader(), Accept: 'application/json' } })
     if (res.status === 200) return await res.json()
-    if (res.status === 404) return null
-    return null
+    if (res.status === 404) return { notFound: true }
+    return { error: true }
   } catch (err) {
     logger.err({ err }, 'webprofile fingerprint lookup call failed')
-    return null
+    // Return undefined to indicate an unexpected error so callers may fall back
+    return undefined
   }
 }

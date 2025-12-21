@@ -126,6 +126,25 @@ async function run() {
     }
     console.log('Delegated SSH key visible in Go webprofile list')
 
+    // Verify service-facing internal API (Basic auth protected) also returns the key
+    try {
+      const svcUrl = `${BASE_URL.replace(/\/$/, '')}/internal/api/service/users/${encodeURIComponent(userId)}/ssh-keys`
+      const svcRes = await fetch(svcUrl, { method: 'GET', headers: { Authorization: 'Basic ' + Buffer.from('overleaf:overleaf').toString('base64') } })
+      if (svcRes.status !== 200) { console.error('Service-facing list returned non-200', svcRes.status); await browser.close(); process.exit(8) }
+      const svcText = await svcRes.text().catch(()=>null)
+      const svcList = svcText ? JSON.parse(svcText) : []
+      const svcHas = svcList.some(k => (returnedFingerprint && k.fingerprint === returnedFingerprint) || (k.public_key && pub && k.public_key.trim() === pub.trim()))
+      if (!svcHas) {
+        console.error('Delegated SSH key not found in service-facing list')
+        try { fs.writeFileSync(path.join(outDir, 'svc_list.txt'), JSON.stringify(svcList || [])) } catch (e) {}
+        await browser.close(); process.exit(9)
+      }
+      console.log('Delegated SSH key visible in service-facing list endpoint')
+    } catch (e) {
+      console.error('Service-facing list check failed', e && (e.stack || e.message || e))
+      await browser.close(); process.exit(10)
+    }
+
     // Now DELETE via Node internal API (as same logged-in user)
     const deleteRes = await page.evaluate(async ({ userId, csrf, keyId }) => {
       const r = await fetch(`/internal/api/users/${userId}/ssh-keys/${keyId}`, { method: 'DELETE', credentials: 'same-origin', headers: { 'X-Csrf-Token': csrf } })

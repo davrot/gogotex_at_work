@@ -614,6 +614,7 @@ export async function remove(req, res) {
 }
 
 export async function listForService(req, res) {
+  try { console.error('DEBUG listForService entry', { params: req.params, headers: { authorization: req && req.headers && req.headers.authorization } }) } catch (e) {}
   let userId = req.params.userId
   if (!userId) return res.status(400).json({ message: 'user id required' })
   // Basic auth check for trusted callers (dev/test convenience)
@@ -627,17 +628,45 @@ export async function listForService(req, res) {
   try {
     // Accept either an ObjectId user id (normal) or a dev-friendly username/email.
     // If userId isn't a valid ObjectId, try to resolve by email to a real user id first.
-    const { User } = await import('../../models/User.js')
     let resolvedUserId = null
     if (/^[0-9a-fA-F]{24}$/.test(userId)) {
       resolvedUserId = userId
     } else {
       // try to find a user by email matching the supplied identifier
+      const { User } = await import('../../models/User.js')
       const u = await User.findOne({ email: userId }).lean().exec()
       if (u && u._id) resolvedUserId = String(u._id)
     }
 
     let keys = []
+
+    // If configured, delegate service listing to the Go webprofile API when possible
+    if (USE_WEBPROFILE_SSH && resolvedUserId) {
+      try {
+        try { console.error('DEBUG listForService: attempting webprofile delegation for', resolvedUserId) } catch (e) {}
+        const client = await import(new URL('../Token/WebProfileClient.mjs', import.meta.url).href)
+        const resList = await client.listSSHKeys(resolvedUserId)
+        try { console.error('DEBUG listForService: webprofile returned', Array.isArray(resList) ? `array len=${resList.length}` : typeof resList) } catch (e) {}
+        if (Array.isArray(resList)) {
+          const mapped = resList.map(k => ({
+            id: String(k.id || (k._id && k._id.toString && k._id.toString())),
+            key_name: k.key_name || k.keyName || k.label || '',
+            label: k.key_name || k.keyName || k.label || '',
+            public_key: k.public_key || k.publicKey || '',
+            fingerprint: k.fingerprint || '',
+            created_at: k.created_at || k.createdAt || null,
+            updated_at: k.updated_at || k.updatedAt || null,
+            userId: k.userId || k.user_id || resolvedUserId,
+          }))
+          return res.status(200).json(mapped)
+        }
+      } catch (e) {
+        try { logger.err({ err: e, userId: resolvedUserId }, 'webprofile listForService delegation failed') } catch (ee) {}
+        try { console.error('DEBUG listForService: delegation error', e && (e.stack || e.message || e)) } catch (e2) {}
+        // fall through to DB-backed listing
+      }
+    }
+
     if (resolvedUserId) {
       keys = await UserSSHKey.find({ userId: resolvedUserId }).lean().exec()
     } else {

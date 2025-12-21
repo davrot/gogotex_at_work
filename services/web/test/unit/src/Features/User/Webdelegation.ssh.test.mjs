@@ -76,4 +76,36 @@ describe('WebProfile delegation for SSH (create/list/remove)', () => {
     // cleanup mock
     try { if (Controller && typeof Controller.__resetUserSSHKeyForTest === 'function') Controller.__resetUserSSHKeyForTest() } catch (e) {}
   })
+
+  it('delegates service-facing listForService to WebProfileClient when enabled', async () => {
+    // stub fetch to simulate webprofile response
+    vi.stubGlobal('fetch', async (url, opts) => ({ status: 200, async json() { return [{ id: 's1', fingerprint: 'SHA256:SVC', public_key: 'ssh-ed25519 AAAA', key_name: 'svc' }] } }))
+    const Controller = await import('../../../../../app/src/Features/User/UserSSHKeysController.mjs')
+    const req = { params: { userId: '000000000000000000000010' }, headers: { authorization: 'Basic ' + Buffer.from('overleaf:overleaf').toString('base64') } }
+    const res = new MockResponse()
+    await Controller.listForService(req, res)
+    expect(res.statusCode).to.equal(200)
+    const body = JSON.parse(res.body)
+    expect(Array.isArray(body)).to.equal(true)
+    expect(body[0].fingerprint).to.equal('SHA256:SVC')
+  })
+
+  it('falls back to DB when service-facing delegation fails', async () => {
+    // simulate fetch throwing
+    vi.stubGlobal('fetch', async () => { throw new Error('network') })
+    const Controller = await import('../../../../../app/src/Features/User/UserSSHKeysController.mjs')
+    const MockUserSSHKey = {
+      find: vi.fn().mockReturnValue({ lean: () => ({ exec: async () => [{ _id: 'dbk1', fingerprint: 'SHA256:DBSVC', userId: '000000000000000000000011' }] }) }),
+    }
+    if (Controller && typeof Controller.__setUserSSHKeyForTest === 'function') Controller.__setUserSSHKeyForTest(MockUserSSHKey)
+    const req = { params: { userId: '000000000000000000000011' }, headers: { authorization: 'Basic ' + Buffer.from('overleaf:overleaf').toString('base64') } }
+    const res = new MockResponse()
+    await Controller.listForService(req, res)
+    expect(res.statusCode).to.equal(200)
+    const body = JSON.parse(res.body)
+    expect(Array.isArray(body)).to.equal(true)
+    expect(body[0].fingerprint).to.equal('SHA256:DBSVC')
+    // cleanup mock
+    try { if (Controller && typeof Controller.__resetUserSSHKeyForTest === 'function') Controller.__resetUserSSHKeyForTest() } catch (e) {}
+  })
 })
