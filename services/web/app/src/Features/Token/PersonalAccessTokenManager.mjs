@@ -6,6 +6,12 @@ const { PersonalAccessToken } = require('../../models/PersonalAccessToken')
 
 let argon2 = null
 let bcrypt = null
+let _lookupCacheOverride = null
+
+export function _setLookupCacheForTests (lc) {
+  _lookupCacheOverride = lc
+}
+
 try {
   argon2 = require('argon2')
 } catch (e) {
@@ -345,17 +351,22 @@ export default {
       // will return inactive immediately after revoke. Best-effort; swallow errors
       // to avoid blocking revoke on cache infra issues.
       try {
-        const fs = await import('fs')
-        const lookupPath = new URL('../../../lib/lookupCache.mjs', import.meta.url).pathname
-        if (fs.existsSync(lookupPath)) {
-          const lookupCacheMod = await import(new URL('../../../lib/lookupCache.mjs', import.meta.url).href)
-          const _lc = (lookupCacheMod && lookupCacheMod.default) || lookupCacheMod
-          const cacheKey = `introspect:${res.hashPrefix}`
-          if (_lc && typeof _lc.invalidate === 'function') {
-            try { await _lc.invalidate(cacheKey) } catch (e) {}
-          } else if (_lc && typeof _lc.set === 'function') {
-            try { await _lc.set(cacheKey, { active: false }, Number(process.env.CACHE_NEGATIVE_TTL_SECONDS || 5)) } catch (e) {}
+        // Prefer an injected override (tests) if present
+        const cacheKey = `introspect:${res.hashPrefix}`
+        const _lc = _lookupCacheOverride || (async () => {
+          const fs = await import('fs')
+          const lookupPath = new URL('../../../lib/lookupCache.mjs', import.meta.url).pathname
+          if (fs.existsSync(lookupPath)) {
+            const lookupCacheMod = await import(new URL('../../../lib/lookupCache.mjs', import.meta.url).href)
+            return (lookupCacheMod && lookupCacheMod.default) || lookupCacheMod
           }
+          return null
+        })()
+        const resolved = await _lc
+        if (resolved && typeof resolved.invalidate === 'function') {
+          try { await resolved.invalidate(cacheKey) } catch (e) {}
+        } else if (resolved && typeof resolved.set === 'function') {
+          try { await resolved.set(cacheKey, { active: false }, Number(process.env.CACHE_NEGATIVE_TTL_SECONDS || 5)) } catch (e) {}
         }
       } catch (e) {
         // ignore cache invalidation errors
@@ -384,19 +395,24 @@ export default {
     }
 
     // Prefer a URL-based import to avoid resolution issues across environments
+    // Prefer an injected override (tests) if present
     let lookupCache
-    try {
-      // Check file exists first to avoid noisy ERR_MODULE_NOT_FOUND stack traces
-      const fs = await import('fs')
-      const lookupPath = new URL('../../../lib/lookupCache.mjs', import.meta.url).pathname
-      if (fs.existsSync(lookupPath)) {
-        lookupCache = await import(new URL('../../../lib/lookupCache.mjs', import.meta.url).href)
-      } else {
+    if (_lookupCacheOverride) {
+      lookupCache = { default: _lookupCacheOverride }
+    } else {
+      try {
+        // Check file exists first to avoid noisy ERR_MODULE_NOT_FOUND stack traces
+        const fs = await import('fs')
+        const lookupPath = new URL('../../../lib/lookupCache.mjs', import.meta.url).pathname
+        if (fs.existsSync(lookupPath)) {
+          lookupCache = await import(new URL('../../../lib/lookupCache.mjs', import.meta.url).href)
+        } else {
+          lookupCache = { default: { get: () => undefined, set: () => {}, invalidate: () => {} } }
+        }
+      } catch (e) {
+        // If anything goes wrong, fall back to a no-op cache
         lookupCache = { default: { get: () => undefined, set: () => {}, invalidate: () => {} } }
       }
-    } catch (e) {
-      // If anything goes wrong, fall back to a no-op cache
-      lookupCache = { default: { get: () => undefined, set: () => {}, invalidate: () => {} } }
     }
     const cacheKey = `introspect:${computeHashPrefixFromPlain(tokenPlain)}`
     const _lc = (lookupCache && lookupCache.default) || lookupCache
