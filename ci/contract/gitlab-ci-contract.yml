@@ -78,7 +78,7 @@ ssh_keys_parity_check:
           docker build -t webprofile-api-ci services/git-bridge/cmd/webprofile-api
           docker rm -f webprofile-api-ci >/dev/null 2>&1 || true
           # Start the shim attached to the develop network to ensure it is reachable by compose hostnames
-          docker run -d --name webprofile-api-ci --network develop_default -e MONGO_URI="$MONGO_URI" -p 3900:3900 webprofile-api-ci
+          docker run -d --name webprofile-api_ci --network develop_default -e MONGO_URI="$MONGO_URI" -p 3900:3900 webprofile-api-ci
           return 0
         else
           echo "Neither 'go' nor 'docker' available in runner; expecting GO_BASE to be reachable at $GO_BASE"
@@ -125,9 +125,79 @@ ssh_keys_parity_check:
     PARITY_USER: ${PARITY_USER:-parity-user}
     MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017/sharelatex}
 
+# Token parity check (non-blocking initially)
+tokens_parity_check:
+  stage: contract
+  when: always
+  allow_failure: true
+  script:
+    - chmod +x scripts/contract/compare_tokens_parity.sh
+    - |
+      set -euo pipefail
+      PARITY_USER=${PARITY_USER:-parity-token-user}
+      NODE_BASE=${NODE_BASE:-http://develop-web-1:3000}
+      GO_BASE=${GO_BASE:-http://webprofile-api-ci:3900}
+      export MONGO_URI=${MONGO_URI:-mongodb://mongo:27017/sharelatex}
+      echo "NODE_BASE=$NODE_BASE GO_BASE=$GO_BASE PARITY_USER=$PARITY_USER MONGO_URI=$MONGO_URI"
+
+      start_shim() {
+        if command -v go >/dev/null 2>&1; then
+          echo "Using 'go' to build and run webprofile-api"
+          pushd services/git-bridge/cmd/webprofile-api >/dev/null
+          go build -o /tmp/webprofile-api .
+          /tmp/webprofile-api & echo $! >/tmp/webprofile-api.pid
+          popd >/dev/null
+          GO_BASE=${GO_BASE}
+          return 0
+        elif command -v docker >/dev/null 2>&1; then
+          echo "Building Docker image for webprofile-api and starting container"
+          docker build -t webprofile-api-ci services/git-bridge/cmd/webprofile-api
+          docker rm -f webprofile-api-ci >/dev/null 2>&1 || true
+          docker run -d --name webprofile-api_ci --network develop_default -e MONGO_URI="$MONGO_URI" -p 3900:3900 webprofile-api-ci
+          return 0
+        else
+          echo "Neither 'go' nor 'docker' available in runner; expecting GO_BASE to be reachable at $GO_BASE"
+          return 1
+        fi
+      }
+
+      start_shim || echo "shim may already be running or not startable; continuing to parity step"
+
+      # Wait for shim to respond (any HTTP response) up to 15s
+      echo "Waiting for Go shim at $GO_BASE to become responsive..."
+      for i in {1..15}; do
+        code=$(curl -sS -o /dev/null -w "%{http_code}" "$GO_BASE/internal/api/users/$PARITY_USER/git-tokens" || true)
+        if [ -n "$code" ]; then
+          echo "Go shim responded with HTTP code $code"
+          break
+        fi
+        sleep 1
+      done
+
+      echo "Running token parity comparison (node=$NODE_BASE go=$GO_BASE user=$PARITY_USER)"
+    - |
+      set -euo pipefail
+      scripts/contract/compare_tokens_parity.sh ${NODE_BASE} ${GO_BASE} ${PARITY_USER}
+      RC=$?
+      if [ $RC -ne 0 ]; then
+        echo "Token parity check FAILED; recording artifacts and continuing (non-blocking)"
+        exit 0
+      fi
+  timeout: 10m
+  artifacts:
+    when: always
+    paths:
+      - tmp/parity_results/*
+    expire_in: 1 week
+  variables:
+    NODE_BASE: ${NODE_BASE}
+    GO_BASE: ${GO_BASE}
+    PARITY_USER: ${PARITY_USER:-parity-token-user}
+    MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017/sharelatex}
+
 gitbridge_go_tests:
   stage: test
-  image: golang:1.21
+  image: golang:1.25
   script:
     - cd services/git-bridge
     - go test ./... -v

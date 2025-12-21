@@ -158,6 +158,20 @@ export default {
 
   // Introspect by plain token value. Returns null if not found/invalid.
   async introspect (tokenPlain) {
+    // If configured, delegate introspection to the Go webprofile-api via HTTP client
+    if (process.env.AUTH_TOKEN_USE_WEBPROFILE_API === 'true') {
+      try {
+        const { introspect } = await import('./WebProfileClient.mjs')
+        const res = await introspect(tokenPlain)
+        if (!res) return null
+        if (res.error === 'bad_request') return { active: false }
+        return res
+      } catch (e) {
+        // fallback to local DB logic on error
+        try { const logger = require('@overleaf/logger'); logger.err({ err: e }, 'webprofile introspect delegation failed, falling back to local') } catch (e) {}
+      }
+    }
+
     // Prefer a URL-based import to avoid resolution issues across environments
     let lookupCache
     try {

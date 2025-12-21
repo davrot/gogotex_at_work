@@ -6,7 +6,7 @@
 
 **Goal:** Replace the Java implementation of `git-bridge` with a Go implementation, update the dev/test/CI tooling, and port all tests and benchmarks so the repository no longer requires Java maintenance.
 
-- [x] T040 Setup Go toolchain in dev environment (devcontainer/Dockerfile, Makefile) — install Go 1.21+ in dev container and provide `make build`/`make test`/`make bench` targets in `services/git-bridge`.
+- [x] T040 Setup Go toolchain in dev environment (devcontainer/Dockerfile, Makefile) — install Go 1.25+ in dev container and provide `make build`/`make test`/`make bench` targets in `services/git-bridge`.
   - Acceptance: `make build` produces `services/git-bridge/bin/git-bridge`; `make test` runs Go unit tests locally. **Status:** skeleton added (Makefile targets, `go.mod`, minimal `cmd/` and `internal/` packages).
 
 - [ ] T041 Replace Java/Maven CI & build with Go modules — update `.github/workflows/*` to run `go build` and `go test`, include `go vet`/`golangci-lint`, and ensure CI artifacts are produced where needed.

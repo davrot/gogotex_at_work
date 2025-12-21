@@ -2,6 +2,12 @@
 
 This document provides a concise overview for getting the development environment running locally.
 
+## Quick start (minimal)
+
+- Install Node.js (via nvm) and Go (>= 1.25). See sections below for details.
+- Start a local MongoDB (via `docker compose` or your preferred method).
+- Build and run `webprofile-api` shim for contract/consistency checks: see **Spec Kit** later in this doc.
+
 ## Prerequisites
 
 - Install Node.js via `nvm` (recommended):
@@ -135,7 +141,12 @@ bin/build
 bin/up
 ```
 
-If you only need to build or run the `git-bridge` service during development or for contract tests, you can build/start it individually. Building `git-bridge` requires Java 21 and Maven (see the Java & Maven section above):
+**Host vs Container networking note:**
+
+- If you run commands from your **host shell**, `localhost` / `127.0.0.1` refers to services published to the host (for example the Mongo port `127.0.0.1:27017` is accessible from the host). Use `http://localhost:3900` to reach a shim you started on the host.
+- If you run commands from **inside the VS Code dev container** or another container, `localhost` refers to _that container_ and will NOT reach other services. In that case use compose service hostnames on the develop network (for example `http://develop-web-1:3000` or `http://webprofile-api-ci:3900`).
+
+If you only need to build or run the `git-bridge` service during development or for contract tests, you can build/start it individually. `git-bridge` is implemented in **Go**; use the Go build or the provided Docker-backed Makefile targets. If you need the legacy Java/Maven build, it is archived — check out the `archive/java-git-bridge` branch or contact the maintainers for a temporary re-enable.
 
 ```bash
 # Build just the git-bridge image using the develop compose setup
@@ -247,6 +258,42 @@ Helper: to start the Go shim attached to the local `develop_default` compose net
 #   http://webprofile-api-ci:3900
 # If you need to reach the shim from your host machine you may use http://localhost:3900
 ````
+
+**Spec Kit:** For a provider-agnostic runbook (build shim, run contract tests, run integration script), see **`.specify/features/example/ci.md`**.
+
+**Run membership contract test locally (example):**
+
+```bash
+# Start a local shim (see 'Build & Run webprofile-api (local)' in the Spec Kit)
+export TARGET_BASE_URL=http://localhost:3900
+cd services/git-bridge/test/contract
+TARGET_BASE_URL=${TARGET_BASE_URL} go test -run TestMembershipEndpointNonMemberForbidden ./... -v
+```
+
+### Token introspection integration test
+
+The introspection integration test requires a reachable MongoDB (`MONGO_URI`) and a running `webprofile-api` instance (default `http://localhost:3900`). You can set the `MONGO_URI` and `TARGET_BASE_URL` env vars when running the test:
+
+```bash
+# example (assumes a local mongodb on 27017 and shim on :3900)
+export MONGO_URI=mongodb://localhost:27017
+export TARGET_BASE_URL=http://localhost:3900
+cd services/git-bridge/test/contract
+MONGO_URI=${MONGO_URI} TARGET_BASE_URL=${TARGET_BASE_URL} go test -run TestIntrospectIntegration_Bcrypt -v
+```
+
+### Use Go shim for token operations (optional)
+
+You can configure `web` to delegate token introspection and token management to the Go `webprofile-api` by setting:
+
+```bash
+# point to the Go shim base URL
+export AUTH_LOCAL_INTROSPECT_URL=http://localhost:3900
+# enable delegation
+export AUTH_TOKEN_USE_WEBPROFILE_API=true
+```
+
+When enabled, `web` will call the Go shim for `introspect` and token create/list/revoke; this helps test parity and enables a phased cutover (the legacy Node manager is used as a fallback if the Go shim is unavailable).
 
 ````
 

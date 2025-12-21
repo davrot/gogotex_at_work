@@ -33,6 +33,29 @@ jobs:
         run: |
           ./develop/bin/wait 300
 
+      - name: Start Go webprofile-api in compose network
+        run: |
+          ./scripts/contract/run_webprofile_in_network.sh webprofile-api-ci
+
+      - name: Wait for webprofile-api
+        run: |
+          for i in $(seq 1 10); do
+            if curl -sS -u overleaf:overleaf -f http://webprofile-api-ci:3900/internal/api/health; then
+              echo "webprofile-api ready"
+              break
+            fi
+            sleep 1
+          done
+
+      - name: Compare Node vs Go token introspect parity
+        run: |
+          ./scripts/contract/compare_introspect.sh http://develop-web-1:3000 http://webprofile-api-ci:3900
+
+      - name: Compare Node vs Go token create/list parity
+        run: |
+          chmod +x scripts/contract/compare_tokens_parity.sh
+          ./scripts/contract/compare_tokens_parity.sh http://develop-web-1:3000 http://webprofile-api-ci:3900
+
       - name: Run contract tests
         env:
           AUDIT_LOG_RETENTION_DAYS: ${{ secrets.AUDIT_LOG_RETENTION_DAYS }}

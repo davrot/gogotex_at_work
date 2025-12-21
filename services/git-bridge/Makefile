@@ -29,7 +29,7 @@ go-mod-tidy:
 	$(GO) mod tidy
 
 check-go:
-	@command -v $(GO) >/dev/null || (echo "go not found; please install Go 1.21+" && exit 1)
+	@command -v $(GO) >/dev/null || (echo "go not found; please install Go 1.25+" && exit 1)
 
 go-build: check-go
 	$(GO) build -o $(GOBIN)/git-bridge ./cmd/gitbridge

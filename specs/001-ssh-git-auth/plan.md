@@ -21,7 +21,7 @@ We will use **GoGoTeX** as the canonical label for Go-based services and compone
   the iteration process.
 -->
 
-**Language/Version**: Go 1.21 (git-bridge) and Node.js 18+ (web)  
+**Language/Version**: Go 1.25 (git-bridge) and Node.js 18+ (web)  
 **Primary Dependencies**: net/ssh (golang.org/x/crypto/ssh), system `git` binary (invoked via os/exec), Mongoose 8.x (web), MongoDB 6.x  
 **Storage**: MongoDB (`sharelatex.usersshkeys` collection)  
 **Testing**: Go unit/integration tests (`go test`), Mocha contract tests for web (`npm test` / `test:contract`), Playwright for E2E where applicable  
