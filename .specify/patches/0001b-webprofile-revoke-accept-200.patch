@@ -1,0 +1,9 @@
+*** a/services/web/app/src/Features/Token/WebProfileClient.mjs
+*** b/services/web/app/src/Features/Token/WebProfileClient.mjs
+@@
+-    if (res.status === 204) return true
++    // Accept 204 No Content as canonical success; also accept 200 for parity
++    // with implementations that return an OK body but no content.
++    if (res.status === 204 || res.status === 200) return true
+     // Log non-204 responses for debugging parity issues
+*** End Patch

@@ -1,6 +1,6 @@
 # Golang Migration Plan (living document)
 
-**Status:** Draft — update as the migration progresses.
+**Status:** Initial migration milestones completed — update as the migration progresses. Completed items include Go shim (`webprofile-api`), unit & contract tests, CI contract gating for Node & Go parity, and benchmark harness integration.
 
 ## Summary
 
@@ -92,11 +92,17 @@ All migrated Go services and components will be labeled **GoGoTeX** in documenta
 
 ## Tests & CI
 
-- Unit tests: small, deterministic tests for logic and edge-cases.
-- Contract tests: Mocha/Playwright/OpenAPI driven tests that run against both implementations and compare results.
-- Integration tests: run `git clone`/`git push` workflows against the real `git-bridge` + Go shim.
-- Perf tests: run perf harness (p95/p99 capture) in CI in a scheduled or on-demand job.
-- Add a CI job `contract:node-and-go` that: 1) builds Go shim, 2) runs contract suite with Node, 3) runs contract suite with Go, 4) diffs results and fails if non-equivalent.
+- Unit tests: small, deterministic tests for logic and edge-cases. `go test ./...` is the primary runner for Go code.
+- Contract tests: Mocha/Playwright/OpenAPI driven tests that run against both implementations and compare results. CI job `contract-tests` builds the Go `webprofile-api`, runs contract tests against Node, then against Go and diffs results; divergence fails the job.
+- Integration tests: run `git clone`/`git push` workflows against the real `git-bridge` + Go shim. See `services/git-bridge/test/integration` and `scripts/contract/run_webprofile_in_network.sh` for examples.
+- Perf tests: run perf harness (p95/p99 capture) in CI and locally via `ci/benchmarks/*`. CI now runs introspection benchmarks against both Node (http://127.0.0.1:3000) and Go webprofile (http://webprofile-api-ci:3900).
+- How to run parity checks locally (developer):
+  1. Start the Node compose stack: `develop/bin/up`
+  2. Build & run webprofile locally (attached to compose network): `scripts/contract/run_webprofile_in_network.sh webprofile-local`
+  3. Run contract parity scripts: `scripts/contract/compare_introspect.sh http://develop-web-1:3000 http://webprofile-local:3900` and `scripts/contract/compare_ssh_parity.sh ...`
+  4. Run introspection bench against webprofile: `BENCH_URL=http://webprofile-local:3900/internal/api/tokens/introspect node ci/benchmarks/introspection-benchmark/bench.js`
+
+- Add a CI job `contract:node-and-go` that: 1) builds Go shim, 2) runs contract suite with Node, 3) runs contract suite with Go, 4) diffs results and fails if non-equivalent. (This is implemented as part of `contract-tests-gating.yml`.)
 
 ---
 

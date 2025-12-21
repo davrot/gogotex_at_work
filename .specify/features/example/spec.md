@@ -10,6 +10,15 @@ This feature implements SSH public-key management and a local HTTPS personal-acc
 
 - Q: What is the canonical precedence when deriving a `service-origin`? → A: `X-Service-Origin` header if present, then mTLS client certificate `CN` if available, then client IP. The header should be treated as authoritative when present.
 
+**Service-Origin precedence & trust (canonical)**
+
+Requests MUST derive the service-origin using the following precedence *only when the header is trusted*:
+1) `X-Service-Origin` header **when TRUST_X_SERVICE_ORIGIN=true and the request originates from a trusted ingress** (matches `TRUSTED_PROXIES` or uses mTLS/API-token authentication),
+2) mTLS client certificate `CN` when available,
+3) request IP (from `x-forwarded-for` or `req.connection.remoteAddress`).
+
+Implementations MUST provide two config knobs: `TRUST_X_SERVICE_ORIGIN` (boolean) and `TRUSTED_PROXIES` (CIDR list or proxy names). When `TRUST_X_SERVICE_ORIGIN=false`, services MUST ignore `X-Service-Origin` even if present.
+
 ### Session 2025-12-14
 
 - Q: How should SSH support be provided for `git-bridge` to enable full git-over-SSH tests and audits? → A: Option A (embed an SSH server directly in `git-bridge`). Rationale: keeps auth, audit, and membership checks colocated for simpler tracing and fewer moving parts.
@@ -140,6 +149,16 @@ Implementations MUST surface these configuration keys in service configuration a
 - Clients MAY supply an `expiresAt` ISO8601 field on token creation; the server MUST cap requested expiries to the maximum allowed lifetime.
 - Rotation: issuing a replacement token SHOULD NOT automatically revoke the previous token unless the client passes `replace=true` on creation.
 - Revocation: `DELETE /internal/api/users/:userId/git-tokens/:tokenId` MUST mark the token inactive immediately and cause subsequent introspection to return `active: false`.
+  - **Deterministic Revocation (clarified)**
+    1. Atomically mark the token inactive in the authoritative data store (DB).
+    2. Synchronously evict/negatively-cache any local lookup entries used by `introspect()` **before returning**. The local negative entry should be applied immediately (not delayed by TTL).
+    3. Publish an `auth.cache.invalidate` message on the configured pubsub channel so other instances can purge stale caches.
+
+  Observable guarantee:
+  - Same-instance introspect after a successful `DELETE` MUST return `active: false` immediately (i.e., in the same request/response window).
+  - Cross-instance invalidation MUST be observable without manual waits; implementers SHOULD aim for invalidation visibility within **≤ 500 ms** in normal conditions, or rely on authoritative DB fallback on introspect for strict correctness.
+
+  Contract/integration tests (T016b/T016c and related unit tests) shall assert the create → introspect(active:true) → delete → introspect(active:false) sequence deterministically.
 - Migration: deploys MUST include a backfill that assigns `expiresAt` to existing tokens without expiry (default → 90 days) and document the migration plan in `FEATURE_BRANCH_NOTES.md`.
 
 ## Scope Model
@@ -183,11 +202,11 @@ Example:
   - Negative lookup TTL (miss): 5s
   - Acceptable stale window for revocation: 60s unless immediate invalidation is requested
 - Invalidation mechanisms:
-  - Primary: publish an invalidation message to a shared channel `auth.cache.invalidate` with payload `{ type, id, fingerprint?, projectId?, reason }`; all service instances should subscribe and purge caches on receipt.
-  - Secondary: synchronous API `POST /internal/api/cache/invalidate` for urgent invalidation requests. This endpoint is protected via `AuthenticationController.requirePrivateApiAuth()` (e.g., basic auth using `httpAuthUsers`) and is rate-limited per service-origin (default 60 req/min). Request body: `{ channel: string, key: string }` (both required).- Cache keys:
-  - SSH keys: `ssh:fingerprint:{fingerprint}` → `{ userId, expiresAt }`
-  - Tokens: keyed by `token:hashprefix:{hashPrefix}` or a hashed lookup; store `{ active, scopes, expiresAt }`.
-- On any `DELETE`/revoke or membership change, services MUST publish an invalidation message.
+  - Primary: publish an invalidation message to a shared channel `auth.cache.invalidate` conforming to a canonical schema (see `specs/auth-cache-invalidate.v1.json`). Example payload fields: `{ version, type, id, hashPrefix?, fingerprint?, reason?, timestamp }`; all service instances should subscribe and purge caches on receipt and validate message schema.
+  - Secondary: synchronous API `POST /internal/api/cache/invalidate` for urgent invalidation requests. This endpoint is protected via `AuthenticationController.requirePrivateApiAuth()` (e.g., basic auth using `httpAuthUsers`) and is rate-limited per service-origin (default 60 req/min). Request body: `{ channel: string, key: string }` (both required).
+  - Cache keys:
+    - SSH keys: `ssh:fingerprint:{fingerprint}` → `{ userId, expiresAt }`
+    - Tokens: keyed by `token:hashprefix:{hashPrefix}` or a hashed lookup; store `{ active, scopes, expiresAt }`.
 
 ```
 

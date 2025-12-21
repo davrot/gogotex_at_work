@@ -1,0 +1,26 @@
+name: Revocation Immediacy Integration Test
+
+on:
+  pull_request:
+    branches: ["**"]
+  workflow_dispatch: {}
+
+jobs:
+  revocation-immediacy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+      - name: Install dependencies
+        run: npm ci
+        working-directory: services/web
+      - name: Run revocation immediacy test
+        env:
+          TEST_DISABLE_RATE_LIMITS: "true"
+          DISABLE_RATE_LIMITS: "true"
+        run: |
+          cd services/web
+          npx mocha --timeout 60000 --require test/acceptance/bootstrap.js test/integration/src/TokenRevocationImmediacyTests.mjs --exit

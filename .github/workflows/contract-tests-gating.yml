@@ -94,18 +94,31 @@ jobs:
           name: bench-key-lookup
           path: ci/benchmarks/key-lookup-benchmark/out.json
 
-      - name: Run introspection micro-benchmark
+      - name: Run introspection micro-benchmark (Node web)
         run: |
           mkdir -p ci/benchmarks/introspection-benchmark
           BENCH_OUTPUT=ci/benchmarks/introspection-benchmark/out.json BENCH_ITER=${BENCH_ITER:-200} BENCH_CONCURRENCY=${BENCH_CONCURRENCY:-20} BENCH_URL=${BENCH_URL:-http://127.0.0.1:3000/internal/api/tokens/introspect} BENCH_TOKEN=${BENCH_TOKEN:-invalid-token} node ci/benchmarks/introspection-benchmark/bench.js
           node ci/benchmarks/check-bench-slo.js ci/benchmarks/introspection-benchmark/out.json 100
 
-      - name: Upload introspection artifact
+      - name: Upload introspection artifact (Node web)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: bench-introspection
+          name: bench-introspection-node
           path: ci/benchmarks/introspection-benchmark/out.json
+
+      - name: Run introspection micro-benchmark (Go webprofile)
+        run: |
+          mkdir -p ci/benchmarks/introspection-benchmark-webprofile
+          BENCH_OUTPUT=ci/benchmarks/introspection-benchmark-webprofile/out.json BENCH_ITER=${BENCH_ITER:-200} BENCH_CONCURRENCY=${BENCH_CONCURRENCY:-20} BENCH_URL=${BENCH_URL:-http://webprofile-api-ci:3900/internal/api/tokens/introspect} BENCH_TOKEN=${BENCH_TOKEN:-invalid-token} node ci/benchmarks/introspection-benchmark/bench.js
+          node ci/benchmarks/check-bench-slo.js ci/benchmarks/introspection-benchmark-webprofile/out.json 100
+
+      - name: Upload introspection artifact (Go webprofile)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-introspection-webprofile
+          path: ci/benchmarks/introspection-benchmark-webprofile/out.json
 
       - name: Upload contract test results
         if: always()

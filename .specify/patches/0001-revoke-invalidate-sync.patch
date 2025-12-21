@@ -1,0 +1,36 @@
+*** a/services/web/app/src/Features/Token/PersonalAccessTokenManager.mjs
+*** b/services/web/app/src/Features/Token/PersonalAccessTokenManager.mjs
+@@
+     const res = await PersonalAccessToken.findOneAndUpdate({ _id: tokenId, userId }, { active: false })
+     if (res) {
+       try {
+         const pub = require('../../../lib/pubsub')
+         // publish to a conventional channel; consumers can subscribe to 'auth.cache.invalidate'
+         pub.publish('auth.cache.invalidate', { type: 'token.revoked', userId, tokenId: tokenId.toString(), hashPrefix: res.hashPrefix })
+       } catch (e) {
+         // swallow pubsub errors but log if logger available
+         try { const logger = require('@overleaf/logger'); logger.err({ err: e, userId, tokenId }, 'failed to publish token.revoke invalidation') } catch (e2) {}
+       }
++      // Ensure local cache/lookup invalidation happens synchronously so introspect
++      // will return inactive immediately after revoke. Best-effort; swallow errors
++      // to avoid blocking revoke on cache infra issues.
++      try {
++        const fs = await import('fs')
++        const lookupPath = new URL('../../../lib/lookupCache.mjs', import.meta.url).pathname
++        if (fs.existsSync(lookupPath)) {
++          const lookupCacheMod = await import(new URL('../../../lib/lookupCache.mjs', import.meta.url).href)
++          const _lc = (lookupCacheMod && lookupCacheMod.default) || lookupCacheMod
++          const cacheKey = `introspect:${res.hashPrefix}`
++          if (_lc && typeof _lc.invalidate === 'function') {
++            try { await _lc.invalidate(cacheKey) } catch (e) {}
++          } else if (_lc && typeof _lc.set === 'function') {
++            try { await _lc.set(cacheKey, { active: false }, Number(process.env.CACHE_NEGATIVE_TTL_SECONDS || 5)) } catch (e) {}
++          }
++        }
++      } catch (e) {
++        // ignore cache invalidation errors
++      }
+     }
+     return !!res
+   },
+*** End Patch

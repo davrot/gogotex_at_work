@@ -206,6 +206,16 @@ const rateLimiters = {
 async function initialize(webRouter, privateApiRouter, publicApiRouter) {
   webRouter.use(unsupportedBrowserMiddleware)
 
+  // Debug: log all incoming DELETE requests to aid in diagnosing missing route handling
+  webRouter.use((req, res, next) => {
+    try {
+      if (req && req.method === 'DELETE') {
+        console.error('[GLOBAL ROUTE DEBUG] incoming DELETE', { method: req.method, url: req.originalUrl || req.url, headers: { cookie: req.headers && req.headers.cookie, 'x-service-origin': req.headers && req.headers['x-service-origin'] }, sessionExists: !!req.session, sessionUserId: req.session && req.session.user && req.session.user._id ? req.session.user._id : null })
+      }
+    } catch (e) {}
+    return next()
+  })
+
   if (!Settings.allowPublicAccess) {
     webRouter.all('*', AuthenticationController.requireGlobalLogin)
   }
@@ -220,6 +230,12 @@ async function initialize(webRouter, privateApiRouter, publicApiRouter) {
     RateLimiterMiddleware.rateLimit(rateLimiters.canSkipCaptcha),
     CaptchaMiddleware.canSkipCaptcha
   )
+
+  // DEBUG CATCHALL: log any request under /internal/api/users/:userId to diagnose missing DELETE routing
+  webRouter.all('/internal/api/users/:userId/*', (req, res, next) => {
+    try { console.error('[CATCHALL DEBUG] incoming', { method: req.method, url: req.originalUrl || req.url, path: req.path, headers: { cookie: req.headers && req.headers.cookie, 'x-service-origin': req.headers && req.headers['x-service-origin'] }, sessionExists: !!req.session, sessionUserId: req.session && req.session.user && req.session.user._id ? req.session.user._id : null }) } catch (e) {}
+    return next()
+  })
 
   webRouter.get('/login', UserPagesController.loginPage)
   AuthenticationController.addEndpointToLoginWhitelist('/login')

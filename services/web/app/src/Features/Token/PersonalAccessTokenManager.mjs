@@ -297,15 +297,41 @@ export default {
     if (_useWebprofile) {
       try {
         const client = await import('./WebProfileClient.mjs')
+        // eslint-disable-next-line no-console
+        console.error('[PersonalAccessTokenManager.revokeToken] delegating to webprofile, userId=' + userId + ', tokenId=' + tokenId)
         const ok = await client.revokeToken(userId, tokenId)
+        // eslint-disable-next-line no-console
+        console.error('[PersonalAccessTokenManager.revokeToken] webprofile revoke result=', ok)
         if (ok) return true
-        return false
+        // If webprofile returned a non-success (e.g., 404 or other parity mismatch), fall back
+        // to local DB revoke to maintain idempotent behaviour and contract expectations.
+        try { console.warn('[PersonalAccessTokenManager.revokeToken] webprofile revoke returned false, falling back to local revoke') } catch (e) {}
       } catch (e) {
         try { const logger = require('@overleaf/logger'); logger.err({ err: e }, 'webprofile revoke delegation failed, falling back to local') } catch (e) {}
       }
     }
 
+    // Debug: log inputs and attempt a preflight find so we can see why revokes return null
+    try {
+      const mongoose = require('mongoose')
+      // eslint-disable-next-line no-console
+      console.error('[PersonalAccessTokenManager.revokeToken] local revoke attempt, tokenId=', tokenId, 'type=', typeof tokenId, 'userId=', userId, 'isValidObjectId=', mongoose.Types.ObjectId.isValid && mongoose.Types.ObjectId.isValid(tokenId))
+      try {
+        const found = await PersonalAccessToken.findOne({ _id: tokenId })
+        // eslint-disable-next-line no-console
+        console.error('[PersonalAccessTokenManager.revokeToken] findOne by _id result=', found && (found._id ? found._id.toString() : null), 'userId=', found && found.userId ? found.userId.toString() : null, 'active=', found && typeof found.active !== 'undefined' ? found.active : null)
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error('[PersonalAccessTokenManager.revokeToken] findOne threw error', e && (e.stack || e))
+      }
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error('[PersonalAccessTokenManager.revokeToken] mongoose not available for preflight check', e && (e.stack || e))
+    }
+
     const res = await PersonalAccessToken.findOneAndUpdate({ _id: tokenId, userId }, { active: false })
+    // eslint-disable-next-line no-console
+    console.error('[PersonalAccessTokenManager.revokeToken] findOneAndUpdate result=', !!res, res && (res._id ? res._id.toString() : null))
     if (res) {
       try {
         const pub = require('../../../lib/pubsub')
@@ -314,6 +340,25 @@ export default {
       } catch (e) {
         // swallow pubsub errors but log if logger available
         try { const logger = require('@overleaf/logger'); logger.err({ err: e, userId, tokenId }, 'failed to publish token.revoke invalidation') } catch (e2) {}
+      }
+      // Ensure local cache/lookup invalidation happens synchronously so introspect
+      // will return inactive immediately after revoke. Best-effort; swallow errors
+      // to avoid blocking revoke on cache infra issues.
+      try {
+        const fs = await import('fs')
+        const lookupPath = new URL('../../../lib/lookupCache.mjs', import.meta.url).pathname
+        if (fs.existsSync(lookupPath)) {
+          const lookupCacheMod = await import(new URL('../../../lib/lookupCache.mjs', import.meta.url).href)
+          const _lc = (lookupCacheMod && lookupCacheMod.default) || lookupCacheMod
+          const cacheKey = `introspect:${res.hashPrefix}`
+          if (_lc && typeof _lc.invalidate === 'function') {
+            try { await _lc.invalidate(cacheKey) } catch (e) {}
+          } else if (_lc && typeof _lc.set === 'function') {
+            try { await _lc.set(cacheKey, { active: false }, Number(process.env.CACHE_NEGATIVE_TTL_SECONDS || 5)) } catch (e) {}
+          }
+        }
+      } catch (e) {
+        // ignore cache invalidation errors
       }
     }
     return !!res

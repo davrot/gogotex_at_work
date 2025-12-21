@@ -110,7 +110,17 @@ export async function revokeToken(userId, tokenId) {
       logger.err({ err }, 'webprofile revoke call failed (timeout or network)')
       return false
     }
-    return res.status === 204
+    // Accept 204 No Content as canonical success; also accept 200 for parity
+    // with implementations that return an OK body but no content.
+    if (res.status === 204 || res.status === 200) return true
+    // Log non-204 responses for debugging parity issues
+    try {
+      const text = await res.text().catch(() => null)
+      logger.warn({ status: res.status, body: text }, 'webprofile revoke returned non-204')
+    } catch (e) {
+      logger.warn({ status: res && res.status }, 'webprofile revoke returned non-204 and body parse failed')
+    }
+    return false
   } catch (err) {
     logger.err({ err }, 'webprofile revoke call failed')
     return false

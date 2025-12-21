@@ -1,0 +1,53 @@
+{
+  "name": "Ubuntu Dev - Overleaf Project",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+  // 1. DOCKER-OUTSIDE-OF-DOCKER (DooD) SETUP
+  // This feature installs the Docker CLI and mounts the host's Docker socket,
+  // allowing your program inside the container to spin up other containers on the host.
+  "features": {
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
+  },
+  // 2. CONFIGURE WORKSPACE FOLDER INSIDE CONTAINER
+  // This tells VS Code which folder inside the container to open.
+  // The default is usually '/workspaces', but we'll use a more descriptive name.
+  "workspaceFolder": "/workspaces/overleaf_dev",
+  // 3. MOUNT THE PROJECT FOLDER (Important!)
+  // This is technically handled by default when you open the folder, 
+  // but explicitly defining the mounts can prevent issues on non-standard paths.
+  "customizations": {
+    "vscode": {
+      "settings": {
+        // Optional: Ensure the default terminal starts in the container
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "editor.rulers": [
+          80,
+          120
+        ],
+        "editor.autoClosingBrackets": "never",
+        "workbench.startupEditor": "none",
+        "editor.suggest.showWords": false,
+        "diffEditor.wordWrap": "on",
+        "editor.autoClosingDelete": "never",
+        "editor.autoClosingOvertype": "never",
+        "editor.autoClosingQuotes": "never",
+        "editor.autoSurround": "never",
+        "editor.dragAndDrop": false,
+        "editor.hover.delay": 5000,
+        "workbench.editor.empty.hint": "hidden"
+      }
+    }
+  },
+  "extensions": [
+    "ms-azuretools.vscode-docker",
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "christian-kohler.npm-intellisense",
+    "humao.rest-client"
+  ],
+  "mounts": [
+    "source=${env:HOME}/.ssh/,target=/home/vscode/.ssh/,type=bind,consistency=cached"
+  ],
+  "remoteUser": "vscode",
+
+  "postCreateCommand": "bash .devcontainer/setup-dev-env.sh"
+}

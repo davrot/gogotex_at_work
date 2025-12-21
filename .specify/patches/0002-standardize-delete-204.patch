@@ -1,0 +1,9 @@
+*** a/services/web/test/contract/src/TokenIntrospectContractTest.mjs
+*** b/services/web/test/contract/src/TokenIntrospectContractTest.mjs
+@@
+-    const revokeRes = await user.doRequest('delete', { url: `/internal/api/users/${user.id}/git-tokens/${body.id}` })
+-    expect([200, 204]).to.include(revokeRes.response.statusCode)
++    const revokeRes = await user.doRequest('delete', { url: `/internal/api/users/${user.id}/git-tokens/${body.id}` })
++    // Canonicalize revoke response: 204 No Content on successful revoke
++    expect(revokeRes.response.statusCode).to.equal(204)
+*** End Patch

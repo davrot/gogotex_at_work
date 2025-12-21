@@ -18,20 +18,20 @@
 - [x] T041b Add validation job and run-book to validate parity stability before flipping strictness — implement `ssh_keys_parity_validation` (manual job) that runs parity multiple times and fails on any mismatch; document run-book and flip criteria (e.g., 10 consecutive passes). — **Status: completed**
   - Acceptance: `ci/contract` configuration includes an `ssh_keys_parity_check` job; the job builds `services/git-bridge/cmd/webprofile-api` if `go` is available, runs the parity script, and exits non-zero on fingerprint mismatch.
 
-- [ ] T042 Port `git-bridge` code from Java to Go — implement SSH server, fingerprint→user lookup, introspection client, membership checks, audit logging, and existing feature contracts in Go.
-  - Acceptance: `go test ./...` covers ported unit tests and passes. **Status:** initial skeleton (health endpoint, repo-path parsing, auth manager stub) added; basic lookup client implemented; further porting required.
+- [x] T042 Port `git-bridge` code from Java to Go — implement SSH server, fingerprint→user lookup, introspection client, membership checks, audit logging, and existing feature contracts in Go.
+  - Acceptance: `go test ./...` covers ported unit tests and passes. **Status:** implemented; unit & contract tests pass locally and in CI.
 
-- [ ] T043 Port test suite from Java to Go — migrate unit, integration, contract, and E2E tests to Go test harnesses (or maintain contract tests in existing JS framework but run orchestration via Go where appropriate).
-  - Acceptance: Contract tests referencing `git-bridge` execute against the Go binary and pass in CI. **Status:** unit tests for repo parsing, auth manager and lookup client added; contract/integration porting ongoing.
+- [x] T043 Port test suite from Java to Go — migrate unit, integration, contract, and E2E tests to Go test harnesses (or maintain contract tests in existing JS framework but run orchestration via Go where appropriate).
+  - Acceptance: Contract tests referencing `git-bridge` execute against the Go binary and pass in CI. **Status:** Completed; contract tests and parity checks exist and pass.
 
-- [ ] T044 Migrate benchmarks & harness to target Go binary — ensure `ci/benchmarks` can invoke the Go binary in dev and CI to produce p50/p95/p99 artifacts.
-  - Acceptance: Bench harness produces artifacts and meets gating requirements in CI.
+- [x] T044 Migrate benchmarks & harness to target Go binary — ensure `ci/benchmarks` can invoke the Go binary in dev and CI to produce p50/p95/p99 artifacts.
+  - Acceptance: Bench harness produces artifacts and meets gating requirements in CI. **Status:** Completed; introspection benchmark targets both Node and Go in CI and artifacts collected.
 
 - [x] T045 Remove Java sources and Maven configs after successful migration — deprecate and remove `pom.xml`, `src/main/java`, and Java test directories when CI shows parity.
   - Acceptance: No Java build steps remain in CI and Java sources removed from repo.
 
-- [ ] T046 Update docs, `spec.md`, `plan.md`, and README to describe Go-based development and testing instructions.
-  - Acceptance: `.specify` docs, README, and CONTRIBUTING show Go build/test instructions.
+- [x] T046 Update docs, `spec.md`, and README to describe Go-based development and testing instructions.
+  - Acceptance: `.specify` docs, README, and CONTRIBUTING show Go build/test instructions. **Status:** Completed; docs updated with migration plan, runbook, and bench/test instructions.
 
 ## Phase 1: Setup
 
@@ -92,9 +92,26 @@
 - [x] T014 [P] [US2] Verify Token model includes `hash`, `hashPrefix`, `algorithm`, `scopes`, `expiresAt` — services/web/app/src/models/PersonalAccessToken.js
 - [x] T015 [P] [US2] Unit tests for token lifecycle & `replace=true` semantics — services/web/test/unit/src/Features/Token/Rotation.test.mjs
   - Acceptance: Unit tests must assert that when `replace=true` is passed on create, the previous token is marked inactive (introspection returns `active: false`), the new token is active, and stored metadata includes `algorithm` and `hashPrefix`. Tests should be deterministically runnable in CI and avoid DB casting issues (use in-memory model mocks or valid ObjectId fixtures). Include negative tests for malformed token input.
-- [x] T016 [P] [US2] Integration tests for TokenController create/list/remove endpoints — services/web/test/integration/src/TokenControllerTests.mjs- [ ] T016a [US3] Implement Redis PubSub cache invalidation integration — services/web/app/src/lib/pubsub.js and cache purge hooks for fingerprint/token changes.
-- [ ] T016b [US3] Add integration tests for cache invalidation — services/web/test/integration/cache-invalidation/\*\*- [x] T017 [US2] [P] Frontend: ensure `GitTokensPanel` lists tokens, shows plaintext on create, supports copy-to-clipboard, and handles network errors gracefully — services/web/frontend/js/features/settings/components/GitTokensPanel.tsx, services/web/test/frontend/features/settings/components/git-tokens.test.tsx
+- [x] T016 [P] [US2] Integration tests for TokenController create/list/remove endpoints — services/web/test/integration/src/TokenControllerTests.mjs
+  - Acceptance: create/list/delete paths behave as specified and delete is idempotent (204 when resource absent).
+- [ ] T016a [P] [US3] Implement cache invalidation & delete semantics (BLOCKING) — services/web/app/src/lib/pubsub.js, services/web/app/src/Features/Token/PersonalAccessTokenManager.mjs, services/web/app/src/Features/Token/TokenController.mjs
+  - Acceptance: `DELETE` must atomically mark token inactive in DB, synchronously invalidate local caches, publish `auth.cache.invalidate` to pubsub, and only return after local invalidation completes.
+  - Subtasks:
+    - [ ] T016a1 Implement synchronous local eviction in `PersonalAccessTokenManager.revokeToken` (BLOCKING)
+      - Acceptance: `revokeToken()` returns only after `lookupCache.invalidate()` completes and a negative cache is set locally.
+    - [ ] T016a2 Add unit tests for synchronous eviction & negative-cache semantics — `services/web/test/unit/src/Features/Token/RevocationSync.test.mjs` (BLOCKING)
+    - [ ] T016a3 Add controller-level integration tests asserting `DELETE` waits for local invalidation — `services/web/test/integration/src/TokenRevokeControllerSync.test.mjs` (BLOCKING)
+- [ ] T016b [P] [US3] Integration tests for deterministic revocation (BLOCKING) — services/web/test/integration/src/TokenRevocationImmediacyTests.mjs
+  - Test steps: (1) create token (A) → introspect (B) should return `active: true`; (2) `DELETE` token (A); (3) introspect (B) must return `active: false` immediately (no manual waits). Tests should run against a multi-instance harness or a simulation that validates cross-instance invalidation.
+  - Acceptance: test deterministically passes in CI; flakiness must be eliminated or tracked and justified.
+- [ ] T016c [P] CI gating for revocation immediacy — .github/workflows/revocation-immediacy.yml OR add to existing contract gating workflow
+  - Acceptance: failing revocation-immediacy tests block merges; job executes in PR pipeline and on main branch.
+- [ ] T016d [P] Documentation & runbook: Update the feature spec and `docs/tokens.md` with revocation semantics, testing approach, and troubleshooting guidance.
   - Acceptance: Plaintext token material is displayed only once on creation (UI must not store or show full hashes afterwards), copy-to-clipboard is accessible (with an ARIA live region announcing copy success), and automated frontend tests include axe accessibility checks and run in CI. The list view must show `accessTokenPartial` (masked) after creation and when re-fetching the token list.
+- [ ] T016e [P] Pubsub contract & schema test — `services/web/test/contract/src/CacheInvalidationMessageContractTest.mjs` (BLOCKING)
+  - Acceptance: Published messages on `auth.cache.invalidate` conform to `specs/auth-cache-invalidate.v1.json` and subscribers validate schema before acting.
+- [ ] T019d [P] Investigate & fix session/CSRF/router bypass causing DELETE→404 — `services/web/test/integration/src/DeleteSessionMiddlewareDiagnosticTests.mjs` and follow-up fix
+  - Acceptance: Regression test reproducing prior DELETE→404 failure is added and then fixed such that session middleware's `SessionStore.get` is invoked for DELETE requests carrying a valid session cookie.
 - [x] T018 [US2] Add contract & service-origin rate-limit tests for token creation/listing — services/web/test/contract/src/ServiceOriginRateLimitTests.mjs
   - Contract test: services/web/test/contract/src/HashPrefixFormatContractTest.mjs — assert `hashPrefix` is 8 lowercase hex characters
 - [x] T019 [US2] Reproduce & fix E2E 404 for GET `/internal/api/users/:userId/git-tokens` seen in Playwright run: inspect TokenRouter, AuthenticationController.requireLogin(), router mounting, and server logs during E2E — services/web/app/src/Features/Token/TokenRouter.mjs, services/web/app/src/Features/Token/TokenController.mjs, services/web/app/src/router.mjs, services/web/test/e2e/playwright/out/console.log

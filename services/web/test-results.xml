@@ -1,91 +1,105 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="Mocha Tests" time="10.145" tests="20" failures="6" skipped="1">
-  <testsuite name="Root Suite" timestamp="2025-12-20T15:49:35" tests="0" time="0.000" failures="0">
+<testsuites name="Mocha Tests" time="9.642" tests="22" failures="4" skipped="2">
+  <testsuite name="Root Suite" timestamp="2025-12-21T19:33:13" tests="0" time="0.000" failures="0">
   </testsuite>
-  <testsuite name="Cache invalidation contract tests" timestamp="2025-12-20T15:49:35" tests="1" file="/workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/test/contract/src/CacheInvalidationContractTest.mjs" time="0.607" failures="0">
-    <testcase name="Cache invalidation contract tests is protected and requires private auth" time="0.594" classname="is protected and requires private auth">
+  <testsuite name="Cache invalidation contract tests" timestamp="2025-12-21T19:33:13" tests="1" file="/workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/test/contract/src/CacheInvalidationContractTest.mjs" time="0.646" failures="0">
+    <testcase name="Cache invalidation contract tests is protected and requires private auth" time="0.637" classname="is protected and requires private auth">
     </testcase>
   </testsuite>
-  <testsuite name="HashPrefix format contract test" timestamp="2025-12-20T15:49:36" tests="1" file="/workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/test/contract/src/HashPrefixFormatContractTest.mjs" time="0.569" failures="0">
-    <testcase name="HashPrefix format contract test returns 8-character lowercase hex `hashPrefix` in token list" time="0.569" classname="returns 8-character lowercase hex `hashPrefix` in token list">
+  <testsuite name="Disable rate-limits test endpoint (regression)" timestamp="2025-12-21T19:33:14" tests="1" file="/workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/test/contract/src/DisableRateLimitsRegressionTest.mjs" time="0.166" failures="0">
+    <testcase name="Disable rate-limits test endpoint (regression) POST /internal/api/test/disable-rate-limits should disable rate limits for introspect and lookup" time="0.166" classname="POST /internal/api/test/disable-rate-limits should disable rate limits for introspect and lookup">
     </testcase>
   </testsuite>
-  <testsuite name="Auth log schema validation" timestamp="2025-12-20T15:49:36" tests="1" file="/workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/test/contract/src/LogSchemaValidationTests.mjs" time="0.016" failures="0">
-    <testcase name="Auth log schema validation should validate sample token.introspect log against schema" time="0.016" classname="should validate sample token.introspect log against schema">
+  <testsuite name="HashPrefix format contract test" timestamp="2025-12-21T19:33:14" tests="1" file="/workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/test/contract/src/HashPrefixFormatContractTest.mjs" time="0.550" failures="0">
+    <testcase name="HashPrefix format contract test returns 8-character lowercase hex `hashPrefix` in token list" time="0.550" classname="returns 8-character lowercase hex `hashPrefix` in token list">
     </testcase>
   </testsuite>
-  <testsuite name="Logging retention &amp; PII masking (contract test scaffold)" timestamp="2025-12-20T15:49:36" tests="2" file="/workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/test/contract/src/LoggingRetentionPIITests.mjs" time="0.602" failures="0">
-    <testcase name="Logging retention &amp; PII masking (contract test scaffold) logs token introspect events with hashPrefix only" time="0.602" classname="logs token introspect events with hashPrefix only">
-    </testcase>
-    <testcase name="Logging retention &amp; PII masking (contract test scaffold) verifies audit log retention policy is configured (environment-specific check)" time="0.000" classname="verifies audit log retention policy is configured (environment-specific check)">
+  <testsuite name="Auth log schema validation" timestamp="2025-12-21T19:33:15" tests="1" file="/workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/test/contract/src/LogSchemaValidationTests.mjs" time="0.017" failures="0">
+    <testcase name="Auth log schema validation should validate sample token.introspect log against schema" time="0.017" classname="should validate sample token.introspect log against schema">
     </testcase>
   </testsuite>
-  <testsuite name="Malformed SSH public_key validation (contract test)" timestamp="2025-12-20T15:49:37" tests="1" file="/workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/test/contract/src/MalformedKeyTests.mjs" time="0.505" failures="0">
-    <testcase name="Malformed SSH public_key validation (contract test) returns 400 for malformed public_key format" time="0.505" classname="returns 400 for malformed public_key format">
+  <testsuite name="Logging retention &amp; PII masking (contract test scaffold)" timestamp="2025-12-21T19:33:15" tests="2" file="/workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/test/contract/src/LoggingRetentionPIITests.mjs" time="0.623" failures="0">
+    <testcase name="Logging retention &amp; PII masking (contract test scaffold) logs token introspect events with hashPrefix only" time="0.623" classname="logs token introspect events with hashPrefix only">
     </testcase>
   </testsuite>
-  <testsuite name="Manual repro SSH key" timestamp="2025-12-20T15:49:38" tests="2" file="/workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/test/contract/src/ManualReproSSH.mjs" time="0.827" failures="0">
-    <testcase name="Manual repro SSH key posts ssh key and logs response" time="0.340" classname="posts ssh key and logs response">
-    </testcase>
-    <testcase name="Manual repro SSH key creates user with known password then logs in and posts ssh key" time="0.487" classname="creates user with known password then logs in and posts ssh key">
+  <testsuite name="Malformed SSH public_key validation (contract test)" timestamp="2025-12-21T19:33:15" tests="1" file="/workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/test/contract/src/MalformedKeyTests.mjs" time="0.496" failures="0">
+    <testcase name="Malformed SSH public_key validation (contract test) returns 400 for malformed public_key format" time="0.496" classname="returns 400 for malformed public_key format">
     </testcase>
   </testsuite>
-  <testsuite name="Membership API contract tests" timestamp="2025-12-20T15:49:38" tests="1" file="/workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/test/contract/src/MembershipContractTest.mjs" time="1.157" failures="0">
-    <testcase name="Membership API contract tests returns 200 for member and 404 for non-member" time="1.156" classname="returns 200 for member and 404 for non-member">
+  <testsuite name="Manual repro SSH key" timestamp="2025-12-21T19:33:16" tests="2" file="/workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/test/contract/src/ManualReproSSH.mjs" time="0.873" failures="0">
+    <testcase name="Manual repro SSH key posts ssh key and logs response" time="0.369" classname="posts ssh key and logs response">
+    </testcase>
+    <testcase name="Manual repro SSH key creates user with known password then logs in and posts ssh key" time="0.504" classname="creates user with known password then logs in and posts ssh key">
     </testcase>
   </testsuite>
-  <testsuite name="Retention Config Contract" timestamp="2025-12-20T15:49:40" tests="1" file="/workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/test/contract/src/RetentionConfigContractTest.mjs" time="0.000" failures="0">
-  </testsuite>
-  <testsuite name="SSH Key CRUD contract tests" timestamp="2025-12-20T15:49:40" tests="1" file="/workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/test/contract/src/SSHKeyCRUDContractTest.mjs" time="0.595" failures="0">
-    <testcase name="SSH Key CRUD contract tests create/list/delete SSH keys as logged-in user" time="0.595" classname="create/list/delete SSH keys as logged-in user">
+  <testsuite name="Membership API contract tests" timestamp="2025-12-21T19:33:17" tests="1" file="/workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/test/contract/src/MembershipContractTest.mjs" time="1.041" failures="0">
+    <testcase name="Membership API contract tests returns 200 for member and 404 for non-member" time="1.041" classname="returns 200 for member and 404 for non-member">
     </testcase>
   </testsuite>
-  <testsuite name="SSH Key Idempotency / concurrency contract tests" timestamp="2025-12-20T15:49:40" tests="1" file="/workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/test/contract/src/SSHKeyIdempotencyContractTest.mjs" time="0.514" failures="1">
-    <testcase name="SSH Key Idempotency / concurrency contract tests concurrent POSTs with same public_key should be deterministic and not create duplicates" time="0.513" classname="concurrent POSTs with same public_key should be deterministic and not create duplicates">
-      <failure message="expected 2 to equal 1" type="AssertionError"><![CDATA[AssertionError: expected 2 to equal 1
-    at Context.<anonymous> (file:///workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/test/contract/src/SSHKeyIdempotencyContractTest.mjs:33:31)
+  <testsuite name="Retention Config Contract" timestamp="2025-12-21T19:33:18" tests="1" file="/workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/test/contract/src/RetentionConfigContractTest.mjs" time="0.001" failures="0">
+  </testsuite>
+  <testsuite name="SSH Key CRUD contract tests" timestamp="2025-12-21T19:33:18" tests="1" file="/workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/test/contract/src/SSHKeyCRUDContractTest.mjs" time="0.606" failures="0">
+    <testcase name="SSH Key CRUD contract tests create/list/delete SSH keys as logged-in user" time="0.606" classname="create/list/delete SSH keys as logged-in user">
+    </testcase>
+  </testsuite>
+  <testsuite name="SSH Key Idempotency / concurrency contract tests" timestamp="2025-12-21T19:33:18" tests="1" file="/workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/test/contract/src/SSHKeyIdempotencyContractTest.mjs" time="0.531" failures="0">
+    <testcase name="SSH Key Idempotency / concurrency contract tests concurrent POSTs with same public_key should be deterministic and not create duplicates" time="0.530" classname="concurrent POSTs with same public_key should be deterministic and not create duplicates">
+    </testcase>
+  </testsuite>
+  <testsuite name="SSH fingerprint lookup contract tests" timestamp="2025-12-21T19:33:19" tests="2" file="/workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/test/contract/src/SSHKeyLookupContractTest.mjs" time="1.040" failures="0">
+    <testcase name="SSH fingerprint lookup contract tests returns userId for a known fingerprint" time="0.532" classname="returns userId for a known fingerprint">
+    </testcase>
+    <testcase name="SSH fingerprint lookup contract tests returns 400 for malformed fingerprint format" time="0.508" classname="returns 400 for malformed fingerprint format">
+    </testcase>
+  </testsuite>
+  <testsuite name="SSH Key Idempotency stress repro" timestamp="2025-12-21T19:33:20" tests="1" file="/workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/test/contract/src/SSHKeyStressReproTest.mjs" time="0.697" failures="0">
+    <testcase name="SSH Key Idempotency stress repro concurrent POSTs with same public_key should be deterministic (stress)" time="0.697" classname="concurrent POSTs with same public_key should be deterministic (stress)">
+    </testcase>
+  </testsuite>
+  <testsuite name="Service-Origin Rate Limits (contract test scaffold)" timestamp="2025-12-21T19:33:20" tests="3" file="/workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/test/contract/src/ServiceOriginRateLimitTests.mjs" time="0.659" failures="3">
+    <testcase name="Service-Origin Rate Limits (contract test scaffold) should enforce 60 req/min per service-origin for introspection" time="0.063" classname="should enforce 60 req/min per service-origin for introspection">
+      <failure message="expected 400 to equal 429" type="AssertionError"><![CDATA[AssertionError: expected 400 to equal 429
+    at Context.<anonymous> (file:///workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/test/contract/src/ServiceOriginRateLimitTests.mjs:65:42)
     at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
 
       + expected - actual
 
-      -2
-      +1
+      -400
+      +429
+      ]]></failure>
+    </testcase>
+    <testcase name="Service-Origin Rate Limits (contract test scaffold) should enforce 60 req/min per service-origin for listing" time="0.472" classname="should enforce 60 req/min per service-origin for listing">
+      <failure message="expected 200 to equal 429" type="AssertionError"><![CDATA[AssertionError: expected 200 to equal 429
+    at Context.<anonymous> (file:///workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/test/contract/src/ServiceOriginRateLimitTests.mjs:139:46)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+
+      + expected - actual
+
+      -200
+      +429
+      ]]></failure>
+    </testcase>
+    <testcase name="Service-Origin Rate Limits (contract test scaffold) should enforce 60 req/min per service-origin for fingerprint lookup" time="0.122" classname="should enforce 60 req/min per service-origin for fingerprint lookup">
+      <failure message="expected -1 to be above +0" type="AssertionError"><![CDATA[AssertionError: expected -1 to be above +0
+    at Context.<anonymous> (file:///workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/test/contract/src/ServiceOriginRateLimitTests.mjs:192:30)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+
+      + expected - actual
+
+      --1
+      +0
       ]]></failure>
     </testcase>
   </testsuite>
-  <testsuite name="SSH fingerprint lookup contract tests" timestamp="2025-12-20T15:49:41" tests="2" file="/workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/test/contract/src/SSHKeyLookupContractTest.mjs" time="3.370" failures="1">
-    <testcase name="SSH fingerprint lookup contract tests returns userId for a known fingerprint" time="0.510" classname="returns userId for a known fingerprint">
+  <testsuite name="Token introspection contract tests" timestamp="2025-12-21T19:33:21" tests="3" file="/workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/test/contract/src/TokenIntrospectContractTest.mjs" time="1.692" failures="1">
+    <testcase name="Token introspection contract tests introspects a valid token and returns shape" time="0.576" classname="introspects a valid token and returns shape">
     </testcase>
-    <testcase name="SSH fingerprint lookup contract tests returns 400 for malformed fingerprint format" time="2.860" classname="returns 400 for malformed fingerprint format">
-      <failure message="login failed: status=429 body=&quot;Rate limit reached, please try again later&quot;" type="Error"><![CDATA[Error: login failed: status=429 body="Rate limit reached, please try again later"
-    at UserHelper.loginUser (file:///workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/test/acceptance/src/helpers/UserHelper.mjs:470:21)
-    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
-    at async UserHelper.login (file:///workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/test/acceptance/src/helpers/UserHelper.mjs:553:20)
-    at async Context.<anonymous> (file:///workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/test/contract/src/SSHKeyLookupContractTest.mjs:46:5)]]></failure>
+    <testcase name="Token introspection contract tests returns inactive for revoked token" time="0.539" classname="returns inactive for revoked token">
+      <failure message="expected [ 200, 204 ] to include 404" type="AssertionError"><![CDATA[AssertionError: expected [ 200, 204 ] to include 404
+    at Context.<anonymous> (file:///workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/test/contract/src/TokenIntrospectContractTest.mjs:61:27)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)]]></failure>
     </testcase>
-  </testsuite>
-  <testsuite name="Service-Origin Rate Limits (contract test scaffold)" timestamp="2025-12-20T15:49:44" tests="3" file="/workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/test/contract/src/ServiceOriginRateLimitTests.mjs" time="0.431" failures="1">
-    <testcase name="Service-Origin Rate Limits (contract test scaffold) should enforce 60 req/min per service-origin for introspection" time="0.058" classname="should enforce 60 req/min per service-origin for introspection">
-    </testcase>
-    <testcase name="Service-Origin Rate Limits (contract test scaffold) should enforce 60 req/min per service-origin for listing" time="0.318" classname="should enforce 60 req/min per service-origin for listing">
-      <failure message="login failed: status=429 body=&quot;Rate limit reached, please try again later&quot;" type="OError"><![CDATA[OError: login failed: status=429 body="Rate limit reached, please try again later"
-    at file:///workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/test/acceptance/src/helpers/User.mjs:436:19]]></failure>
-    </testcase>
-    <testcase name="Service-Origin Rate Limits (contract test scaffold) should enforce 60 req/min per service-origin for fingerprint lookup" time="0.055" classname="should enforce 60 req/min per service-origin for fingerprint lookup">
-    </testcase>
-  </testsuite>
-  <testsuite name="Token introspection contract tests" timestamp="2025-12-20T15:49:44" tests="3" file="/workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/test/contract/src/TokenIntrospectContractTest.mjs" time="0.948" failures="3">
-    <testcase name="Token introspection contract tests introspects a valid token and returns shape" time="0.319" classname="introspects a valid token and returns shape">
-      <failure message="login failed: status=429 body=&quot;Rate limit reached, please try again later&quot;" type="OError"><![CDATA[OError: login failed: status=429 body="Rate limit reached, please try again later"
-    at file:///workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/test/acceptance/src/helpers/User.mjs:436:19]]></failure>
-    </testcase>
-    <testcase name="Token introspection contract tests returns inactive for revoked token" time="0.315" classname="returns inactive for revoked token">
-      <failure message="login failed: status=429 body=&quot;Rate limit reached, please try again later&quot;" type="OError"><![CDATA[OError: login failed: status=429 body="Rate limit reached, please try again later"
-    at file:///workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/test/acceptance/src/helpers/User.mjs:436:19]]></failure>
-    </testcase>
-    <testcase name="Token introspection contract tests allows service-origin basic auth introspection" time="0.314" classname="allows service-origin basic auth introspection">
-      <failure message="login failed: status=429 body=&quot;Rate limit reached, please try again later&quot;" type="OError"><![CDATA[OError: login failed: status=429 body="Rate limit reached, please try again later"
-    at file:///workspaces/overleaf_dev/workspace/git-bridge/overleaf_with_admin_extension/services/web/test/acceptance/src/helpers/User.mjs:436:19]]></failure>
+    <testcase name="Token introspection contract tests allows service-origin basic auth introspection" time="0.577" classname="allows service-origin basic auth introspection">
     </testcase>
   </testsuite>
 </testsuites>

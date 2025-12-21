@@ -107,8 +107,13 @@ class Csrf {
         }
         if (err && err.code === 'EBADCSRFTOKEN') {
           try { console.error('[Csrf] EBADCSRFTOKEN (non-relaxed)', { path: req.path, method: req.method, headers: req.headers, body: req.body ? Object.keys(req.body) : null, sessionExists: !!req.session, sessionUser: SessionManager.getSessionUser ? SessionManager.getSessionUser(req.session) : null }) } catch (e) {}
+          try {
+            if (req.method === 'DELETE' && ((req.path && req.path.includes('/internal/api/users/')) || (req.originalUrl && req.originalUrl.includes('/internal/api/users/')))) {
+              try { console.error('[Csrf] DELETE path EBADCSRFTOKEN on internal api users', { path: req.path, originalUrl: req.originalUrl, headers: req.headers, sessionExists: !!req.session, sessionUser: SessionManager.getSessionUser ? SessionManager.getSessionUser(req.session) : null }) } catch (e) {}
+            }
+          } catch (e) {}
         }
-        next(err)
+        next(err) 
       })
     }
   }

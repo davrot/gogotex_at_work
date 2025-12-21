@@ -134,6 +134,48 @@ cd develop
 
 This helps ensure that `envsubst` and compose config changes are applied and containers are restarted with the updated config.
 
+### Running the Go webprofile API locally
+
+The `webprofile-api` is a Go shim that implements SSH key and token endpoints used by `git-bridge`. You can run it locally against the dev-compose Mongo instance:
+
+```bash
+# Build and run using Go (requires Go 1.25+)
+cd services/git-bridge/cmd/webprofile-api
+go build -o webprofile-api .
+# (in another terminal)
+MONGO_URI=mongodb://mongo:27017/sharelatex ./webprofile-api
+```
+
+Or use the helper that runs it in the compose network (recommended for parity tests):
+
+```bash
+# from repo root (ensures it's attached to the compose network)
+./scripts/contract/run_webprofile_in_network.sh webprofile-local
+```
+
+### Running contract parity and benchmarks
+
+- Run the contract parity scripts (compares Node vs Go behavior):
+
+```bash
+scripts/contract/compare_introspect.sh http://develop-web-1:3000 http://webprofile-local:3900
+scripts/contract/compare_ssh_parity.sh http://develop-web-1:3000 http://webprofile-local:3900
+```
+
+- Run the introspection benchmark against the Go webprofile API:
+
+```bash
+BENCH_URL=http://webprofile-local:3900/internal/api/tokens/introspect BENCH_ITER=200 node ci/benchmarks/introspection-benchmark/bench.js
+```
+
+- Run Go unit tests:
+
+```bash
+make go-test
+```
+
+These steps are integrated into CI in `contract-tests-gating.yml`. If parity or benchmarks diverge significantly, see `docs/golang-migration-plan.md` for runbook and rollback steps.
+
 ## Creating OAuth app
 
 In dev-env, run the following command in mongo to create the oauth application

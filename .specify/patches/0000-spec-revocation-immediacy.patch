@@ -1,0 +1,6 @@
+*** a/.specify/features/example/spec.md
+*** b/.specify/features/example/spec.md
+@@
+-  - Acceptable stale window for revocation: 60s unless immediate invalidation is requested
++  - **Revocation immediacy:** Revocation MUST be reflected immediately in token introspection responses. Implementations MUST publish an invalidation message (channel `auth.cache.invalidate`) and synchronously purge or update any local caches used by `POST /internal/api/tokens/introspect` so that subsequent introspect requests return `active: false` for the revoked token. Do not rely on an eventual 60s stale window for correctness of contract tests.
+*** End Patch

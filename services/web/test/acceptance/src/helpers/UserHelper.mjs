@@ -26,7 +26,16 @@ let globalUserNum = Settings.test?.counterInit ?? 0
 
 const throwIfErrorResponse = async response => {
   if (response.status < 200 || response.status >= 300) {
-    const body = await response.text()
+    let body = ''
+    try {
+      if (response && response.bodyUsed) {
+        body = '<body already consumed>'
+      } else {
+        body = await response.text()
+      }
+    } catch (e) {
+      body = `<err:${e && e.message ? e.message : String(e)}>`
+    }
     throw new Error(
       `request failed: status=${response.status} body=${JSON.stringify(body)}`
     )

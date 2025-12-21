@@ -55,10 +55,17 @@ describe('Token introspection contract tests', function () {
     })
     const token = body && (body.plaintext || body.token)
     expect(token).to.be.a('string')
+    // DEBUG: ensure create response contains an id for subsequent revoke
+    // eslint-disable-next-line no-console
+    console.error('[TokenIntrospectContractTest] create body:', body)
 
     // revoke via API
     const revokeRes = await user.doRequest('delete', { url: `/internal/api/users/${user.id}/git-tokens/${body.id}` })
-    expect([200, 204]).to.include(revokeRes.response.statusCode)
+    // DEBUG: inspect revoke response
+    // eslint-disable-next-line no-console
+    console.error('[TokenIntrospectContractTest] revokeRes:', revokeRes.response && revokeRes.response.statusCode, revokeRes.body, revokeRes.response && revokeRes.response.request && (revokeRes.response.request.href || revokeRes.response.request.uri && (revokeRes.response.request.uri.protocol + '//' + revokeRes.response.request.uri.host + revokeRes.response.request.uri.path) ) )
+    // Canonicalize revoke response: 204 No Content on successful revoke
+    expect(revokeRes.response.statusCode).to.equal(204)
 
     // introspect should be inactive
     const [adminUser, adminPass] = Object.entries(Settings.httpAuthUsers)[0]
