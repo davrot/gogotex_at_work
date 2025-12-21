@@ -5,7 +5,7 @@ Summary of the recent migration tasks to delegate SSH and token-related internal
 ## What was migrated
 
 - Tokens
-  - /internal/api/tokens/introspect  — delegated via `WebProfileClient.introspect()`
+  - /internal/api/tokens/introspect — delegated via `WebProfileClient.introspect()`
   - /internal/api/users/:userId/git-tokens (GET/POST) and /internal/api/users/:userId/git-tokens/:tokenId (DELETE) — delegated via `WebProfileClient.createToken/listTokens/revokeToken()`
 
 - SSH keys

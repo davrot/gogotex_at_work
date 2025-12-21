@@ -9,6 +9,7 @@ This PR will make SSH delegation parity checks required in CI by merging `ci/PAR
 - Contract tests (`compare_ssh_contract_test.go`) pass in CI and are tolerant to runner shim absence when appropriate.
 
 Files changed in the ready branch:
+
 - `services/web/app/src/Features/User/UserSSHKeysController.mjs` — service-facing delegation
 - `services/web/test/unit/.../Webdelegation.ssh.test.mjs` — unit tests
 - `services/web/test/e2e/playwright/ssh_delegation_parity.mjs` — extended to check service-facing list
@@ -16,6 +17,7 @@ Files changed in the ready branch:
 - `develop/dev.env` — enabled `AUTH_SSH_USE_WEBPROFILE_API=true` for dev/canary
 
 Next steps after approval:
+
 1. Merge the branch to default (CI will require parity checks afterward).
 2. Monitor CI and triage any flakiness. If stable for several runs, prepare to flip the default to `true` in staging/production manifests and coordinate rollout.
 3. Close migration todos and update release notes.
