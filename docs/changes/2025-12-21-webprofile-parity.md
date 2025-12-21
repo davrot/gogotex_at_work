@@ -12,4 +12,5 @@ Summary of changes (2025-12-21)
   - Updated `docs/ci/PR_enable_parity_and_host_checks.md` to reflect script and CI changes.
 
 Notes:
+
 - I pushed branch `chore/remove-java-sources` with the above changes and prepared the CI helper job. Please review and, when parity is validated (e.g., nightly/validation runs), add `ci/PARITY_STRICT` to the default branch to enable the strict parity job.

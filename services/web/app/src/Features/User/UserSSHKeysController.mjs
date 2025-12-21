@@ -29,6 +29,10 @@ export function __resetLookupCacheForTest() { _testLookupCache = null }
 import SessionManager from '../Authentication/SessionManager.mjs'
 import AdminAuthorizationHelper from '../Helpers/AdminAuthorizationHelper.mjs'
 
+// Toggle to delegate SSH key operations to the Go webprofile API when enabled
+// Default: opt-in only to avoid changing existing behavior by accident in tests/runtimes
+const USE_WEBPROFILE_SSH = process.env.AUTH_SSH_USE_WEBPROFILE_API === 'true'
+
 function _computeFingerprint(publicKey) {
   // publicKey expected in OpenSSH format: "ssh-rsa AAAAB3Nza... [comment]"
   try {
@@ -81,6 +85,50 @@ export async function list(req, res) {
     }
   }
   const criteria = { userId }
+  // If configured, delegate listing to the Go webprofile API
+  if (USE_WEBPROFILE_SSH) {
+    try {
+      const client = await import(new URL('../Token/WebProfileClient.mjs', import.meta.url).href)
+      const resList = await client.listSSHKeys(userId)
+      if (Array.isArray(resList)) {
+        // Enrich with user metadata (prefer sessionUser) to mirror DB path
+        let username = null
+        let displayName = null
+        try {
+          const sessionUser = SessionManager.getSessionUser(req.session)
+          if (sessionUser && String(sessionUser._id) === String(userId) && sessionUser.email) {
+            username = sessionUser.email
+            displayName = `${sessionUser.first_name || ''}${sessionUser.first_name && sessionUser.last_name ? ' ' : ''}${sessionUser.last_name || ''}`.trim() || null
+          } else {
+            const { User } = await import('../../../models/User.js')
+            const user = await User.findById(userId).lean().exec()
+            username = user && user.email ? user.email : null
+            displayName = user
+              ? `${user.first_name || ''}${user.first_name && user.last_name ? ' ' : ''}${user.last_name || ''}`.trim() || null
+              : null
+          }
+        } catch (e) {}
+
+        const enriched = resList.map(k => ({
+          id: k.id || (k._id && k._id.toString && k._id.toString()),
+          key_name: k.key_name || k.keyName || k.label || '',
+          label: k.key_name || k.keyName || k.label || '',
+          public_key: k.public_key || k.publicKey || '',
+          fingerprint: k.fingerprint || '',
+          created_at: k.created_at || k.createdAt || null,
+          updated_at: k.updated_at || k.updatedAt || null,
+          userId: k.userId || k.user_id || userId,
+          username,
+          display_name: displayName,
+        }))
+        return res.status(200).json(enriched)
+      }
+    } catch (e) {
+      try { logger.err({ err: e }, 'webprofile ssh list delegation failed') } catch (ee) {}
+      // fall through to DB-backed listing
+    }
+  }
+
   try {
     const keys = await UserSSHKey.find(criteria).lean().exec()
     // Enrich keys with user metadata: username (email) and display_name
@@ -219,6 +267,23 @@ export async function create(req, res) {
     try { console.error('DEBUG create before computeFingerprint') } catch (e) {}
     const fingerprint = _computeFingerprint(publicKey) || ''
       _metricInc('ssh_upsert_total')
+
+    // If configured, attempt to delegate creation to the Go webprofile API
+    if (USE_WEBPROFILE_SSH) {
+      try {
+        const client = await import(new URL('../Token/WebProfileClient.mjs', import.meta.url).href)
+        const created = await client.createSSHKey(userId, { public_key: publicKey, key_name: keyName })
+        if (created) {
+          const createdAt = created.created_at || created.createdAt || null
+          const updatedAt = created.updated_at || created.updatedAt || null
+          try { logger.info({ type: 'sshkey.added', userId, keyId: created.id, fingerprint: created.fingerprint, timestamp: new Date().toISOString() }) } catch (e) {}
+          return res.status(createdAt ? 201 : 200).json({ id: created.id || created._id || null, key_name: created.key_name || created.keyName || created.label || '', label: created.key_name || created.keyName || created.label || '', public_key: created.public_key || created.publicKey || publicKey, fingerprint: created.fingerprint || fingerprint, created_at: createdAt, updated_at: updatedAt, userId: String(created.userId || created.user_id || userId) })
+        }
+      } catch (e) {
+        try { logger.err({ err: e, userId }, 'webprofile create ssh key delegation failed, falling back to local') } catch (e2) {}
+      }
+    }
+
     try {
       const now = new Date()
       const requestId = (req && req.get && req.get('x-request-id')) || (req && req.headers && req.headers['x-request-id']) || crypto.randomUUID()
@@ -453,6 +518,20 @@ export async function remove(req, res) {
   }
   try {
     console.error('DEBUG remove starting userId=', userId, 'keyId=', keyId)
+
+    // If configured, attempt to delegate removal to the Go webprofile API
+    if (USE_WEBPROFILE_SSH) {
+      try {
+        const client = await import(new URL('../Token/WebProfileClient.mjs', import.meta.url).href)
+        const ok = await client.removeSSHKey(userId, keyId)
+        if (ok) {
+          try { logger.info({ type: 'sshkey.removed', userId, keyId, timestamp: new Date().toISOString() }) } catch (e) {}
+          return res.sendStatus(204)
+        }
+      } catch (e) {
+        try { console.error('DEBUG webprofile remove ssh key delegation failed', e && e.stack ? e.stack : e) } catch (e2) {}
+      }
+    }
 
     // Defensive invocation of findOneAndDelete to handle different mock shapes
     try { console.error('DEBUG findOneAndDelete typeof', typeof UserSSHKey.findOneAndDelete, 'hasMock=', !!(UserSSHKey.findOneAndDelete && UserSSHKey.findOneAndDelete.mock)) } catch (e) {}

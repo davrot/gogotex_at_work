@@ -76,3 +76,47 @@ export async function revokeToken(userId, tokenId) {
     return false
   }
 }
+
+// ---- SSH key support ----
+
+export async function createSSHKey(userId, { public_key, key_name }) {
+  const url = `${DEFAULT_BASE.replace(/\/$/, '')}/internal/api/users/${encodeURIComponent(userId)}/ssh-keys`
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: authHeader() },
+      body: JSON.stringify({ public_key, key_name }),
+    })
+    if (res.status !== 200 && res.status !== 201) return null
+    return await res.json()
+  } catch (err) {
+    logger.err({ err }, 'webprofile create ssh key call failed')
+    return null
+  }
+}
+
+export async function listSSHKeys(userId) {
+  const url = `${DEFAULT_BASE.replace(/\/$/, '')}/internal/api/users/${encodeURIComponent(userId)}/ssh-keys`
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: { Authorization: authHeader() },
+    })
+    if (res.status !== 200) return null
+    return await res.json()
+  } catch (err) {
+    logger.err({ err }, 'webprofile list ssh keys call failed')
+    return null
+  }
+}
+
+export async function removeSSHKey(userId, keyId) {
+  const url = `${DEFAULT_BASE.replace(/\/$/, '')}/internal/api/users/${encodeURIComponent(userId)}/ssh-keys/${encodeURIComponent(keyId)}`
+  try {
+    const res = await fetch(url, { method: 'DELETE', headers: { Authorization: authHeader() } })
+    return res.status === 204
+  } catch (err) {
+    logger.err({ err }, 'webprofile remove ssh key call failed')
+    return false
+  }
+}
