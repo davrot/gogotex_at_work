@@ -36,8 +36,9 @@ description: "Tasks for SSH-only Git authentication feature"
     - [x] T052h (P3) **Add module test-harness docs** — `modz/.ci/test-harness.md` describing how to run per-module tests, required env vars, and any docker/redis dependencies. (PARTIAL)
       - Acceptance: docs present and verified on a dev machine; CI jobs reference the docs.
       - Notes: `MOD_INFO.md` files created with run instructions and notes for live tests.
-    - [ ] T052i (P1) **Create follow-up issues/PRs** for modules where tests cannot be added immediately; include owner, estimated effort, and blocking dependencies.
+    - [ ] T052i (P1) **Create follow-up issues/PRs** for modules where tests cannot be added immediately; include owner, estimated effort, and blocking dependencies. (PENDING: automation blocked by missing GH auth)
       - Acceptance: Issues created and linked from this task for visibility.
+      - Notes: Draft issue bodies created under `specs/modz_issues/` (one per follow-up). To publish issues automatically, run `gh auth login` here or provide a GITHUB_TOKEN with repo permissions and run the automation step.
 - [ ] T053 Open PR(s) for `integrate/modz` (or per-module integrate branches), request module-owner review, and add CI jobs to validate multi-instance tests where required (e.g., Redis-enabled jobs for pubsub tests).
   - Procedure:
     1. Ensure your SSH key is loaded and works; a normal `git push` is sufficient (no https credential prompts required):
