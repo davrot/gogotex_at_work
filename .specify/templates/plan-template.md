@@ -33,6 +33,7 @@
 
 [Gates determined based on constitution file]
 
+**Solo Developer Note:** If the repository contains `.specify/constitution-solo-mode.md`, the plan SHOULD document how the constitution gates will be validated locally (commands to run tests, benchmarks, and linters). In solo-mode, PR/CI requirements may be waived by the project's maintainers; however, the plan must still include a clear `Constitution Check` describing local validation steps and acceptance criteria.
 ## Project Structure
 
 ### Documentation (this feature)

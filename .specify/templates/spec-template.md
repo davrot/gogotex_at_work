@@ -20,6 +20,7 @@
   - Demonstrated to users independently
 -->
 
+**Solo Developer Note:** When the repository declares Solo Developer Mode (`.specify/constitution-solo-mode.md`), tests remain mandatory but CI is optional. Instead of CI job configurations, include explicit **local test commands** (e.g., `npm test`, `go test ./...`, `pytest`) and any environment setup steps required to run the tests locally. Document benchmark run commands and SLO validation steps for local execution.
 ### User Story 1 - [Brief Title] (Priority: P1)
 
 [Describe this user journey in plain language]

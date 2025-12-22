@@ -1,22 +1,20 @@
 <!--
 Sync Impact Report
 
-- Version change: TEMPLATE → 1.0.0
+- Version change: 1.0.0 → 1.1.0
 - Modified principles:
-	- [PRINCIPLE_1_NAME] → Code Quality (NON-NEGOTIABLE)
-	- [PRINCIPLE_2_NAME] → Testing Standards (NON-NEGOTIABLE)
-	- [PRINCIPLE_3_NAME] → User Experience Consistency
-	- [PRINCIPLE_4_NAME] → Performance Requirements
-	- [PRINCIPLE_5_NAME] → Observability & Versioning
-- Added sections: Development Workflow, Governance (clarified amendment + versioning policy)
+	- Development Workflow → Added Solo Developer Mode override rules (ADAPTATION for solo contexts)
+	- Testing Standards → Clarified local-test requirement for solo mode and test-first expectations
+	- Infrastructure Automation → New constraint: AI assistants must not create PRs or workflows in solo mode
+- Added sections: Solo Developer Mode (amendment), Infrastructure Automation (clarified)
 - Removed sections: none
-- Templates requiring updates:
-	- .specify/templates/plan-template.md ⚠ pending (align "Constitution Check" with new mandatory gates)
-	- .specify/templates/spec-template.md ⚠ pending (ensure "User Scenarios & Testing (mandatory)" reflects test-first policy)
-	- .specify/templates/tasks-template.md ⚠ pending (task templates must reflect mandatory test tasks and performance tasks)
+- Templates requiring updates (updated):
+	- .specify/templates/plan-template.md ✅ updated (Constitution Check notes for solo-mode)
+	- .specify/templates/spec-template.md ✅ updated (User Scenarios & Testing now includes solo-mode guidance)
+	- .specify/templates/tasks-template.md ✅ updated (local-test guidance in solo-mode and CI optional)
 - Follow-up TODOs:
-	- TODO(RATIFICATION_DATE): original adoption date unknown — set when ratified
-	- Ensure codeowners/core maintainers review gating checklist referenced in Governance
+	- TODO(RATIFICATION_DATE): original adoption date unknown — leave as TODO for historical ratification date
+	- Propagate solo-mode note to any contributor-facing docs (e.g., README, CONTRIBUTING)
 -->
 
 # Overleaf with Admin Extension Constitution
@@ -97,6 +95,15 @@ All development work MUST follow these gates and checks:
 - Tasks MUST be organized by user story and include test tasks for each story
 	(see .specify/templates/tasks-template.md).
 
+### Solo Developer Mode (AMENDMENT)
+In repositories that opt into Solo Developer Mode (see `.specify/constitution-solo-mode.md`), the following adaptations override team-oriented requirements:
+- **PR requirement WAIVED** for solo developers; do not create PRs unless collaboration is requested.
+- **AI assistants MUST NOT** create GitHub PRs, issues, or Actions workflows unless explicitly approved by the developer.
+- **CI is optional**: tests are REQUIRED and MUST be runnable locally; CI jobs are recommended but not mandatory in solo-mode.
+- **Escalations (external support)** are discouraged; instead document diagnostics locally and request human intervention only when necessary.
+- Plans and Constitution Checks should document how the feature will be validated locally (commands to run tests, benchmarks, and linters).
+
+Note: Solo Developer Mode is intended for individual contributors who explicitly opt-in by adding `.specify/constitution-solo-mode.md` and updating `.specify/ai-context.md`.
 ## Governance
 Amendment and approval process:
 - Amendments to this constitution are made via a documented pull request that
@@ -116,5 +123,5 @@ Compliance & review expectations:
 - CI MUST run the test suite and any declared performance checks; failing CI
 	blocks merges.
 
-**Version**: 1.0.0 | **Ratified**: TODO(RATIFICATION_DATE): original adoption date unknown | **Last Amended**: 2025-12-10
+**Version**: 1.1.0 | **Ratified**: TODO(RATIFICATION_DATE): original adoption date unknown | **Last Amended**: 2025-12-22
 *** End Patch

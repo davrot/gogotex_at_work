@@ -8,8 +8,7 @@ description: "Task list template for feature implementation"
 **Input**: Design documents from `/specs/[###-feature-name]/`
 **Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, contracts/
 
-**Tests**: The examples below include test tasks. Tests are OPTIONAL - only include them if explicitly requested in the feature specification.
-
+**Tests**: The examples below include test tasks. Tests are REQUIRED where the feature affects behavior, but CI is OPTIONAL in Solo Developer Mode. If the repository declares Solo Developer Mode (`.specify/constitution-solo-mode.md`), tasks MUST include explicit **local test commands** and environment setup steps (e.g., `npm test`, `make test`, `pytest`), so reviewers can validate changes locally without CI.
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
 ## Format: `[ID] [P?] [Story] Description`
