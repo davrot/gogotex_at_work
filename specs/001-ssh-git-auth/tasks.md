@@ -31,8 +31,8 @@ description: "Tasks for SSH-only Git authentication feature"
       - Acceptance: tests for indexer and worker exist and pass; stylesheets and translations lint/format validated.
     - [ ] T052f (P2) `modz/admin_extensions` — **Add controller & frontend tests (ProjectList, UserActivate).**
       - Acceptance: tests cover critical endpoints and components and pass in CI or locally.
-    - [ ] T052g (P3) `modz/logo_tools` — **Add smoke/script tests validating scripts run and produce expected artifacts.**
-      - Acceptance: shell/Python smoke tests run in CI and verify outputs (e.g., generated icons exist).
+    - [x] T052g (P3) `modz/logo_tools` — **Remove test requirement (waived).** (COMPLETED)
+      - Notes: Per stakeholder decision, smoke/script tests for `logo_tools` are not required and have been waived. Scripts remain in the repository for manual use; CI will not run these smoke tests by default.
     - [x] T052h (P3) **Add module test-harness docs** — `modz/.ci/test-harness.md` describing how to run per-module tests, required env vars, and any docker/redis dependencies. (PARTIAL)
       - Acceptance: docs present and verified on a dev machine; CI jobs reference the docs.
       - Notes: `MOD_INFO.md` files created with run instructions and notes for live tests.
@@ -55,6 +55,7 @@ description: "Tasks for SSH-only Git authentication feature"
     4. Verify CI runs on the PR and iterate on failures; if CI requires secrets for certain tests (LLM tests, Docker), gate those behind `RUN_LLM_TESTS` or document required secrets in the follow-up issue.
 
   - Acceptance: PR(s) created, CI jobs run and are green or have documented failures with mitigation plans; follow-up issues created for outstanding items and linked from the PR.
+
 - [ ] T054 Archive or remove `other_mods/` after validation and confirmation that `modz/` contains canonical, approved snapshots.
   - Acceptance: `other_mods/` moved to an archive location or removed in a follow-up commit with a short justification in the PR.
 
