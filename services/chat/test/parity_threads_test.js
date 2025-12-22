@@ -14,6 +14,14 @@ function spawnGoServer() {
   return p
 }
 
+function spawnGoServerWithSeed(seed) {
+  const env = { ...process.env, PORT: String(GO_PORT), SEED_THREADS: JSON.stringify(seed) }
+  const p = spawn('go', ['run', './cmd/chat'], { env, stdio: ['ignore', 'pipe', 'pipe'] })
+  p.stdout.on('data', d => process.stdout.write(`[go] ${d}`))
+  p.stderr.on('data', d => process.stderr.write(`[go] ${d}`))
+  return p
+}
+
 async function waitFor(url, timeout = 5000) {
   const start = Date.now()
   while (Date.now() - start < timeout) {
@@ -41,11 +49,15 @@ async function main() {
   let goProc = null
   let reused = false
   try {
-    try {
-      await waitFor(`http://127.0.0.1:${GO_PORT}/project/abc/threads`, 500)
-      reused = true
-    } catch (_) {
-      goProc = spawnGoServer()
+    // seed the Go process via env variable: kill existing proc if present and restart
+    if (process.env.REUSE_GO !== 'true') {
+      if (reused) {
+        // kill and restart to pick up new env
+        goProc && goProc.kill()
+        goProc = spawnGoServerWithSeed({ abc: ['t1', 't2'] })
+      } else {
+        goProc = spawnGoServerWithSeed({ abc: ['t1', 't2'] })
+      }
     }
 
     await waitFor(`http://127.0.0.1:${GO_PORT}/project/abc/threads`, 5000)

@@ -46,4 +46,3 @@ jobs:
         run: |
           cd services/chat
           npm run bench:threads || true
-
