@@ -4,9 +4,13 @@ import * as messagesController from '../app/js/Features/Messages/MessageHttpCont
 
 const GO_PORT = 3011
 
-function spawnGoServer() {
+function spawnGoServer(timeoutSeconds = 30) {
   const env = { ...process.env, PORT: String(GO_PORT) }
-  const p = spawn('go', ['run', './cmd/chat'], { env, stdio: ['ignore', 'pipe', 'pipe'] })
+  // Use GO_RUN_TIMEOUT env var (e.g. '30s') if provided, otherwise use default seconds
+  const timeout = process.env.GO_RUN_TIMEOUT || `${timeoutSeconds}s`
+  // Use bash -lc with timeout to ensure the process won't hang indefinitely
+  const cmd = `timeout ${timeout} go run ./cmd/chat`
+  const p = spawn('bash', ['-lc', cmd], { env, stdio: ['ignore', 'pipe', 'pipe'] })
   p.stdout.on('data', d => process.stdout.write(`[go] ${d}`))
   p.stderr.on('data', d => process.stderr.write(`[go] ${d}`))
   return p

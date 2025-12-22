@@ -4,19 +4,35 @@ import * as messagesController from '../app/js/Features/Messages/MessageHttpCont
 import * as ThreadManager from '../app/js/Features/Threads/ThreadManager.js'
 import * as MessageManager from '../app/js/Features/Messages/MessageManager.js'
 
-const GO_PORT = 3011
+let GO_PORT = 3011
 
-function spawnGoServer() {
-  const env = { ...process.env, PORT: String(GO_PORT) }
-  const p = spawn('go', ['run', './cmd/chat'], { env, stdio: ['ignore', 'pipe', 'pipe'] })
+async function getFreePort() {
+  const net = await import('node:net')
+  return new Promise((resolve, reject) => {
+    const s = net.createServer()
+    s.listen(0, '127.0.0.1', () => {
+      const port = s.address().port
+      s.close(() => resolve(port))
+    })
+    s.on('error', reject)
+  })
+}
+
+function spawnGoServer(port, timeoutSeconds = 30) {
+  const env = { ...process.env, PORT: String(port) }
+  const timeout = process.env.GO_RUN_TIMEOUT || `${timeoutSeconds}s`
+  const cmd = `timeout ${timeout} go run ./cmd/chat`
+  const p = spawn('bash', ['-lc', cmd], { env, stdio: ['ignore', 'pipe', 'pipe'] })
   p.stdout.on('data', d => process.stdout.write(`[go] ${d}`))
   p.stderr.on('data', d => process.stderr.write(`[go] ${d}`))
   return p
 }
 
-function spawnGoServerWithSeed(seed) {
-  const env = { ...process.env, PORT: String(GO_PORT), SEED_THREADS: JSON.stringify(seed) }
-  const p = spawn('go', ['run', './cmd/chat'], { env, stdio: ['ignore', 'pipe', 'pipe'] })
+function spawnGoServerWithSeed(port, seed, timeoutSeconds = 30) {
+  const env = { ...process.env, PORT: String(port), SEED_THREADS: JSON.stringify(seed) }
+  const timeout = process.env.GO_RUN_TIMEOUT || `${timeoutSeconds}s`
+  const cmd = `timeout ${timeout} go run ./cmd/chat`
+  const p = spawn('bash', ['-lc', cmd], { env, stdio: ['ignore', 'pipe', 'pipe'] })
   p.stdout.on('data', d => process.stdout.write(`[go] ${d}`))
   p.stderr.on('data', d => process.stderr.write(`[go] ${d}`))
   return p
@@ -37,27 +53,28 @@ async function waitFor(url, timeout = 5000) {
 }
 
 async function main() {
-  // stub ThreadManager and MessageManager to return a deterministic response
-  const originalFindAll = ThreadManager.findAllThreadRooms
-  const originalGetMessages = MessageManager.getMessages
-  ThreadManager.findAllThreadRooms = async (projectId) => [{ _id: 'room1', thread_id: 't1' }]
-  MessageManager.getMessages = async (roomId, limit, before) => []
+  // Seed Node server via env to return deterministic response without DB
+  const projectId = '507f1f77bcf86cd799439011'
+  process.env.SEED_THREADS = JSON.stringify({ [projectId]: ['t1', 't2'] })
 
-  const context = { res: { statusCode: null, status(code) { this.statusCode = code; return this }, setBody(body) { this.body = body }, json(obj) { this.body = obj } }, requestBody: {}, params: { path: { projectId: 'abc' } } }
-  const nodeBody = await messagesController.getThreads(context)
+  const context = { res: { statusCode: null, status(code) { this.statusCode = code; return this }, setBody(body) { this.body = body }, json(obj) { this.body = obj } }, requestBody: {}, params: { path: { projectId } } }
+  await messagesController.getThreads(context)
+  const nodeBody = context.res.body
 
   let goProc = null
   let reused = false
   try {
-    // seed the Go process via env variable: kill existing proc if present and restart
-    if (process.env.REUSE_GO !== 'true') {
-      if (reused) {
-        // kill and restart to pick up new env
-        goProc && goProc.kill()
-        goProc = spawnGoServerWithSeed({ abc: ['t1', 't2'] })
-      } else {
-        goProc = spawnGoServerWithSeed({ abc: ['t1', 't2'] })
-      }
+    // If a Go server is already running, reuse it; otherwise spawn a seeded instance
+    // Reserve a free port for this test run
+    GO_PORT = await getFreePort()
+
+    try {
+      await waitFor(`http://127.0.0.1:${GO_PORT}/project/abc/threads`, 500)
+      reused = true
+      console.log('Reusing existing Go server')
+    } catch (_) {
+      console.log('Starting seeded Go server')
+      goProc = spawnGoServerWithSeed(GO_PORT, { abc: ['t1', 't2'] })
     }
 
     await waitFor(`http://127.0.0.1:${GO_PORT}/project/abc/threads`, 5000)
@@ -74,10 +91,17 @@ async function main() {
 
     console.log('Parity check passed')
   } finally {
-    ThreadManager.findAllThreadRooms = originalFindAll
-    MessageManager.getMessages = originalGetMessages
+    // Cleanup: ensure we remove the seed env var and stop the Go process we started
+    delete process.env.SEED_THREADS
     if (goProc && !reused) {
-      goProc.kill()
+      try {
+        goProc.kill()
+        await new Promise((resolve) => {
+          goProc.once('close', resolve)
+        })
+      } catch (e) {
+        // ignore
+      }
     }
   }
 }

@@ -8,6 +8,9 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    env:
+      # GO_RUN_TIMEOUT controls how long `go run` may execute in spike tests (e.g. '30s', '60s')
+      GO_RUN_TIMEOUT: '30s'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
