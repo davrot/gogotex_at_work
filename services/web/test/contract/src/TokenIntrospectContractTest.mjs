@@ -1,6 +1,14 @@
 import { expect } from 'chai'
 import UserHelper from '../../acceptance/src/helpers/UserHelper.mjs'
-import Settings from '@overleaf/settings'
+
+const { default: Settings } = await import('@overleaf/settings').catch(() => ({ default: {} }))
+if (!Settings.httpAuthUsers || Object.keys(Settings.httpAuthUsers).length === 0) {
+  const httpAuthUser = process.env.WEB_API_USER || 'overleaf'
+  const httpAuthPass = process.env.WEB_API_PASSWORD || 'overleaf'
+  Settings.httpAuthUsers = { [httpAuthUser]: httpAuthPass }
+  // eslint-disable-next-line no-console
+  console.debug('[TokenIntrospectContractTest] injected default Settings.httpAuthUsers', Object.keys(Settings.httpAuthUsers))
+}
 
 describe('Token introspection contract tests', function () {
   this.timeout(60 * 1000)

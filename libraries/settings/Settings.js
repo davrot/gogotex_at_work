@@ -21,8 +21,10 @@ let settingsExist = false
 const defaultsPath =
   pathIfExists(Path.join(CWD, 'config/settings.defaults.cjs')) ||
   pathIfExists(Path.join(CWD, 'config/settings.defaults.js')) ||
-  pathIfExists(Path.join(ENTRY_POINT_DIR, 'config/settings.defaults.cjs')) ||
-  pathIfExists(Path.join(ENTRY_POINT_DIR, 'config/settings.defaults.js'))
+  pathIfExists(Path.join(CWD, 'services', 'web', 'config', 'settings.defaults.cjs')) ||
+  pathIfExists(Path.join(CWD, 'services', 'web', 'config', 'settings.defaults.js')) ||
+  (ENTRY_POINT_DIR && pathIfExists(Path.join(ENTRY_POINT_DIR, 'config/settings.defaults.cjs'))) ||
+  (ENTRY_POINT_DIR && pathIfExists(Path.join(ENTRY_POINT_DIR, 'config/settings.defaults.js')))
 if (defaultsPath) {
   console.log(`Using default settings from ${defaultsPath}`)
   settings = require(defaultsPath)
