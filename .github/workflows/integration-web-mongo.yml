@@ -1,0 +1,62 @@
+name: Integration: Web Mongo Persistor
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  web-mongo-integration:
+    name: Web Mongo Integration Tests
+    runs-on: ubuntu-latest
+    services:
+      mongo:
+        image: mongo:6
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval 'db.adminCommand({ping:1})' || exit 1"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.25'
+
+      - name: Wait for Mongo
+        run: |
+          for i in {1..30}; do
+            if mongosh --eval 'db.adminCommand({ping:1})' >/dev/null 2>&1; then
+              echo "Mongo ready"; break
+            fi
+            echo "Waiting for mongo... ($i)"; sleep 2
+          done
+
+      - name: Run unit tests (token package)
+        run: |
+          cd services/web
+          go test ./internal/token -run TestSha256HexPrefix -v
+
+      - name: Run Mongo Persistor Integration Test
+        env:
+          MONGO_URI: mongodb://localhost:27017
+        run: |
+          cd services/web
+          go test ./internal/token -run TestMongoPersistor_Integration -v
+
+      - name: Run Revocation Immediacy Test
+        env:
+          MONGO_URI: mongodb://localhost:27017
+        run: |
+          cd services/web
+          go test ./internal/token -run TestMongoPersistor_RevocationImmediacy -v
+
+      - name: Upload test results (if any)
+        if: failure()
+        run: |
+          echo "Integration tests failed — inspect job logs for details."
