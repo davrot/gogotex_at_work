@@ -1,21 +1,29 @@
 package main
 
 import (
-	"fmt"
+	"encoding/json"
 	"log"
 	"net/http"
+	"os"
 )
 
-func main() {
-	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, `{"status":"ok"}`)
-	})
+func statusHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode("chat is alive")
+}
 
-	addr := ":3000"
+func main() {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "3011"
+	}
+	addr := ":" + port
+	mux := http.NewServeMux()
+	mux.HandleFunc("/status", statusHandler)
+
 	log.Printf("chat service listening on %s", addr)
-	if err := http.ListenAndServe(addr, nil); err != nil {
+	if err := http.ListenAndServe(addr, mux); err != nil {
 		log.Fatalf("server error: %v", err)
 	}
 }
