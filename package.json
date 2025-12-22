@@ -51,7 +51,11 @@
     "pretest:focused": "node -e \"console.log('Reminder: re-read docs/dev-setup.md and ensure dev-container/network/BASE_URL are configured before running e2e tests')\"",
     "test:focused": "npx vitest run test/focused --run && ( [ \"$RUN_E2E\" = \"true\" ] && (cd services/web && npm run e2e:playwright) || true )",
     "test:focused:unit": "npx vitest run test/focused --run",
-    "test:focused:e2e": "cd services/web && npm run e2e:playwright"
+    "test:focused:e2e": "cd services/web && npm run e2e:playwright",
+    "test:sandbox-compile": "cd services/sandbox-compile/services/clsi && SANDBOXED_COMPILES_HOST_DIR_COMPILES=/tmp/overleaf/data/compiles SANDBOXED_COMPILES_HOST_DIR_OUTPUT=/tmp/overleaf/data/output SANDBOXED_COMPILES_HOST_DIR=/tmp/overleaf npm run test:unit:_run",
+    "test:modz:ai_assistant": "npx vitest run modz/ai_assistant/test/unit --run",
+    "test:modz:track_changes": "npx vitest run modz/track-changes-and-comments/test/unit --run",
+    "test:modz:all-smoke": "node -e \"process.exit(require('child_process').execSync('cd modz/latex-editor && npm test || exit 1; cd ../sandbox-compile && npm test || exit 1;').status)\" || true"
   },
   "workspaces": [
     "jobs/mirror-documentation",
@@ -60,6 +64,7 @@
     "services/analytics",
     "services/chat",
     "services/clsi",
+    "services/sandbox-compile",
     "services/clsi-cache",
     "services/clsi-perf",
     "services/contacts",

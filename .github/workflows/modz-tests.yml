@@ -1,0 +1,30 @@
+name: modz-tests
+
+on:
+  pull_request:
+    branches:
+      - '**'
+  push:
+    branches:
+      - integrate/modz
+
+jobs:
+  test-mods:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - name: Install deps
+        run: npm ci
+      - name: Run ai_assistant unit tests
+        run: npm run test:modz:ai_assistant
+      - name: Run track-changes unit tests
+        run: npm run test:modz:track_changes
+      - name: Run smoke tests (latex-editor + sandbox-compile)
+        run: |
+          set -e
+          (cd modz/latex-editor && npm test)
+          (cd modz/sandbox-compile && npm test)
