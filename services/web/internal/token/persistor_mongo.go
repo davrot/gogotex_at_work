@@ -80,15 +80,32 @@ func (m *MongoPersistor) Introspect(ctx context.Context, tokenPlain string) (Tok
 	return TokenMeta{HashPrefix: doc.HashPrefix, Algorithm: doc.Algorithm, UserID: doc.UserID, Active: doc.Active, Scopes: doc.Scopes}, nil
 }
 
-// Revoke marks a token inactive.
+// Revoke marks a token inactive and publishes an invalidation record so caches can purge synchronously.
 func (m *MongoPersistor) Revoke(ctx context.Context, tokenPlain string) error {
 	hash := sha256Hex(tokenPlain)
+	// Find the existing doc to obtain the hashPrefix for invalidation
+	var doc struct {
+		HashPrefix string `bson:"hashPrefix"`
+	}
+	if err := m.col.FindOne(ctx, bson.M{"hash": hash}).Decode(&doc); err != nil {
+		if err == mongo.ErrNoDocuments {
+			return ErrNotFound
+		}
+		return err
+	}
+	// Update active flag
 	res, err := m.col.UpdateOne(ctx, bson.M{"hash": hash}, bson.M{"$set": bson.M{"active": false}})
 	if err != nil {
 		return err
 	}
 	if res.MatchedCount == 0 {
 		return ErrNotFound
+	}
+	// Insert an invalidation record (synchronous) so other processes can observe and purge caches
+	invCol := m.col.Database().Collection("token_invalidations")
+	_, err = invCol.InsertOne(ctx, bson.M{"hashPrefix": doc.HashPrefix, "revokedAt": time.Now().UTC()})
+	if err != nil {
+		return err
 	}
 	return nil
 }
