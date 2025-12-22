@@ -16,11 +16,17 @@ echo "=== dev/run-local-all.sh: starting local validation ==="
 if [ -f services/chat/package.json ]; then
   echo "--- Lint: services/chat ---"
   (cd services/chat && npm ci --silent) || echo "npm ci failed in services/chat (continue)"
-  # Only run lint if eslint is installed locally or available on PATH
-  if [ -x "services/chat/node_modules/.bin/eslint" ] || command -v eslint >/dev/null 2>&1; then
+  # Prefer service-local eslint, then repo-root eslint, then global eslint
+  if [ -x "services/chat/node_modules/.bin/eslint" ]; then
     (cd services/chat && npm run lint) || echo "Lint warnings or errors in services/chat (see above)"
+  elif [ -x "./node_modules/.bin/eslint" ]; then
+    echo "Using repo-root eslint to lint services/chat"
+    ./node_modules/.bin/eslint --max-warnings 0 --format unix services/chat || echo "Lint warnings or errors in services/chat (see above)"
+  elif command -v eslint >/dev/null 2>&1; then
+    echo "Using global eslint to lint services/chat"
+    eslint --max-warnings 0 --format unix services/chat || echo "Lint warnings or errors in services/chat (see above)"
   else
-    echo "Skipping lint in services/chat: eslint not installed locally. To enable, add eslint to devDependencies or install it globally."
+    echo "Skipping lint in services/chat: eslint not found locally or at repo root. To enable, add eslint to services/chat devDependencies or install it at the repo root."
   fi
 fi
 

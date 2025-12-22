@@ -78,6 +78,7 @@
     "local:test:unit": "npm run test:unit:all",
     "local:test:frontend": "npm run test:frontend",
     "local:test": "npm run local:test:unit && npm run local:test:frontend && npm run local:test:acceptance",
+    "test": "npm run local:test",
     "e2e:playwright": "node test/e2e/playwright/pre-run.js && node test/e2e/playwright/run-user-flow.mjs",
     "e2e:playwright:ci": "CONFIRM_DEV_SETUP=true CONFIRM_BASE_URL=true BASE_URL=${BASE_URL:-http://develop-web-1:3000} node test/e2e/playwright/git_roundtrip_ssh.mjs",
     "e2e:create-test-user": "bash test/e2e/create_test_user.sh",
