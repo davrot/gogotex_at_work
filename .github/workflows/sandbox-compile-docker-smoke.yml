@@ -1,0 +1,26 @@
+name: sandbox-compile-docker-smoke
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - integrate/modz
+
+jobs:
+  docker-smoke:
+    runs-on: ubuntu-latest
+    if: env.RUN_DOCKER_SMOKE == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - name: Install deps
+        run: npm ci
+      - name: Run sandbox Docker smoke
+        run: npm run test:modz:sandbox_compile
+        env:
+          RUN_DOCKER_SMOKE: "true"
