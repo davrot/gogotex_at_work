@@ -305,6 +305,7 @@ export AUTH_TOKEN_USE_WEBPROFILE_API=true
 # - To run local parity checks against a running `develop` stack (or the shim started above):
 #   AUTH_TOKEN_ALLOW_BCRYPT_FALLBACK=true ./scripts/contract/compare_tokens_parity.sh http://develop-web-1:3000 http://localhost:3900 <user>
 # - For debugging, the `scripts/contract` directory contains helper scripts to start the shim and compare introspect/token parity.
+# - Note: when running `go run` locally for short-lived testing you can set `GO_RUN_TIMEOUT` (e.g. `GO_RUN_TIMEOUT='30s'`) to fail fast if the process hangs or blocks the test run. CI spike workflows also set this env var to limit `go run` duration.
 
 ```
 
