@@ -202,13 +202,18 @@ Example:
 - Defaults:
   - Positive lookup TTL: 60s (configurable, recommended max 300s)
   - Negative lookup TTL (miss): 5s
-  - Acceptable stale window for revocation: 60s unless immediate invalidation is requested
+- Revocation immediacy and acceptable stale windows:
+  - Acceptable stale window for *non-urgent* invalidations: **60s** (configurable, default).
+  - **Revocation immediacy:** For explicit token revocation requests (for example `DELETE /internal/api/users/:userId/git-tokens/:tokenId`) implementations **MUST** ensure subsequent `Introspect` returns `active:false` within **500ms** under the benchmark-defined "normal conditions" (see SLO/benchmark section). To support this, `Revoke` **MUST** synchronously publish an invalidation message and purge any in-process caches before returning success; include structured logging for the invalidation and any retries. Contract and integration tests (T0AC/T0AD/T0AE) MUST assert the 500ms bound.
 - Invalidation mechanisms:
-  - Primary: publish an invalidation message to a shared channel `auth.cache.invalidate` conforming to a canonical schema (see `specs/auth-cache-invalidate.v1.json`). Example payload fields: `{ version, type, id, hashPrefix?, fingerprint?, reason?, timestamp }`; all service instances should subscribe and purge caches on receipt and validate message schema.
+  - Primary: publish an invalidation message to a shared channel `auth.cache.invalidate` conforming to a canonical schema (see `specs/auth-cache-invalidate.v1.json`). Example payload fields: `{ version, type, id, hashPrefix?, fingerprint?, projectId?, reason?, timestamp }`; all service instances should subscribe, schema-validate messages on receipt, and purge caches accordingly.
+  - Failure modes: if publishing an invalidation message fails, implementations **MUST** retry with exponential backoff for up to **1s total**. If retries fail, the implementation **MUST** attempt a synchronous invalidation before acknowledging revoke success (for example, insert an invalidation record in a DB collection that other instances poll or otherwise can observe). All failures and retries **MUST** be logged as structured events and surfaced to monitoring.
   - Secondary: synchronous API `POST /internal/api/cache/invalidate` for urgent invalidation requests. This endpoint is protected via `AuthenticationController.requirePrivateApiAuth()` (e.g., basic auth using `httpAuthUsers`) and is rate-limited per service-origin (default 60 req/min). Request body: `{ channel: string, key: string }` (both required).
-  - Cache keys:
-    - SSH keys: `ssh:fingerprint:{fingerprint}` → `{ userId, expiresAt }`
-    - Tokens: keyed by `token:hashprefix:{hashPrefix}` or a hashed lookup; store `{ active, scopes, expiresAt }`.
+
+- Cache keys:
+  - SSH keys: `ssh:fingerprint:{fingerprint}` → `{ userId, expiresAt }`
+  - Tokens: keyed by `token:hashprefix:{hashPrefix}` or a hashed lookup; store `{ active, scopes, expiresAt }`.
+- On any `DELETE`/revoke or membership change, services MUST publish an invalidation message.
 
 ```
 
