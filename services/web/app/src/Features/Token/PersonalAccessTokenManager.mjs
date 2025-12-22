@@ -422,6 +422,8 @@ export default {
     }
 
     const prefix = computeHashPrefixFromPlain(tokenPlain)
+    // Debug: ensure this code path is reached and to help stubbing in tests
+    try { console.debug('[PersonalAccessTokenManager.introspect] about to query with prefix=', prefix) } catch (e) {}
     const candidates = await PersonalAccessToken.find({ hashPrefix: prefix, active: true }).lean()
     for (const c of candidates) {
       const ok = await verifyTokenAgainstHash(tokenPlain, c.hash)
