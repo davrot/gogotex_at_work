@@ -2,7 +2,9 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 # start server in background
-GO_CMD="go run main.go"
+# Use GO_RUN_TIMEOUT to prevent a `go run` process from hanging indefinitely (e.g. '30s')
+GO_RUN_TIMEOUT="${GO_RUN_TIMEOUT:-30s}"
+GO_CMD="timeout $GO_RUN_TIMEOUT go run main.go"
 $GO_CMD > /tmp/go_webprofile_integration.log 2>&1 &
 PID=$!
 trap 'kill $PID || true; wait $PID 2>/dev/null || true' EXIT

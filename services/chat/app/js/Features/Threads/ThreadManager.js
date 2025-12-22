@@ -38,7 +38,23 @@ export async function findOrCreateThread(projectId, threadId) {
   return result
 }
 
+function parseSeedThreads() {
+  try {
+    const raw = process.env.SEED_THREADS
+    if (raw) return JSON.parse(raw)
+  } catch (e) {
+    // ignore
+  }
+  return {}
+}
+
 export async function findAllThreadRooms(projectId) {
+  // If seeded, return the seeded thread ids as fake rooms
+  const _seedThreads = parseSeedThreads()
+  if (_seedThreads && _seedThreads[projectId]) {
+    return _seedThreads[projectId].map(id => ({ _id: id, thread_id: id }))
+  }
+
   return await db.rooms
     .find(
       {
