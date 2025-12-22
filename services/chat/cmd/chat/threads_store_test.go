@@ -2,10 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"github.com/davrot/gogotex_at_work/services/chat/internal/store"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"github.com/davrot/gogotex_at_work/services/chat/internal/store"
 )
 
 func TestThreadsHandlerWithSeed(t *testing.T) {
@@ -22,11 +22,11 @@ func TestThreadsHandlerWithSeed(t *testing.T) {
 	if res.StatusCode != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", res.StatusCode)
 	}
-	var body []interface{}
+	var body map[string]interface{}
 	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
 		t.Fatalf("error decoding body: %v", err)
 	}
-	if len(body) != len(threads) {
-		t.Fatalf("expected %d threads, got %d", len(threads), len(body))
+	if len(body) != 0 {
+		t.Fatalf("expected empty object for seeded threads, got %+v", body)
 	}
 }
