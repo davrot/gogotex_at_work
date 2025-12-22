@@ -58,6 +58,7 @@
     "test:modz:references": "npx vitest run modz/references/services/web/test/unit --run",
     "test:modz:admin_extensions": "npx vitest run modz/admin_extensions/services/web/test/unit --run",
     "test:modz:latex_editor": "npx vitest run modz/latex-editor/services/web/test/unit --run",
+    "test:modz:sandbox_compile": "node modz/sandbox-compile/test/run_docker_smoke.mjs",
     "test:modz:all-smoke": "node -e \"process.exit(require('child_process').execSync('cd modz/latex-editor && npm test || exit 1; cd ../sandbox-compile && npm test || exit 1;').status)\" || true"
   },
   "workspaces": [

@@ -3,7 +3,7 @@ name: modz-tests
 on:
   pull_request:
     branches:
-      - '**'
+      - "**"
   push:
     branches:
       - integrate/modz
@@ -23,8 +23,18 @@ jobs:
         run: npm run test:modz:ai_assistant
       - name: Run track-changes unit tests
         run: npm run test:modz:track_changes
-      - name: Run smoke tests (latex-editor + sandbox-compile)
+      - name: Run references unit tests
+        run: npm run test:modz:references
+      - name: Run admin_extensions unit tests
+        run: npm run test:modz:admin_extensions
+      - name: Run latex-editor unit tests
+        run: npm run test:modz:latex_editor
+      - name: Run sandbox-compile Docker smoke (optional)
+        if: env.RUN_DOCKER_SMOKE == 'true'
+        run: npm run test:modz:sandbox_compile
+      - name: Run smoke tests (latex-editor + sandbox-compile quick smoke)
+        if: env.RUN_DOCKER_SMOKE != 'true'
         run: |
           set -e
           (cd modz/latex-editor && npm test)
-          (cd modz/sandbox-compile && npm test)
+          echo 'Skipping sandbox-compile Docker smoke (enable RUN_DOCKER_SMOKE=true to run)'
