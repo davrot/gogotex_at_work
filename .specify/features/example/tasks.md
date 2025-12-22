@@ -92,7 +92,7 @@
 
 - [x] T001a (BLOCKING) Constitution compliance check — .specify/memory/constitution.md, CI pipeline (implemented: `scripts/ci/check_constitution.sh` + `.github/workflows/check-constitution.yml`)
   - Acceptance: PRs that implement or change this feature MUST include and pass the constitution checklist: linters, unit & contract tests, and benchmark gating (T033) where applicable. The new workflow runs the script on pull requests.
-- [ ] T0AB Finalize constitution templates & CI gating templates — .specify/templates/* & `.github/workflows/check-constitution.yml` — **Acceptance:** templates updated to reflect constitution gates and ratification metadata filled; CI checks read templates and enforce gates.
+- [ ] T0AB Finalize constitution templates & CI gating templates — .specify/templates/\* & `.github/workflows/check-constitution.yml` — **Acceptance:** templates updated to reflect constitution gates and ratification metadata filled; CI checks read templates and enforce gates.
 
 - [x] T0AA (BLOCKING) Formalize benchmark runner profile & harness — ci/benchmarks/README.md, ci/benchmarks/harness-config.json (implemented)
   - Acceptance: Provide a reproducible runner profile (recommended 2 vCPU, 4GB RAM), a seeded dataset (documented seed and size), harness command-lines, artifact format (p50/p95/p99), and example invocation for warm/cold runs. The harness must be runnable in local/dev CI and in the CI runner used for gating.
