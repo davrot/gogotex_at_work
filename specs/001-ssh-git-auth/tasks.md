@@ -6,6 +6,43 @@ description: "Tasks for SSH-only Git authentication feature"
 
 **Input**: Design documents from `specs/001-ssh-git-auth/` (plan.md, spec.md)
 
+## Repository consolidation (modz imports)
+
+- [x] T050 Import reduced snapshots for related modules into `modz/` (e.g., `modz/sandbox-compile`, `modz/admin_extensions`, `modz/ai_assistant`, `modz/latex-editor`, `modz/references`, `modz/track-changes-and-comments`, `modz/logo_tools`) — **Status:** imported to `integrate/modz`.
+  - Acceptance: files for each module are present under `modz/<module>` and include an `IMPORT.md` and provenance metadata.
+- [x] T051 Verify `modz/latex-editor` matches the canonical 31-file list and prune extraneous files (if any).
+  - Acceptance: `git ls-files modz/latex-editor` lists the 31 files (plus `IMPORT.md`/metadata) and the branch commit documents the shrink.
+- [ ] T052 Run module-specific unit/integration/lint checks for each imported module under `modz/` and fix failures.
+  - Acceptance: `npm test` or equivalent for the module completes successfully on `integrate/modz` for each module, or the failures are triaged and tracked in follow-up tasks.
+  - Subtasks (prioritized):
+    - [x] T052a (P1) `modz/latex-editor` — **Add frontend unit tests & build/lint scripts.** (PARTIAL)
+      - Acceptance: `npm test` (or `pnpm test`) executes and passes; `build` and `lint` scripts present; add Playwright E2E if applicable.
+      - Notes: smoke test added; full component/unit accessibility tests remain as follow-up (see T052e/T052h).
+    - [x] T052b (P1) `modz/ai_assistant` — **Add server & frontend unit tests.** (COMPLETED)
+      - Acceptance: tests for controllers/hooks are present and pass; `package.json` includes `test` script.
+      - Notes: LLM config checker and controller unit tests added; local live-test gating added.
+    - [x] T052c (P1) `modz/track-changes-and-comments` — **Add unit & integration tests for DocumentUpdater and review-panel.** (COMPLETED)
+      - Acceptance: unit and integration tests run and pass; linting configured.
+      - Notes: `DocumentManager` unit test added with lightweight stubs; further integration tests can be added in follow-ups.
+    - [x] T052d (P1) `modz/sandbox-compile` — **Verify & restore `services/clsi` tests, CI job parity.** (PARTIAL)
+      - Acceptance: `services/clsi` tests run locally (e.g., 356 passing) and CI job configured to run them.
+      - Notes: smoke tests added; CI workflow includes smoke job; Docker-dependent checks remain manual or require CI secrets.
+    - [ ] T052e (P2) `modz/references` — **Add frontend unit tests and worker tests for reference indexing.**
+      - Acceptance: tests for indexer and worker exist and pass; stylesheets and translations lint/format validated.
+    - [ ] T052f (P2) `modz/admin_extensions` — **Add controller & frontend tests (ProjectList, UserActivate).**
+      - Acceptance: tests cover critical endpoints and components and pass in CI or locally.
+    - [ ] T052g (P3) `modz/logo_tools` — **Add smoke/script tests validating scripts run and produce expected artifacts.**
+      - Acceptance: shell/Python smoke tests run in CI and verify outputs (e.g., generated icons exist).
+    - [x] T052h (P3) **Add module test-harness docs** — `modz/.ci/test-harness.md` describing how to run per-module tests, required env vars, and any docker/redis dependencies. (PARTIAL)
+      - Acceptance: docs present and verified on a dev machine; CI jobs reference the docs.
+      - Notes: `MOD_INFO.md` files created with run instructions and notes for live tests.
+    - [ ] T052i (P1) **Create follow-up issues/PRs** for modules where tests cannot be added immediately; include owner, estimated effort, and blocking dependencies.
+      - Acceptance: Issues created and linked from this task for visibility.
+- [ ] T053 Open PR(s) for `integrate/modz` (or per-module integrate branches), request module-owner review, and add CI jobs to validate multi-instance tests where required (e.g., Redis-enabled jobs for pubsub tests).
+  - Acceptance: PR(s) created, CI jobs run and are green or have documented failures with mitigation plans.
+- [ ] T054 Archive or remove `other_mods/` after validation and confirmation that `modz/` contains canonical, approved snapshots.
+  - Acceptance: `other_mods/` moved to an archive location or removed in a follow-up commit with a short justification in the PR.
+
 ## Phase 1: Setup (Shared Infrastructure)
 
 - [ ] T002 Verify and add runtime config keys in `services/git-bridge/conf/envsubst_template.json` (`GIT_BRIDGE_WEB_PROFILE_API_URL`, `GIT_BRIDGE_WEB_PROFILE_API_TOKEN`, `GIT_BRIDGE_SSH_ONLY_FLAG`)
