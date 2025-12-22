@@ -37,6 +37,10 @@
   - Acceptance: A document `.specify/migrations/migration-readiness.md` exists listing per-service criteria: parity contract tests, bench + SLO validation, Docker/CI updated to run Go binary, documented rollout & rollback steps, and an owner for the migration. CI must fail PRs attempting to flip runtime if any checklist item is missing.
   - Current: **open** — Checklist file not present; owners & automation TBD.
 
+- [ ] T0A1 Audit & reconcile migrations T047–T057 — inspect each migration task and update statuses to accurately reflect whether business logic, runtime flip, Docker/CI changes, and parity tests are complete.
+  - Acceptance: Each task T047..T057 is updated with a clear status and subtasks where work remains; issue links and owners assigned; issue #9 links to the audit results.
+  - Current: **open** — audit not yet performed.
+
 ## Phase 0b: Additional service migrations — Backends → Go
 
 **Goal:** Migrate additional backend services to Go progressively. Each service migration is independently testable and should include a Go module, `cmd/` entrypoint, unit tests, CI build/test job(s), and contract parity checks where relevant.
