@@ -1,0 +1,13 @@
+FROM golang:1.25
+
+# Run tests from the module root inside the container
+WORKDIR /srv
+
+# Copy only the web service to keep the image small
+COPY . /srv
+
+# Ensure modules are available and build the test binary
+RUN cd /srv && go test ./internal/token -c -o token.test
+
+# Allow passing test flags and env from docker run
+ENTRYPOINT ["/srv/token.test"]
