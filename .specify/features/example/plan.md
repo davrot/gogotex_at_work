@@ -55,8 +55,7 @@ Note: the `V0ReplacementAdapter` (legacy snapshot parity) is a substantial integ
 - Testing Standards: unit tests for managers, contract tests for endpoints (`/internal/api/tokens/introspect` and `/internal/api/users/:userId/ssh-keys`), and an E2E covering both SSH and HTTPS paths are required.
 - Observability: emit structured logs for create/delete/use events and instrument metrics for token/key creation and introspections.
 - Performance: document SLOs (key lookup p95 ≤ 50ms) and include a short benchmark in CI for the key lookup path.
-
-## Risks
+**Solo Developer Note:** If the repository opts into Solo Developer Mode (presence of `.specify/constitution-solo-mode.md`), document **local validation steps** here — commands to run unit tests, contract tests, and benchmarks locally (e.g., `npm test`, `go test ./...`, `node ci/benchmarks/bench.js`). In solo mode, CI jobs are optional; the Plan must still include clear local acceptance criteria and the commands to validate them.## Risks
 
 - Security risk if tokens are stored or displayed in plaintext. Mitigation: return plaintext only on creation and store hashes only.
 - Operational complexity if per-key allowed-repo lists are used; prefer membership checks at git RPC time or forced-command wrapper.
