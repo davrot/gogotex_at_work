@@ -13,8 +13,9 @@ const manager = managerModule.default
 if (_origUseWebprofile === undefined) delete process.env.AUTH_TOKEN_USE_WEBPROFILE_API
 else process.env.AUTH_TOKEN_USE_WEBPROFILE_API = _origUseWebprofile
 
-// Import the model and stub `find` to inspect queries
-const PersonalAccessTokenModel = require('../../../../../app/src/models/PersonalAccessToken')
+// Import the model (use the services/web copy) and stub `find` to inspect queries
+import path from 'node:path'
+const PersonalAccessTokenModel = require(path.resolve(process.cwd(), 'services/web/app/src/models/PersonalAccessToken'))
 
 describe('PersonalAccessToken hashPrefix behavior', function () {
   it('computeHashPrefix derived from sha256(tokenPlain).slice(0,8) is used for queries', async function () {
