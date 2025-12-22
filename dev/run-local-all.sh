@@ -8,7 +8,8 @@ export GO_RUN_TIMEOUT="${GO_RUN_TIMEOUT:-30s}"
 
 echo "=== dev/run-local-all.sh: starting local validation ==="
 
-# check solo/autonomous mode
+# preflight & mode checks
+./dev/check-preflight.sh
 ./dev/check-solo-mode.sh
 
 # Lint JS in services/chat
@@ -23,11 +24,21 @@ if [ -d cmd/chat ] || [ -d services/chat/cmd/chat ]; then
   (cd services/chat && go test ./...)
 fi
 
-# parity tests
+# Parity tests
 echo "--- Parity tests (services/chat) ---"
 ./dev/run-parity.sh
 
+# Services web (node tests)
+if [ -f services/web/package.json ]; then
+  echo "--- Node tests: services/web ---"
+  (cd services/web && npm ci --silent && npm test) || echo "services/web tests returned non-zero exit code"
+fi
+
+# Benchmarks
+echo "--- Running benchmarks ---"
+./dev/run-bench.sh || echo "Benchmarks returned non-zero exit code"
+
 # Optional bench note
-echo "--- Bench sampling: run dev/run-bench.sh to execute benchmarks ---"
+echo "--- Bench artifacts (if any) are in dev/artifacts ---"
 
 echo "=== run-local-all: complete ==="
