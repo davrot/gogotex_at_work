@@ -99,8 +99,8 @@ All migrated Go services and components will be labeled **GoGoTeX** in documenta
 - How to run parity checks locally (developer):
   1. Start the Node compose stack: `develop/bin/up`
   2. Build & run webprofile locally (attached to compose network): `scripts/contract/run_webprofile_in_network.sh webprofile-local`
-  3. Run contract parity scripts: `scripts/contract/compare_introspect.sh http://develop-web-1:3000 http://webprofile-local:3900` and `scripts/contract/compare_ssh_parity.sh ...`
-  4. Run introspection bench against webprofile: `BENCH_URL=http://webprofile-local:3900/internal/api/tokens/introspect node ci/benchmarks/introspection-benchmark/bench.js`
+
+Note: when running `go run` locally for short-lived testing you can set `GO_RUN_TIMEOUT` (e.g. `GO_RUN_TIMEOUT='30s'`) to make tool invocations fail fast if the process hangs or blocks the test run. CI spike workflows also use this env var to limit `go run` duration. 3. Run contract parity scripts: `scripts/contract/compare_introspect.sh http://develop-web-1:3000 http://webprofile-local:3900` and `scripts/contract/compare_ssh_parity.sh ...` 4. Run introspection bench against webprofile: `BENCH_URL=http://webprofile-local:3900/internal/api/tokens/introspect node ci/benchmarks/introspection-benchmark/bench.js`
 
 - Add a CI job `contract:node-and-go` that: 1) builds Go shim, 2) runs contract suite with Node, 3) runs contract suite with Go, 4) diffs results and fails if non-equivalent. (This is implemented as part of `contract-tests-gating.yml`.)
 
