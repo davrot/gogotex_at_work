@@ -282,6 +282,22 @@ cd services/git-bridge/test/contract
 MONGO_URI=${MONGO_URI} TARGET_BASE_URL=${TARGET_BASE_URL} go test -run TestIntrospectIntegration_Bcrypt -v
 ```
 
+## Revocation Immediacy test (local)
+
+You can run the Revocation Immediacy integration test locally to verify that a revoked token is observed as inactive within the canonical **500ms** bound. Use the host URI when running from your host shell, and the compose service hostname when running from inside a devcontainer or another container attached to the `develop` network.
+
+```bash
+# From host shell (mongo published on host:27017):
+cd services/web
+MONGO_URI='mongodb://127.0.0.1:27017' go test ./internal/token -run TestMongoPersistor_RevocationImmediacy -v
+
+# From inside a devcontainer or a container on the develop network:
+cd services/web
+MONGO_URI='mongodb://develop-mongo-1:27017' go test ./internal/token -run TestMongoPersistor_RevocationImmediacy -v
+```
+
+> Note: When running inside a devcontainer, `localhost` refers to that container and will not reach host-published services — prefer compose hostnames like `develop-mongo-1`.
+
 # Running tests inside the VS Code dev container or another container
 
 When you run tests from _inside_ the VS Code dev container (or any other container attached to the `develop` compose network), `localhost` will refer to the container itself and will not reach the host-published Mongo port. In that case point tests at the compose service hostname instead (for example `develop-mongo-1`):
