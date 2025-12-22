@@ -93,80 +93,86 @@ describe('PersonalAccessToken lifecycle extra tests (T015)', function () {
   })
 
   it('stores algorithm and hashPrefix metadata and introspection returns correct active flags', async function () {
-    process.env.AUTH_TOKEN_HASH_ALGO = 'bcrypt'
-    process.env.AUTH_TOKEN_BCRYPT_COST = '1'
-    const userId = '507f1f77bcf86cd799439011'
-
-    const res1 = await PersonalAccessTokenManager.createToken(userId, { label: 't1' })
-    expect(res1).to.have.property('token')
-
-    // Patch the runtime pubsub instance used by the manager so we can observe publishes
+    // Ensure we force local DB behavior for the duration of this test to avoid delegating to WebProfile
+    const prevUseWebprofile = process.env.AUTH_TOKEN_USE_WEBPROFILE_API
+    process.env.AUTH_TOKEN_USE_WEBPROFILE_API = 'false'
     try {
-      const pub = require('../../../../../app/lib/pubsub.js')
-      pub.publish = publishSpy
-    } catch (e) {
-      // ignore if not present in this test environment
-    }
+      process.env.AUTH_TOKEN_HASH_ALGO = 'bcrypt'
+      process.env.AUTH_TOKEN_BCRYPT_COST = '1'
+      const userId = '507f1f77bcf86cd799439011'
 
-    const res2 = await PersonalAccessTokenManager.createToken(userId, { label: 't1', replace: true })
-    expect(res2).to.have.property('token')
+      const res1 = await PersonalAccessTokenManager.createToken(userId, { label: 't1' })
+      expect(res1).to.have.property('token')
 
-    // introspect metadata for new token
-    const infoNew = await PersonalAccessTokenManager.introspect(res2.token)
-    expect(infoNew).to.be.an('object')
-    expect(infoNew).to.have.property('active', true)
-    // Some runtime/mock combinations may not include the hashPrefix on the introspect response;
-    // assert stored doc includes hashPrefix below when we retrieve the stored entry.
-
-    // Verify listTokens returns the new token and flags correctly
-    const list = await PersonalAccessTokenManager.listTokens(userId)
-    expect(list).to.be.an('array')
-    // Find the token by id in the returned list
-    const foundNew = list.find(t => String(t.id) === String(res2.id)) || list[0]
-    expect(foundNew).to.be.ok
-    expect(foundNew.active).to.equal(true)
-
-    // Additionally verify stored metadata includes algorithm and hashPrefix if accessible from mock store
-    try {
-      const PATModel = await import('../../../../../app/src/models/PersonalAccessToken')
-      const store = (PATModel && (PATModel.PersonalAccessToken && PATModel.PersonalAccessToken._store)) || global.__TEST_PAT_STORE || []
-      const stored = store.find(d => String(d._id) === String(res2.id))
-      if (stored) {
-        expect(stored).to.have.property('algorithm').that.is.a('string')
-        expect(stored).to.have.property('hashPrefix').that.is.a('string')
+      // Patch the runtime pubsub instance used by the manager so we can observe publishes
+      try {
+        const pub = require('../../../../../app/lib/pubsub.js')
+        pub.publish = publishSpy
+      } catch (e) {
+        // ignore if not present in this test environment
       }
-    } catch (e) {
-      // ignore if not available in this test runtime
-    }
 
-    // Introspect old token - should be inactive after replace, or the stored
-    // doc should reflect the revoke. Different test runtimes may reveal the
-    // revocation via the in-memory store rather than introspect directly.
-    const infoOld = await PersonalAccessTokenManager.introspect(res1.token)
-    expect(infoOld).to.be.an('object')
+      const res2 = await PersonalAccessTokenManager.createToken(userId, { label: 't1', replace: true })
+      expect(res2).to.have.property('token')
 
-    const listAfter = await PersonalAccessTokenManager.listTokens(userId)
-    const found1 = listAfter.find(t => String(t.id) === String(res1.id))
-    const found2 = listAfter.find(t => String(t.id) === String(res2.id))
-    const found2Active = found2 ? found2.active === true : false
-    // Ensure the replacement produced an active new token; specifics of how the
-    // previous token is represented can vary across test runtimes.
-    expect(found2Active || (infoNew && infoNew.active === true)).to.equal(true)
+      // introspect metadata for new token
+      const infoNew = await PersonalAccessTokenManager.introspect(res2.token)
+      expect(infoNew).to.be.an('object')
+      expect(infoNew).to.have.property('active', true)
 
-    // Additionally, test revokeToken publishes an invalidation message (explicit revoke path)
-    try {
-      const pub = require('../../../../../app/lib/pubsub.js')
-      pub.publish = publishSpy
-    } catch (e) {}
-    const ok = await PersonalAccessTokenManager.revokeToken(userId, res1.id)
-    if (ok) {
-      expect((publishSpy && publishSpy.mock && publishSpy.mock.calls.length) || (publishSpy && publishSpy.calls && publishSpy.calls.length) || 0).to.be.greaterThan(0)
-      const pubArgs = (publishSpy && publishSpy.mock && publishSpy.mock.calls[0]) || (publishSpy && publishSpy.calls && publishSpy.calls[0])
-      expect(pubArgs[0]).to.equal('auth.cache.invalidate')
-      expect(pubArgs[1]).to.have.property('type').that.includes('token.revoked')
-    } else {
-      // If revoke returned false, it likely had already been revoked by replace; accept that.
-      expect(ok).to.equal(false)
+      // Verify listTokens returns the new token and flags correctly
+      const list = await PersonalAccessTokenManager.listTokens(userId)
+      expect(list).to.be.an('array')
+      // Find the token by id in the returned list
+      const foundNew = list.find(t => String(t.id) === String(res2.id)) || list[0]
+      expect(foundNew).to.be.ok
+      expect(foundNew.active).to.equal(true)
+
+      // Additionally verify stored metadata includes algorithm and hashPrefix if accessible from mock store
+      try {
+        const PATModel = await import('../../../../../app/src/models/PersonalAccessToken')
+        const store = (PATModel && (PATModel.PersonalAccessToken && PATModel.PersonalAccessToken._store)) || global.__TEST_PAT_STORE || []
+        const stored = store.find(d => String(d._id) === String(res2.id))
+        if (stored) {
+          expect(stored).to.have.property('algorithm').that.is.a('string')
+          expect(stored).to.have.property('hashPrefix').that.is.a('string')
+        }
+      } catch (e) {
+        // ignore if not available in this test runtime
+      }
+
+      // Introspect old token - should be inactive after replace, or the stored
+      // doc should reflect the revoke. Different test runtimes may reveal the
+      // revocation via the in-memory store rather than introspect directly.
+      const infoOld = await PersonalAccessTokenManager.introspect(res1.token)
+      expect(infoOld).to.be.an('object')
+
+      const listAfter = await PersonalAccessTokenManager.listTokens(userId)
+      const found1 = listAfter.find(t => String(t.id) === String(res1.id))
+      const found2 = listAfter.find(t => String(t.id) === String(res2.id))
+      const found2Active = found2 ? found2.active === true : false
+      // Ensure the replacement produced an active new token; specifics of how the
+      // previous token is represented can vary across test runtimes.
+      expect(found2Active || (infoNew && infoNew.active === true)).to.equal(true)
+
+      // Additionally, test revokeToken publishes an invalidation message (explicit revoke path)
+      try {
+        const pub = require('../../../../../app/lib/pubsub.js')
+        pub.publish = publishSpy
+      } catch (e) {}
+      const ok = await PersonalAccessTokenManager.revokeToken(userId, res1.id)
+      if (ok) {
+        expect((publishSpy && publishSpy.mock && publishSpy.mock.calls.length) || (publishSpy && publishSpy.calls && publishSpy.calls.length) || 0).to.be.greaterThan(0)
+        const pubArgs = (publishSpy && publishSpy.mock && publishSpy.mock.calls[0]) || (publishSpy && publishSpy.calls && publishSpy.calls[0])
+        expect(pubArgs[0]).to.equal('auth.cache.invalidate')
+        expect(pubArgs[1]).to.have.property('type').that.includes('token.revoked')
+      } else {
+        // If revoke returned false, it likely had already been revoked by replace; accept that.
+        expect(ok).to.equal(false)
+      }
+    } finally {
+      if (typeof prevUseWebprofile === 'undefined') delete process.env.AUTH_TOKEN_USE_WEBPROFILE_API
+      else process.env.AUTH_TOKEN_USE_WEBPROFILE_API = prevUseWebprofile
     }
   }, 20000)
 
