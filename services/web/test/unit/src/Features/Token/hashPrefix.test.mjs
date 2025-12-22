@@ -21,10 +21,11 @@ describe('PersonalAccessToken hashPrefix behavior', function () {
     const tokenPlain = 'test-token-12345'
     const expectedPrefix = crypto.createHash('sha256').update(tokenPlain).digest('hex').slice(0, 8)
 
-    // stub the model find to capture the query
-    const originalFind = PersonalAccessTokenModel.PersonalAccessToken.find
+    // stub the model find to capture the query (stub at mongoose.Model level for robustness)
+    const mongoosePkg = require('mongoose')
+    const originalFind = mongoosePkg.Model.find
     let capturedQuery = null
-    PersonalAccessTokenModel.PersonalAccessToken.find = vi.fn((query) => {
+    mongoosePkg.Model.find = vi.fn((query) => {
       capturedQuery = query
       return { lean: () => Promise.resolve([]) }
     })
@@ -36,7 +37,7 @@ describe('PersonalAccessToken hashPrefix behavior', function () {
       expect(capturedQuery.hashPrefix).toBe(expectedPrefix)
     } finally {
       // restore
-      PersonalAccessTokenModel.PersonalAccessToken.find = originalFind
+      mongoosePkg.Model.find = originalFind
     }
   })
 
