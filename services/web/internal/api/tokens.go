@@ -5,7 +5,20 @@ import (
 	"math/rand"
 	"net/http"
 	"time"
+
+	"github.com/davrot/gogotex_at_work/services/web/internal/token"
 )
+
+func tokenManager() *token.Manager {
+	return tokenMgr
+}
+
+var tokenMgr *token.Manager
+
+// SetTokenManager lets tests or startup code inject the manager
+func SetTokenManager(m *token.Manager) {
+	tokenMgr = m
+}
 
 // CreateTokenRequest stores token create request fields.
 type CreateTokenRequest struct {
@@ -37,6 +50,10 @@ func CreateTokenHandler(w http.ResponseWriter, r *http.Request) {
 		AccessTokenPartial: token[:8],
 	}
 
+	// Register in token manager if present
+	if tm := tokenManager(); tm != nil {
+		tm.Create(token, req.UserID, []string{"repo:read"})
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(resp)
