@@ -5,7 +5,10 @@
   // This feature installs the Docker CLI and mounts the host's Docker socket,
   // allowing your program inside the container to spin up other containers on the host.
   "features": {
-    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {},
+    "ghcr.io/devcontainers/features/go:1": {
+      "version": "1.25"
+    }
   },
   // 2. CONFIGURE WORKSPACE FOLDER INSIDE CONTAINER
   // This tells VS Code which folder inside the container to open.
