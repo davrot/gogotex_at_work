@@ -1,21 +1,18 @@
-const { describe, it, expect, vi, beforeEach } = require('vitest')
-const path = require('node:path')
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import path from 'node:path'
 
-const DM_PATH = path.resolve(__dirname, '../../services/document-updater/app/js/DocumentManager.js')
-const REDIS_PATH = path.resolve(__dirname, '../../services/document-updater/app/js/RedisManager.js')
-const PERSIST_PATH = path.resolve(__dirname, '../../services/document-updater/app/js/PersistenceManager.js')
+const DM_PATH = path.resolve('./modz/track-changes-and-comments/services/document-updater/app/js/DocumentManager.js')
+const REDIS_PATH = path.resolve('./modz/track-changes-and-comments/services/document-updater/app/js/RedisManager.js')
+const PERSIST_PATH = path.resolve('./modz/track-changes-and-comments/services/document-updater/app/js/PersistenceManager.js')
 
 describe('DocumentManager.getDoc', () => {
   beforeEach(() => {
-    // Reset modules
-    delete require.cache[require.resolve(DM_PATH)]
-    delete require.cache[require.resolve(REDIS_PATH)]
-    delete require.cache[require.resolve(PERSIST_PATH)]
+    // no-op: we set mocks directly in each test
   })
 
   it('falls back to persistence when redis misses and stores in redis', async () => {
-    const RedisManager = require(REDIS_PATH)
-    const PersistenceManager = require(PERSIST_PATH)
+    const RedisManager = await import(REDIS_PATH)
+    const PersistenceManager = await import(PERSIST_PATH)
 
     RedisManager.promises = {
       getDoc: vi.fn().mockResolvedValue({ lines: null, version: null }),
@@ -33,7 +30,7 @@ describe('DocumentManager.getDoc', () => {
       }),
     }
 
-    const DocumentManager = require(DM_PATH)
+    const DocumentManager = await import(DM_PATH)
 
     const result = await DocumentManager.getDoc('proj', 'doc1')
 
