@@ -5,14 +5,14 @@ PR creation: failed due to missing GitHub CLI / API credentials. Please create a
 
 Open follow-up items (created after import & initial tests):
 
-- references (T052e)
+- references (T052e) — **Completed (tests added & passing locally)**
   - Owner: TBD
   - Effort: 2-3 days
   - Tasks:
-    - add unit tests for worker/indexer
-    - add integration tests for frontend references UI
-    - ensure lint & build scripts present
-  - Blocking: access to sample indexed data; test harness for worker
+    - unit tests for worker/indexer added and pass locally
+    - integration tests for frontend `ReferencePickerModal` added and pass locally
+    - lint & build scripts validated
+  - Blocking: none (follow-up fixtures optional)
 
 - admin_extensions (T052f)
   - Owner: TBD
