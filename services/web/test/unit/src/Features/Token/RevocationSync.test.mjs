@@ -2,7 +2,10 @@ import { describe, it, expect, vi } from 'vitest'
 import mongoose from 'mongoose'
 
 // Prevent OverwriteModelError / module cache issues by clearing mongoose models and reset modules
-if (mongoose.models && mongoose.models.PersonalAccessToken) {
+if (mongoose.deleteModel) {
+  // Mongoose >=6 provides deleteModel
+  try { mongoose.deleteModel('PersonalAccessToken') } catch (e) { /* ignore */ }
+} else if (mongoose.models && mongoose.models.PersonalAccessToken) {
   delete mongoose.models.PersonalAccessToken
 }
 
