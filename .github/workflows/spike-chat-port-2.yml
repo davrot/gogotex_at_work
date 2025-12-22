@@ -5,6 +5,7 @@ on:
     paths:
       - "services/chat/**"
   workflow_dispatch:
+  workflow_dispatch:
 
 jobs:
   build-and-test:

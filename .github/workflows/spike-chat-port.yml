@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "services/chat/**"
+  workflow_dispatch:
 
 jobs:
   build-and-test:
