@@ -1,0 +1,43 @@
+name: 'Merge on green'
+
+on:
+  workflow_run:
+    workflows:
+      - 'Go build & test'
+      - 'Build & Test Go service (template)'
+      - 'CI: Go Chat Service'
+      - 'CI: Go Contacts Service'
+      - 'CI: Go Document-Updater Service'
+      - 'CI: Go Notifications Service'
+      - 'CI: Go Real-Time Service'
+      - 'CI: Go CLSI Service'
+      - 'CI: Go Docstore Service'
+      - 'CI: Go Filestore Service'
+      - 'CI: Go History-v1 Service'
+      - 'CI: Go Project-History Service'
+      - 'CI: Go Web Service'
+    types:
+      - completed
+
+jobs:
+  merge:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Merge PRs labeled 'merge-on-green' when checks pass
+        uses: peter-evans/merge-on-green@v3
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          label: merge-on-green
+          merge-method: merge
+          required-status-checks: all
+          required-branches: main
+
+      - name: Comment on merged PRs (optional)
+        if: always()
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            // The merge-on-green action merges PRs; this step is a noop placeholder
+            core.info('merge-on-green completed')

@@ -1,0 +1,32 @@
+name: 'Label PRs for Merge-on-Green'
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+jobs:
+  add-label:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add merge-on-green label when authorized
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pr = context.payload.pull_request;
+            if (!pr) return;
+            const branch = pr.head.ref || '';
+            const body = pr.body || '';
+            const title = pr.title || '';
+            const shouldLabel = branch.startsWith('migrate/') || body.includes('Autonomy: full') || title.includes('Autonomy: full');
+            if (shouldLabel) {
+              await github.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                labels: ['merge-on-green']
+              });
+              core.info(`Added 'merge-on-green' label to PR #${pr.number}`);
+            } else {
+              core.info('No merge-on-green label criteria matched');
+            }
