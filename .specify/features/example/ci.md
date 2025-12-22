@@ -78,6 +78,61 @@ This document describes how to run the membership contract test and the `webprof
   - Run `integration_test.sh` and fail the job on non-zero exit.
   - Publish any test artifacts (logs, parity outputs) to the pipeline artifacts store.
 
+## Running GitHub Actions locally (required for some environments)
+
+Sometimes maintainers cannot or prefer not to run workflows in cloud CI (no credits, restricted runners). This project requires being able to run certain GitHub Actions workflows locally; the steps below document a supported, reproducible approach.
+
+Important notes:
+
+- GitHub Actions in the cloud may use custom hosted runners and services; when running locally you should ensure a compatible environment (Docker, `act` limitations, and required service availability) is used.
+- The Spec Kit mandates that the most important gating workflows (for example `integration-web-mongo.yml`) be runnable locally using the documented method.
+
+1. Install `act` (nektos/act) locally in your dev environment or devcontainer. The devcontainer setup script installs `act` optionally. Confirm with:
+
+```sh
+act --version
+```
+
+2. Prepare secrets and environment variables used by the workflow. Create a `.secrets` file in the repo root (always keep it local and do not commit):
+
+```ini
+# .secrets (local only)
+MONGO_URI=mongodb://develop-mongo-1:27017
+AUTO_MERGE_TOKEN=placeholder_for_local_testing
+# add any other secrets referenced by workflows
+```
+
+3. Ensure Docker Compose services used by the workflow are running and on a known network (the default `develop_default` works for the project). For example:
+
+```sh
+# start required services: mongo and any others the workflow depends on
+cd develop && bin/up && cd -
+```
+
+4. Use `act` to run the workflow or a specific job. Example (runs the `web-mongo-integration` job in `integration-web-mongo.yml`):
+
+```sh
+# Run the specific job interactively with secrets loaded
+act -j "web-mongo-integration" -s MONGO_URI="mongodb://develop-mongo-1:27017" -s AUTO_MERGE_TOKEN=mytoken
+```
+
+If your local `act` environment lacks the exact runner image used in cloud (Ubuntu), prefer the `-P` mapping to provide an image for `ubuntu-latest`:
+
+```sh
+act -P ubuntu-latest=nektos/act-environments-ubuntu:18.04 -j "web-mongo-integration" -s MONGO_URI="mongodb://develop-mongo-1:27017"
+```
+
+5. Use the helper script (recommended): `scripts/ci/run-actions-locally.sh` — this script loads `.secrets`, ensures compose services are up, and calls `act` with the appropriate job name and runner image mapping. See the script for usage examples.
+
+Caveats & limitations
+
+- `act` does not perfectly emulate GitHub-hosted runners (some actions or features may behave differently). Use it for reproducible, local gating, but validate in your target CI provider before flipping strict gates.
+- When workflows rely on resource profiles to measure benchmarks, consider using Docker images to emulate the runner profile or run benchmarks inside a container with resource limits to approximate the CI runner.
+
+Addendum
+
+- Make it a policy that any future gating workflow that is considered "required to be runnable locally" MUST include a concise act-compatible invocation snippet in its Spec Kit section. This project requires that the integration and parity gating jobs be runnable locally by maintainers.
+
 ## Example (pseudo-job steps)
 
 - Build shim
