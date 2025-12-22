@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+
+	"github.com/davrot/gogotex_at_work/services/web/internal/api"
 )
 
 func main() {
@@ -11,6 +13,15 @@ func main() {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprint(w, `{"status":"ok"}`)
+	})
+
+	// Minimal introspect endpoint for parity & testing
+	http.HandleFunc("/internal/api/tokens/introspect", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		api.IntrospectHandler(w, r)
 	})
 
 	addr := ":3000"
