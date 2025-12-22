@@ -82,15 +82,6 @@ clean_ci:
 
 test: test_unit test_acceptance test_frontend test_frontend_ct test_writefull
 
-# Build a small image containing the web test binary and run the Mongo-backed integration test
-docker-test-image:
-	docker build -f Dockerfile.test -t web-test:local .
-
-docker-test-integration: docker-test-image
-	@echo "Running Mongo-backed token persistor integration test against develop-mongo-1"
-	docker run --rm --network develop_default -e MONGO_URI='mongodb://develop-mongo-1:27017' web-test:local -test.run TestMongoPersistor_Integration -test.v
-
-
 test_module: test_unit_module test_acceptance_module
 
 #

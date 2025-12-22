@@ -1,21 +1,21 @@
-name: "Merge on green"
+name: 'Merge on green'
 
 on:
   workflow_run:
     workflows:
-      - "Go build & test"
-      - "Build & Test Go service (template)"
-      - "CI: Go Chat Service"
-      - "CI: Go Contacts Service"
-      - "CI: Go Document-Updater Service"
-      - "CI: Go Notifications Service"
-      - "CI: Go Real-Time Service"
-      - "CI: Go CLSI Service"
-      - "CI: Go Docstore Service"
-      - "CI: Go Filestore Service"
-      - "CI: Go History-v1 Service"
-      - "CI: Go Project-History Service"
-      - "CI: Go Web Service"
+      - 'Go build & test'
+      - 'Build & Test Go service (template)'
+      - 'CI: Go Chat Service'
+      - 'CI: Go Contacts Service'
+      - 'CI: Go Document-Updater Service'
+      - 'CI: Go Notifications Service'
+      - 'CI: Go Real-Time Service'
+      - 'CI: Go CLSI Service'
+      - 'CI: Go Docstore Service'
+      - 'CI: Go Filestore Service'
+      - 'CI: Go History-v1 Service'
+      - 'CI: Go Project-History Service'
+      - 'CI: Go Web Service'
     types:
       - completed
 

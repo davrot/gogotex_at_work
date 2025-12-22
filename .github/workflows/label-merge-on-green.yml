@@ -1,4 +1,4 @@
-name: "Label PRs for Merge-on-Green"
+name: 'Label PRs for Merge-on-Green'
 
 on:
   pull_request:

@@ -282,21 +282,6 @@ cd services/git-bridge/test/contract
 MONGO_URI=${MONGO_URI} TARGET_BASE_URL=${TARGET_BASE_URL} go test -run TestIntrospectIntegration_Bcrypt -v
 ```
 
-# Running tests inside the VS Code dev container or another container
-
-When you run tests from *inside* the VS Code dev container (or any other container attached to the `develop` compose network), `localhost` will refer to the container itself and will not reach the host-published Mongo port. In that case point tests at the compose service hostname instead (for example `develop-mongo-1`):
-
-```bash
-# from inside devcontainer or a container on the develop network
-export MONGO_URI=mongodb://develop-mongo-1:27017
-# If the Go shim is attached to the develop network as `webprofile-api-ci`, use that hostname for TARGET_BASE_URL
-export TARGET_BASE_URL=http://webprofile-api-ci:3900
-cd services/git-bridge/test/contract
-MONGO_URI=${MONGO_URI} TARGET_BASE_URL=${TARGET_BASE_URL} go test -run TestIntrospectIntegration_Bcrypt -v
-```
-
-This pattern also applies to other integration tests; prefer compose hostnames when running from inside containers or devcontainers.
-
 ### Use Go shim for token operations (optional)
 
 You can configure `web` to delegate token introspection and token management to the Go `webprofile-api` by setting:
@@ -367,14 +352,7 @@ bin/up
 docker compose -f develop/docker-compose.yml up -d mongo
 ````
 
-If you prefer to run a lightweight standalone Mongo for quick integration tests, you may also run:
-
-```bash
-# start a test mongo instance that listens on host:27017
-docker run -d --name mongo-test -p 27017:27017 mongo:6
-```
-
-> Note: prefer using `MONGO_URI` as the canonical environment variable name for configuration and scripts instead of `MONGO_URL`. The codebase accepts `MONGO_URI` and will fall back to `MONGO_URL` temporarily for compatibility; please standardize tooling and CI to use `MONGO_URI` moving forward. 2. Wait for the container to accept connections and for the init script to run. You can follow the logs:
+2. Wait for the container to accept connections and for the init script to run. You can follow the logs:
 
 ```bash
 docker compose -f develop/docker-compose.yml logs -f mongo
