@@ -33,6 +33,47 @@
 - [ ] T046 Update docs, `spec.md`, `plan.md`, and README to describe Go-based development and testing instructions.
   - Acceptance: `.specify` docs, README, and CONTRIBUTING show Go build/test instructions.
 
+## Phase 0b: Additional service migrations — Backends → Go
+
+**Goal:** Migrate additional backend services to Go progressively. Each service migration is independently testable and should include a Go module, `cmd/` entrypoint, unit tests, CI build/test job(s), and contract parity checks where relevant.
+
+- [x] T047 [P] Migrate `chat` backend to Go — `services/chat`: add `go.mod`, `cmd/chat`, core handlers, unit tests, and CI job to build/test `services/chat`.
+  - Acceptance: `go test ./services/chat/...` passes locally and in CI; equivalent contract tests (chat message endpoints) pass against the Go binary. **Status:** scaffolding added (health endpoint, test, workflow template applies); further porting of business logic required.
+
+- [x] T048 [P] Migrate `contacts` backend to Go — `services/contacts`: add `go.mod`, `cmd/contacts`, services for contact CRUD, unit tests, and CI job to build/test `services/contacts`.
+  - Acceptance: `go test ./services/contacts/...` passes; contract tests for contact endpoints pass. **Status:** scaffolding added (health endpoint, test, workflow template applies); further porting required.
+
+- [x] T049 [P] Migrate `document-updater` backend to Go — `services/document-updater`: add `go.mod`, `cmd/document-updater`, port core document update handlers, unit tests, and CI job.
+  - Acceptance: `go test ./services/document-updater/...` passes; integration tests for document update flows pass. **Status:** scaffolding added (health endpoint, test, workflow template applies); further porting required.
+
+- [x] T050 [P] Migrate `notifications` backend to Go — `services/notifications`: add `go.mod`, `cmd/notifications`, event handlers (email/push), unit tests, and CI job.
+  - Acceptance: `go test ./services/notifications/...` passes; notification delivery contract tests pass against Go implementation. **Status:** scaffolding added (health endpoint, test, workflow template applies); further porting required.
+
+- [x] T051 [P] Migrate `real-time` backend to Go — `services/real-time`: add `go.mod`, `cmd/real-time`, real-time websocket/transport handlers, unit tests, and CI job (consider performance benchmarks).
+  - Acceptance: `go test ./services/real-time/...` passes; real-time integration smoke tests (connect, subscribe, publish) pass. **Status:** scaffolding added (health endpoint, test, workflow template applies); further porting required.
+
+- [x] T052 [P] Migrate `clsi` (compile sandbox interface) backend to Go — `services/clsi`: add `go.mod`, `cmd/clsi`, CLI and API handlers, unit tests, and CI job. Include security sandboxing test harness.
+  - Acceptance: `go test ./services/clsi/...` passes; sandbox CI smoke job validates compile requests and seccomp profile tests. **Status:** scaffolding added (health endpoint, test, workflow template applies); further porting required.
+
+- [x] T053 [P] Migrate `docstore` backend to Go — `services/docstore`: add `go.mod`, `cmd/docstore`, storage interfaces, unit tests, and CI job.
+  - Acceptance: `go test ./services/docstore/...` passes; file retrieval and storage contract tests pass. **Status:** scaffolding added (health endpoint, test, workflow template applies); further porting required.
+
+- [x] T054 [P] Migrate `filestore` backend to Go — `services/filestore`: add `go.mod`, `cmd/filestore`, file service endpoints, unit tests, and CI job. Ensure compatibility with existing storage mounts and policies.
+  - Acceptance: `go test ./services/filestore/...` passes; file upload/download tests and mount compatibility checks pass in CI. **Status:** scaffolding added (health endpoint, test, workflow template applies); further porting required.
+
+- [x] T055 [P] Migrate `history-v1` backend to Go — `services/history-v1`: add `go.mod`, `cmd/history-v1`, history store and retrieval handlers, unit tests, and CI job.
+  - Acceptance: `go test ./services/history-v1/...` passes; history retrieval and retention tests pass. **Status:** scaffolding added (health endpoint, test, workflow template applies); further porting required.
+
+- [x] T056 [P] Migrate `project-history` backend to Go — `services/project-history`: add `go.mod`, `cmd/project-history`, project audit handlers, unit tests, and CI job.
+  - Acceptance: `go test ./services/project-history/...` passes; cross-service contract tests (project history listing and audit) pass. **Status:** scaffolding added (health endpoint, test, workflow template applies); further porting required.
+
+- [x] T057 [P] Migrate `web` backend to Go (optional incremental cutover) — `services/web`: incrementally extract and replace components with Go where appropriate, add Go modules for new services, and add CI jobs to build/test Go components. This task is **incremental** and should follow a careful compatibility plan (delegation, shim, parity checks).
+  - Acceptance: Each extracted component has Go tests and a parity validation comparing behavior between Node and Go shims; CI must demonstrate parity for delegated endpoints before flipping traffic. **Status:** initial shim scaffolding added (health endpoint, test, go.mod); follow-up sub-tasks required to incrementally port components.
+
+> Notes:
+> - Mark tasks `[P]` if they are parallelizable and do not require other services to be migrated first.
+> - For each migration add a **parity/contract** validation job (similar to `git-bridge`), document rollback plans, and add any required security or sandboxing tests for components handling user content.
+
 ## Phase 1: Setup
 
 - [x] T001 Validate feature docs and plan presence — .specify/features/example/plan.md, .specify/features/example/spec.md (docs present)
