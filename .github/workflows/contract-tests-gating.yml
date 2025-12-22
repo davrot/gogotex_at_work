@@ -88,6 +88,13 @@ jobs:
           BENCH_OUTPUT=ci/benchmarks/introspection-benchmark/out.json BENCH_ITER=${BENCH_ITER:-200} BENCH_CONCURRENCY=${BENCH_CONCURRENCY:-20} BENCH_URL=${BENCH_URL:-http://127.0.0.1:3000/internal/api/tokens/introspect} BENCH_TOKEN=${BENCH_TOKEN:-invalid-token} node ci/benchmarks/introspection-benchmark/bench.js
           node ci/benchmarks/check-bench-slo.js ci/benchmarks/introspection-benchmark/out.json 100
 
+      - name: Run Revocation Immediacy Test
+        env:
+          MONGO_URI: mongodb://127.0.0.1:27017
+        run: |
+          cd services/web
+          MONGO_URI='mongodb://127.0.0.1:27017' go test ./internal/token -run TestMongoPersistor_RevocationImmediacy -v
+
       - name: Upload introspection artifact
         if: always()
         uses: actions/upload-artifact@v4

@@ -89,10 +89,11 @@
 - [x] T002b Add migration/backfill for PersonalAccessToken re-hash & metadata — services/web/migrations/re-hash-personal-access-tokens.mjs (migration script present)
   - Acceptance: Migration preserves original algorithm metadata (`algorithm`/`hashPrefix` fields), provides a safe re-hash or re-issue strategy (idempotent, reversible steps documented), and includes tests or a dry-run mode to validate behavior.
   - Depends on: **T004** (config validation & runtime hash availability check). Do not run or merge the migration before T004 is completed and verified in a staging environment.
-- [ ] T0AC Add integration test for revocation immediacy — services/web/test/integration/TokenRevocationImmediacyTest.go
-  - Acceptance: After `DELETE` (revoke) returns success, `Introspect` must return `active:false` within **500ms** in CI and local runs; contract test should assert an invalidation message was published (or invalidation doc inserted).
-- [ ] T0AD Implement synchronous invalidation hook for token revocation — services/web/internal/token (MongoPersistor + cache invalidation)
+- [x] T0AC Add integration test for revocation immediacy — services/web/test/integration/TokenRevocationImmediacyTest.go — **Status:** implemented, tests verified locally; CI gate pending.
+  - Acceptance: After `DELETE` (revoke) returns success, `Introspect` must return `active:false` within **500ms** in CI and local runs; contract test asserts invalidation message inserted or published.
+- [x] T0AD Implement synchronous invalidation hook for token revocation — services/web/internal/token (MongoPersistor + cache invalidation) — **Status:** implemented and tested locally.
   - Acceptance: `Revoke` writes inactive state, inserts an invalidation record or publishes an invalidation message, and returns only after any in-process cache invalidation completes (document implementation and tests).
+- [ ] T0AE Add CI gate job that runs `TestMongoPersistor_RevocationImmediacy` in PR gating (contract-tests-gating) — **Acceptance:** job fails the PR if the immediacy test fails; artifacts uploaded on failure.
 
 - [x] T001a (BLOCKING) Constitution compliance check — .specify/memory/constitution.md, CI pipeline (implemented: `scripts/ci/check_constitution.sh` + `.github/workflows/check-constitution.yml`)
   - Acceptance: PRs that implement or change this feature MUST include and pass the constitution checklist: linters, unit & contract tests, and benchmark gating (T033) where applicable. The new workflow runs the script on pull requests.
