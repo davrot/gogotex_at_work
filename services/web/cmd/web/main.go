@@ -24,6 +24,21 @@ func main() {
 		api.IntrospectHandler(w, r)
 	})
 
+	// Minimal token create endpoint for parity & testing
+	http.HandleFunc("/internal/api/users/", func(w http.ResponseWriter, r *http.Request) {
+		// naive path prefix handler: only support POST for /internal/api/users/:userId/git-tokens
+		if r.Method != "POST" {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		// ensure path ends with /git-tokens
+		if len(r.URL.Path) < 1 || r.URL.Path[len(r.URL.Path)-10:] != "/git-tokens" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		api.CreateTokenHandler(w, r)
+	})
+
 	addr := ":3000"
 	log.Printf("web-go-shim listening on %s", addr)
 	if err := http.ListenAndServe(addr, nil); err != nil {
