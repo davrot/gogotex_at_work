@@ -1,0 +1,27 @@
+name: "CI: Go History-v1 Service"
+
+on:
+  push:
+    paths:
+      - "services/history-v1/**"
+  pull_request:
+    paths:
+      - "services/history-v1/**"
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.25"
+      - name: Run go vet
+        run: |
+          cd services/history-v1
+          go vet ./...
+      - name: Run tests
+        run: |
+          cd services/history-v1
+          go test ./...
