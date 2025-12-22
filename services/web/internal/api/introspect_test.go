@@ -9,6 +9,8 @@ import (
 )
 
 func TestIntrospectHandler_Valid(t *testing.T) {
+	// Ensure manager is not set for fallback behavior
+	SetManager(nil)
 	body := bytes.NewBufferString(`{"token":"valid-token"}`)
 	req := httptest.NewRequest("POST", "/internal/api/tokens/introspect", body)
 	r := httptest.NewRecorder()
