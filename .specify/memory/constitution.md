@@ -116,5 +116,5 @@ Compliance & review expectations:
 - CI MUST run the test suite and any declared performance checks; failing CI
 	blocks merges.
 
-**Version**: 1.0.0 | **Ratified**: TODO(RATIFICATION_DATE): original adoption date unknown | **Last Amended**: 2025-12-10
+**Version**: 1.0.0 | **Ratified**: 2025-12-22 | **Last Amended**: 2025-12-10
 *** End Patch

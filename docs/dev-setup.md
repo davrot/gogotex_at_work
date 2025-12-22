@@ -284,7 +284,7 @@ MONGO_URI=${MONGO_URI} TARGET_BASE_URL=${TARGET_BASE_URL} go test -run TestIntro
 
 # Running tests inside the VS Code dev container or another container
 
-When you run tests from *inside* the VS Code dev container (or any other container attached to the `develop` compose network), `localhost` will refer to the container itself and will not reach the host-published Mongo port. In that case point tests at the compose service hostname instead (for example `develop-mongo-1`):
+When you run tests from _inside_ the VS Code dev container (or any other container attached to the `develop` compose network), `localhost` will refer to the container itself and will not reach the host-published Mongo port. In that case point tests at the compose service hostname instead (for example `develop-mongo-1`):
 
 ```bash
 # from inside devcontainer or a container on the develop network

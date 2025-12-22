@@ -7,16 +7,11 @@
 **Goal:** Replace the Java implementation of `git-bridge` with a Go implementation, update the dev/test/CI tooling, and port all tests and benchmarks so the repository no longer requires Java maintenance.
 
 - [x] T040 Setup Go toolchain in dev environment (devcontainer/Dockerfile, Makefile) — install Go 1.25+ in dev container and provide `make build`/`make test`/`make bench` targets in `services/git-bridge`.
-  - Acceptance: `make build` produces `services/git-bridge/bin/git-bridge`; `make test` runs Go unit tests locally. **Status:** skeleton added (Makefile targets, `go.mod`, minimal `cmd/` and `internal/` packages).
-  - Acceptance: `make build` produces `services/git-bridge/bin/git-bridge`; `make test` runs Go unit tests locally. **Status:** skeleton added (Makefile targets, `go.mod`, minimal `cmd/` and `internal/` packages).
+  - Acceptance: `make build` produces `services/git-bridge/bin/git-bridge` and `make test` runs Go unit tests locally. **Status:** skeleton added (Makefile targets, `go.mod`, minimal `cmd/` and `internal/` packages).
 
-- [x] T041 Replace Java/Maven CI & build with Go modules — update `.github/workflows/*` to run `go build` and `go test`, include `go vet`/`golangci-lint`, and ensure CI artifacts are produced where needed.
-  - Acceptance: CI job builds and runs Go tests successfully. **Status:** Completed — CI build/test jobs updated to target Go; verify green runs before final pruning.
-
-- [x] T041a Add CI parity job to run SSH key endpoint parity between Node and Go — implement a contract-stage job that builds/starts the Go `webprofile-api` shim, runs `scripts/contract/compare_ssh_parity.sh`, and fails the job on divergence. Initially mark `allow_failure: true` until parity is stable; flip to required when tests are reliable. — **Status: completed**
-
-- [x] T041b Add validation job and run-book to validate parity stability before flipping strictness — implement `ssh_keys_parity_validation` (manual job) that runs parity multiple times and fails on any mismatch; document run-book and flip criteria (e.g., 10 consecutive passes). — **Status: completed**
-  - Acceptance: `ci/contract/gitlab-ci-contract.yml` includes `ssh_keys_parity_check` job; job builds `services/git-bridge/cmd/webprofile-api` if `go` is available and runs the parity script; job exits non-zero on fingerprint mismatch.
+- [x] T041 Replace Java/Maven CI & build with Go modules (includes `go vet`/`golangci-lint`) — **Acceptance:** CI builds and runs Go tests successfully. **Status:** Completed — CI build/test jobs updated to target Go; verify green runs before final pruning.
+  - [x] T041a Add CI parity job to compare Node vs Go outputs (initial `allow_failure: true`). **Status:** completed.
+  - [x] T041b Add validation run-book `ssh_keys_parity_validation` to assert stability; **Flip criteria:** flip `allow_failure: false` after **10** consecutive successful validation runs or maintainers sign-off. **Owner:** @maintainers (substitute actual owner as appropriate).
 
 - [ ] T042a Port SSH auth core and lookup (unit tests & coverage) — services/git-bridge/internal/ssh
   - Acceptance: Unit tests for SSH auth and lookup modules cover core behaviors and achieve agreed coverage (owner-defined, e.g., critical modules ≥ 80%). Verify `go test ./services/git-bridge/...` passes.
@@ -97,6 +92,7 @@
 
 - [x] T001a (BLOCKING) Constitution compliance check — .specify/memory/constitution.md, CI pipeline (implemented: `scripts/ci/check_constitution.sh` + `.github/workflows/check-constitution.yml`)
   - Acceptance: PRs that implement or change this feature MUST include and pass the constitution checklist: linters, unit & contract tests, and benchmark gating (T033) where applicable. The new workflow runs the script on pull requests.
+- [ ] T0AB Finalize constitution templates & CI gating templates — .specify/templates/* & `.github/workflows/check-constitution.yml` — **Acceptance:** templates updated to reflect constitution gates and ratification metadata filled; CI checks read templates and enforce gates.
 
 - [x] T0AA (BLOCKING) Formalize benchmark runner profile & harness — ci/benchmarks/README.md, ci/benchmarks/harness-config.json (implemented)
   - Acceptance: Provide a reproducible runner profile (recommended 2 vCPU, 4GB RAM), a seeded dataset (documented seed and size), harness command-lines, artifact format (p50/p95/p99), and example invocation for warm/cold runs. The harness must be runnable in local/dev CI and in the CI runner used for gating.
@@ -126,7 +122,7 @@
 
 **Independent Test:** Create a user, POST an SSH key, GET the key list and verify fingerprint format `SHA256:<base64>` and idempotent create behavior.
 
-- [x] T010 [P] [US1] Ensure SSH Keys CRUD controller & private routes exist and enforce auth — services/web/app/src/Features/User/UserSSHKeysController.mjs
+- [x] T010 [P] [US1] Ensure SSH Keys CRUD controller & private routes exist and enforce auth (key-management-add-remove) — services/web/app/src/Features/User/UserSSHKeysController.mjs
 - [x] T011 [P] [US1] Implement server-side fingerprint computation & validation (SHA256 base64) — services/web/app/src/models/UserSSHKey.js
 - [x] T012 [US1] Add contract tests for SSH keys endpoints — services/web/test/contract/src/SSHKeyCRUDContractTest.mjs
 - [x] T013 [US1] Implement & test frontend UI for SSH keys (inline validation & ARIA) — services/web/frontend/js/features/settings/components/SSHKeysPanel.tsx, services/web/test/frontend/features/settings/components/ssh-keys.test.tsx
@@ -140,7 +136,7 @@
 
 **Independent Test:** Create a token via POST and verify returned plaintext token once; subsequent GET shows `accessTokenPartial` only.
 
-- [x] T014 [P] [US2] Verify Token model includes `hash`, `hashPrefix`, `algorithm`, `scopes`, `expiresAt` — services/web/app/src/models/PersonalAccessToken.js
+- [x] T014 [P] [US2] Verify Token model includes `hash`, `hashPrefix`, `algorithm`, `scopes`, `expiresAt` (token-management) — services/web/app/src/models/PersonalAccessToken.js
 - [x] T015 [P] [US2] Unit tests for token lifecycle & `replace=true` semantics — services/web/test/unit/src/Features/Token/Rotation.test.mjs
   - Acceptance: Unit tests must assert that when `replace=true` is passed on create, the previous token is marked inactive (introspection returns `active: false`), the new token is active, and stored metadata includes `algorithm` and `hashPrefix`. Tests should be deterministically runnable in CI and avoid DB casting issues (use in-memory model mocks or valid ObjectId fixtures). Include negative tests for malformed token input.
 - [x] T016 [P] [US2] Integration tests for TokenController create/list/remove endpoints — services/web/test/integration/src/TokenControllerTests.mjs
@@ -162,7 +158,7 @@
 
 **Independent Test:** POST `/internal/api/tokens/introspect` with a token and receive `{ active, userId, scopes, expiresAt }`.
 
-- [x] T020 [P] [US3] Verify/implement introspect endpoint & controller tests — services/web/app/src/Features/Token/TokenController.mjs, services/web/test/unit/src/Features/Token/TokenController.test.mjs
+- [x] T020 [P] [US3] Verify/implement introspect endpoint & controller tests (token-introspect) — services/web/app/src/Features/Token/TokenController.mjs, services/web/test/unit/src/Features/Token/TokenController.test.mjs
 - [x] T021 [US3] Add integration & contract tests for introspection shape and error cases — services/web/test/integration/src/TokenIntrospectionTests.mjs, services/web/test/contract/src/TokenIntrospectContractTest.mjs
 - [x] T022 [US3] Add micro-benchmark for introspection latency (CI) and gate p95 ≤ 100ms — ci/benchmarks/introspection-benchmark/ (implemented: `ci/benchmarks/introspection-benchmark/bench.js` and CI invocation)
 
@@ -174,7 +170,7 @@
 
 **Independent Test:** Simulate fingerprint lookup → obtain userId; simulate RPC with known user but not a member → observe 403 and audit log.
 
-- [x] T023 [P] [US4] Ensure private fingerprint lookup API exists and is contract-covered — GET /internal/api/ssh-keys/:fingerprint, services/web/test/contract/src/SSHKeyLookupContractTest.mjs (implemented)
+- [x] T023 [P] [US4] Ensure private fingerprint lookup API exists and is contract-covered (ssh-key-lookup) — GET /internal/api/ssh-keys/:fingerprint, services/web/test/contract/src/SSHKeyLookupContractTest.mjs (implemented)
 - [x] T024 [US4] Short-lived cache and pubsub invalidation for fingerprint lookup — services/web/app/src/lib/cache.js, services/web/lib/pubsub.js (implemented)
 - [x] T024b Implement synchronous cache invalidation API & contract tests — POST /internal/api/cache/invalidate, services/web/test/contract/src/CacheInvalidationContractTest.mjs (implemented)
 - [x] T025 [US4] Wire `git-bridge` (Go) to call fingerprint lookup and introspection fallback path — services/git-bridge/internal/ssh/auth_manager.go, services/git-bridge/test/contract/\*\*
