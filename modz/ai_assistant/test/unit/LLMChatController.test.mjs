@@ -10,6 +10,13 @@ describe('LLMChatController', () => {
     delete process.env.LLM_API_URL
     delete process.env.LLM_API_KEY
     delete process.env.LLM_MODEL_NAME
+    // Mock User module to avoid Mongoose dependency at import time
+    vi.mock('../../services/web/app/src/models/User.js', () => ({
+      User: {
+        findById: vi.fn().mockResolvedValue(null),
+      },
+    }))
+    // Ensure SessionManager is available (we added a shim), but spy on its method on-demand in tests
     // Clear module cache and re-import fresh
     controller = await import(controllerPath)
   })
@@ -23,7 +30,7 @@ describe('LLMChatController', () => {
     const req = { session: {}, params: { Project_id: 'p1' } }
     const res = { json: vi.fn() }
 
-    await controller.getModels(req, res)
+    await controller.default.getModels(req, res)
 
     expect(res.json).toHaveBeenCalled()
     const arg = res.json.mock.calls[0][0]
@@ -44,7 +51,7 @@ describe('LLMChatController', () => {
     const req = { session: {}, params: { Project_id: 'p1' } }
     const res = { json: vi.fn() }
 
-    await controller.getModels(req, res)
+    await controller.default.getModels(req, res)
 
     expect(res.json).toHaveBeenCalled()
     const arg = res.json.mock.calls[0][0]
@@ -56,7 +63,7 @@ describe('LLMChatController', () => {
     const req = { body: { messages: [{ role: 'user', content: 'hi' }] }, params: { Project_id: 'p1' }, session: {} }
     const res = { status: vi.fn().mockReturnThis(), json: vi.fn() }
 
-    await controller.chat(req, res)
+    await controller.default.chat(req, res)
 
     expect(res.status).toHaveBeenCalledWith(503)
     const arg = res.json.mock.calls[0][0]

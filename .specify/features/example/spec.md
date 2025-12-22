@@ -12,10 +12,11 @@ This feature implements SSH public-key management and a local HTTPS personal-acc
 
 **Service-Origin precedence & trust (canonical)**
 
-Requests MUST derive the service-origin using the following precedence *only when the header is trusted*:
-1) `X-Service-Origin` header **when TRUST_X_SERVICE_ORIGIN=true and the request originates from a trusted ingress** (matches `TRUSTED_PROXIES` or uses mTLS/API-token authentication),
-2) mTLS client certificate `CN` when available,
-3) request IP (from `x-forwarded-for` or `req.connection.remoteAddress`).
+Requests MUST derive the service-origin using the following precedence _only when the header is trusted_:
+
+1. `X-Service-Origin` header **when TRUST_X_SERVICE_ORIGIN=true and the request originates from a trusted ingress** (matches `TRUSTED_PROXIES` or uses mTLS/API-token authentication),
+2. mTLS client certificate `CN` when available,
+3. request IP (from `x-forwarded-for` or `req.connection.remoteAddress`).
 
 Implementations MUST provide two config knobs: `TRUST_X_SERVICE_ORIGIN` (boolean) and `TRUSTED_PROXIES` (CIDR list or proxy names). When `TRUST_X_SERVICE_ORIGIN=false`, services MUST ignore `X-Service-Origin` even if present.
 
@@ -159,6 +160,7 @@ Implementations MUST surface these configuration keys in service configuration a
   - Cross-instance invalidation MUST be observable without manual waits; implementers SHOULD aim for invalidation visibility within **≤ 500 ms** in normal conditions, or rely on authoritative DB fallback on introspect for strict correctness.
 
   Contract/integration tests (T016b/T016c and related unit tests) shall assert the create → introspect(active:true) → delete → introspect(active:false) sequence deterministically.
+
 - Migration: deploys MUST include a backfill that assigns `expiresAt` to existing tokens without expiry (default → 90 days) and document the migration plan in `FEATURE_BRANCH_NOTES.md`.
 
 ## Scope Model
