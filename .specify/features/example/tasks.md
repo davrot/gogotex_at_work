@@ -33,6 +33,10 @@
 - [x] T046 Update docs, `spec.md`, and README to describe Go-based development and testing instructions.
   - Acceptance: `.specify` docs, README, and CONTRIBUTING show Go build/test instructions. **Status:** Completed; docs updated with migration plan, runbook, and bench/test instructions.
 
+- [ ] T0A0 Migration readiness checklist — add a canonical checklist and per-service readiness criteria and require it before flipping production runtime from Node → Go.
+  - Acceptance: A document `.specify/migrations/migration-readiness.md` exists listing per-service criteria: parity contract tests, bench + SLO validation, Docker/CI updated to run Go binary, documented rollout & rollback steps, and an owner for the migration. CI must fail PRs attempting to flip runtime if any checklist item is missing.
+  - Current: **open** — Checklist file not present; owners & automation TBD.
+
 ## Phase 0b: Additional service migrations — Backends → Go
 
 **Goal:** Migrate additional backend services to Go progressively. Each service migration is independently testable and should include a Go module, `cmd/` entrypoint, unit tests, CI build/test job(s), and contract parity checks where relevant.
