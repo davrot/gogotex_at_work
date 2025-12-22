@@ -1,0 +1,27 @@
+name: "CI: Go Chat Service"
+
+on:
+  push:
+    paths:
+      - "services/chat/**"
+  pull_request:
+    paths:
+      - "services/chat/**"
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.20"
+      - name: Run go vet
+        run: |
+          cd services/chat
+          go vet ./...
+      - name: Run tests
+        run: |
+          cd services/chat
+          go test ./...

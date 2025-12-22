@@ -1,0 +1,6 @@
+{
+  "runIntegration": true,
+  "LLM_API_URL": "https://chat-ai.academiccloud.de/v1",
+  "LLM_API_KEY": "1091223f88ffa6f7f04d3947a3b46b93",
+  "LLM_MODEL_NAME": "qwen3-32b"
+}
