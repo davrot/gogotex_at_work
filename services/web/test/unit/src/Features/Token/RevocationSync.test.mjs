@@ -1,4 +1,10 @@
 import { describe, it, expect, vi } from 'vitest'
+import mongoose from 'mongoose'
+
+// Prevent OverwriteModelError in the test environment by clearing previously compiled models
+if (mongoose.models && mongoose.models.PersonalAccessToken) {
+  delete mongoose.models.PersonalAccessToken
+}
 
 import PAM, { _setLookupCacheForTests } from '../../../../../app/src/Features/Token/PersonalAccessTokenManager.mjs'
 import * as PATModel from '../../../../../app/src/models/PersonalAccessToken'
