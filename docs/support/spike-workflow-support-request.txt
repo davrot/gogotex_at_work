@@ -1,0 +1,30 @@
+Summary: Spike workflow runs are stuck in queued state, no jobs are created; manual dispatch returned HTTP 422 earlier and API now shows a queued run with no jobs.
+
+Repo: davrot/gogotex_at_work
+Workflow files: .github/workflows/spike-chat-port.yml, .github/workflows/spike-chat-port-2.yml
+Run id: 20441160742 (URL: https://github.com/davrot/gogotex_at_work/actions/runs/20441160742)
+Created at: 2025-12-22T18:55:17Z
+
+API observations:
+- `GET /actions/workflows` shows workflows with ids 218055048/218055049.
+- Manual dispatch attempts returned HTTP 422: "Workflow does not have 'workflow_dispatch' trigger" even after adding workflow_dispatch and merging to main.
+- Later a run was queued but remained in `queued` status for >10 minutes and `GET /actions/runs/{id}/jobs` returns `total_count: 0`.
+
+Attempts made:
+- Added `.github/workflows/spike-chat-port.yml` and `.github/workflows/spike-chat-port-2.yml` with `workflow_dispatch` and `pull_request` triggers and merged to `main`.
+- Attempted manual dispatch via GH API for both workflows (IDs 218055048/218055049) — API returned 422.
+- Opened PR #25 with a tiny change under `services/chat` and pushed empty commits to force sync — no runs appeared.
+- Closed and reopened PR #22 to try triggering events; also pushed commits to sync.
+- Tried to cancel a stuck queued run via API (500 error).
+
+Permission notes:
+- Attempted to list self-hosted runners but the PAT returned HTTP 403, so runner availability couldn't be confirmed.
+
+Impact: prevents running spike parity CI for PRs that port code to Go.
+
+Request: Please investigate why these spike workflows are not dispatchable and why queued runs do not create jobs (possible indexing or runner availability issue). See run id above.
+
+---
+
+Prepared by: davrot
+Timestamp: 2025-12-22T18:xx:xxZ
