@@ -4,6 +4,22 @@ const DEFAULT_BASE = process.env.AUTH_LOCAL_INTROSPECT_URL || 'http://localhost:
 const BASIC_AUTH_USER = process.env.WEBPROFILE_ADMIN_USER || 'overleaf'
 const BASIC_AUTH_PASS = process.env.WEBPROFILE_ADMIN_PASS || 'overleaf'
 
+// Helper: perform fetch with a bounded timeout so tests and CI cannot hang
+// if a remote service or a test stub returns a promise that never resolves.
+// Uses Promise.race to ensure we always reject after timeoutMs milliseconds.
+async function fetchWithTimeout (url, opts = {}, timeoutMs = Number(process.env.WEBPROFILE_FETCH_TIMEOUT_MS || 3000)) {
+  const fetchPromise = fetch(url, opts)
+  const timeoutPromise = new Promise((_, reject) => {
+    const id = setTimeout(() => {
+      clearTimeout(id)
+      const err = new Error(`fetch timeout after ${timeoutMs}ms`)
+      err.name = 'FetchTimeoutError'
+      reject(err)
+    }, timeoutMs)
+  })
+  return Promise.race([fetchPromise, timeoutPromise])
+}
+
 function authHeader() {
   const cred = Buffer.from(`${BASIC_AUTH_USER}:${BASIC_AUTH_PASS}`).toString('base64')
   return `Basic ${cred}`
@@ -12,14 +28,20 @@ function authHeader() {
 export async function introspect(token) {
   const url = `${DEFAULT_BASE.replace(/\/$/, '')}/internal/api/tokens/introspect`
   try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: authHeader(),
-      },
-      body: JSON.stringify({ token }),
-    })
+    let res
+    try {
+      res = await fetchWithTimeout(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: authHeader(),
+        },
+        body: JSON.stringify({ token }),
+      })
+    } catch (err) {
+      logger.err({ err }, 'webprofile introspect call failed (timeout or network)')
+      return null
+    }
     if (res.status === 400) {
       const body = await res.json().catch(() => ({}))
       return { error: 'bad_request', body }
@@ -35,14 +57,20 @@ export async function introspect(token) {
 export async function createToken(userId, payload) {
   const url = `${DEFAULT_BASE.replace(/\/$/, '')}/internal/api/users/${encodeURIComponent(userId)}/git-tokens`
   try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: authHeader(),
-      },
-      body: JSON.stringify(payload),
-    })
+    let res
+    try {
+      res = await fetchWithTimeout(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: authHeader(),
+        },
+        body: JSON.stringify(payload),
+      })
+    } catch (err) {
+      logger.err({ err }, 'webprofile create token call failed (timeout or network)')
+      return null
+    }
     if (res.status !== 200 && res.status !== 201) return null
     return await res.json()
   } catch (err) {
@@ -54,10 +82,16 @@ export async function createToken(userId, payload) {
 export async function listTokens(userId) {
   const url = `${DEFAULT_BASE.replace(/\/$/, '')}/internal/api/users/${encodeURIComponent(userId)}/git-tokens`
   try {
-    const res = await fetch(url, {
-      method: 'GET',
-      headers: { Authorization: authHeader() },
-    })
+    let res
+    try {
+      res = await fetchWithTimeout(url, {
+        method: 'GET',
+        headers: { Authorization: authHeader() },
+      })
+    } catch (err) {
+      logger.err({ err }, 'webprofile list tokens call failed (timeout or network)')
+      return null
+    }
     if (res.status !== 200) return null
     return await res.json()
   } catch (err) {
@@ -69,8 +103,24 @@ export async function listTokens(userId) {
 export async function revokeToken(userId, tokenId) {
   const url = `${DEFAULT_BASE.replace(/\/$/, '')}/internal/api/users/${encodeURIComponent(userId)}/git-tokens/${encodeURIComponent(tokenId)}`
   try {
-    const res = await fetch(url, { method: 'DELETE', headers: { Authorization: authHeader() } })
-    return res.status === 204
+    let res
+    try {
+      res = await fetchWithTimeout(url, { method: 'DELETE', headers: { Authorization: authHeader() } })
+    } catch (err) {
+      logger.err({ err }, 'webprofile revoke call failed (timeout or network)')
+      return false
+    }
+    // Accept 204 No Content as canonical success; also accept 200 for parity
+    // with implementations that return an OK body but no content.
+    if (res.status === 204 || res.status === 200) return true
+    // Log non-204 responses for debugging parity issues
+    try {
+      const text = await res.text().catch(() => null)
+      logger.warn({ status: res.status, body: text }, 'webprofile revoke returned non-204')
+    } catch (e) {
+      logger.warn({ status: res && res.status }, 'webprofile revoke returned non-204 and body parse failed')
+    }
+    return false
   } catch (err) {
     logger.err({ err }, 'webprofile revoke call failed')
     return false
@@ -82,11 +132,17 @@ export async function revokeToken(userId, tokenId) {
 export async function createSSHKey(userId, { public_key, key_name }) {
   const url = `${DEFAULT_BASE.replace(/\/$/, '')}/internal/api/users/${encodeURIComponent(userId)}/ssh-keys`
   try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: authHeader() },
-      body: JSON.stringify({ public_key, key_name }),
-    })
+    let res
+    try {
+      res = await fetchWithTimeout(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: authHeader() },
+        body: JSON.stringify({ public_key, key_name }),
+      })
+    } catch (err) {
+      logger.err({ err }, 'webprofile create ssh key call failed (timeout or network)')
+      return null
+    }
     if (res.status !== 200 && res.status !== 201) return null
     return await res.json()
   } catch (err) {
@@ -98,10 +154,16 @@ export async function createSSHKey(userId, { public_key, key_name }) {
 export async function listSSHKeys(userId) {
   const url = `${DEFAULT_BASE.replace(/\/$/, '')}/internal/api/users/${encodeURIComponent(userId)}/ssh-keys`
   try {
-    const res = await fetch(url, {
-      method: 'GET',
-      headers: { Authorization: authHeader() },
-    })
+    let res
+    try {
+      res = await fetchWithTimeout(url, {
+        method: 'GET',
+        headers: { Authorization: authHeader() },
+      })
+    } catch (err) {
+      logger.err({ err }, 'webprofile list ssh keys call failed (timeout or network)')
+      return null
+    }
     if (res.status !== 200) return null
     return await res.json()
   } catch (err) {
@@ -113,7 +175,13 @@ export async function listSSHKeys(userId) {
 export async function removeSSHKey(userId, keyId) {
   const url = `${DEFAULT_BASE.replace(/\/$/, '')}/internal/api/users/${encodeURIComponent(userId)}/ssh-keys/${encodeURIComponent(keyId)}`
   try {
-    const res = await fetch(url, { method: 'DELETE', headers: { Authorization: authHeader() } })
+    let res
+    try {
+      res = await fetchWithTimeout(url, { method: 'DELETE', headers: { Authorization: authHeader() } })
+    } catch (err) {
+      logger.err({ err }, 'webprofile remove ssh key call failed (timeout or network)')
+      return false
+    }
     return res.status === 204
   } catch (err) {
     logger.err({ err }, 'webprofile remove ssh key call failed')
@@ -125,7 +193,13 @@ export async function removeSSHKey(userId, keyId) {
 export async function getSSHKeyByFingerprint(fingerprint) {
   const url = `${DEFAULT_BASE.replace(/\/$/, '')}/internal/api/ssh-keys/${encodeURIComponent(fingerprint)}`
   try {
-    const res = await fetch(url, { method: 'GET', headers: { Authorization: authHeader(), Accept: 'application/json' } })
+    let res
+    try {
+      res = await fetchWithTimeout(url, { method: 'GET', headers: { Authorization: authHeader(), Accept: 'application/json' } })
+    } catch (err) {
+      logger.err({ err }, 'webprofile fingerprint lookup call failed (timeout or network)')
+      return undefined
+    }
     if (res.status === 200) return await res.json()
     if (res.status === 404) return { notFound: true }
     return { error: true }

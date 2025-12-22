@@ -54,11 +54,26 @@ const sessionStore = new CustomSessionStore({ client: sessionsRedisClient })
 
 const app = express()
 
+// Top-most diagnostic: log any request against /internal/api/users for visibility at the earliest point
+app.use((req, res, next) => {
+  try {
+    if (req.url && req.url.includes('/internal/api/users/')) {
+      try { console.error('[APP TOP DIAG] incoming', { method: req.method, url: req.url, rawHeaders: req.rawHeaders, headers: req.headers, sockAddr: req.socket && req.socket.remoteAddress, proto: req.protocol }) } catch (e) {}      try {
+        res.on('finish', () => {
+          try { console.error('[APP TOP DIAG] finish', { method: req.method, url: req.url, status: res.statusCode, sessionExists: !!req.session, sessionUser: req.session && req.session.user ? { _id: req.session.user._id, email: req.session.user.email } : null }) } catch (e) {}
+        })
+      } catch (e) {}    }
+  } catch (e) {}
+  next()
+})
+
 // Top-most early handler: if x-debug-echo: 1 is present, return raw headers & session immediately
 // This runs before any body-parsing, CSRF, or auth middleware to capture the incoming request as received
 app.use((req, res, next) => {
   try {
     if (req.get && req.get('x-debug-echo') === '1') {
+      // Early cookie parsing diagnostics (before cookie-parser/session run)
+      try { console.error('[APP TOP DEBUG ECHO] EARLY DIAG cookies:', { cookies: req.cookies || null, signedCookies: req.signedCookies || null, sessionID: req.sessionID || null }) } catch (e) {}
       const sessionUser = req.session && req.session.user ? { _id: req.session.user._id, email: req.session.user.email } : null
       const out = {
         stage: 'app-top',
@@ -78,11 +93,32 @@ app.use((req, res, next) => {
 })
 try { console.error('[APP TOP DEBUG ECHO] registered') } catch (e) {}
 
+// Very early: log all /internal/api/debug hits at the app level so we can see if the request
+// reaches the process before any routers/middleware take over
+app.use((req, res, next) => {
+  try {
+    if (req.url && req.url.includes('/internal/api/debug')) {
+      try { console.error('[DEBUG PATH TOP] incoming', { method: req.method, url: req.url, headersSummary: Object.keys(req.headers || {}).reduce((acc, k) => { acc[k] = k === 'cookie' ? String(req.headers[k]).slice(0,200) : req.headers[k]; return acc }, {}), cookies: req.cookies || null, signedCookies: req.signedCookies || null, sessionExists: !!req.session }) } catch (e) {}
+    }
+  } catch (e) {}
+  next()
+})
+
 // Test-only: ensure response Content-Type for SSH key list endpoints so clients parse correctly
 app.use((req, res, next) => {
   try {
     if (process.env.NODE_ENV === 'test' && (req.originalUrl || req.url) && (req.originalUrl || req.url).includes('/internal/api/users/') && (req.originalUrl || req.url).includes('/ssh-keys')) {
       try { res.setHeader('Content-Type', 'application/json; charset=utf-8') } catch (e) {}
+    }
+  } catch (e) {}
+  next()
+})
+
+// Test-only: very early delete path tracer to log exact state for problematic DELETEs
+app.use((req, res, next) => {
+  try {
+    if (process.env.NODE_ENV === 'test' && req.method === 'DELETE' && req.url && req.url.includes('/internal/api/users/') && req.url.includes('/git-tokens/')) {
+      try { console.error('[EARLY DELETE TRACER] incoming', { method: req.method, url: req.url, rawHeaders: req.rawHeaders, headers: req.headers, cookies: req.cookies || null, signedCookies: req.signedCookies || null, sessionExists: !!req.session }) } catch (e) {}
     }
   } catch (e) {}
   next()
@@ -237,6 +273,17 @@ app.use((req, res, next) => {
   next()
 })
 
+// Test-only: log DELETE internal api users requests as early as possible so we can see
+// whether the request reaches the process, and whether session/cookies are parsed
+app.use((req, res, next) => {
+  try {
+    if (req.method === 'DELETE' && req.url && req.url.includes('/internal/api/users/')) {
+      try { console.error('[DELETE DEBUG TOP] incoming', { method: req.method, url: req.url, rawHeaders: req.rawHeaders, headers: req.headers, cookies: req.cookies || null, signedCookies: req.signedCookies || null, csrfHeader: req.get && req.get('x-csrf-token'), sessionSummary: req.session ? { id: req.session.id || req.sessionID, hasUser: !!req.session.user } : null }) } catch (e) {}
+    }
+  } catch (e) {}
+  next()
+})
+
 // App-level early debug echo middleware: short-circuit and return raw headers/session
 // whenever the request includes the test header `x-debug-echo: 1` (runs before CSRF)
 app.use((req, res, next) => {
@@ -263,6 +310,37 @@ app.use((req, res, next) => {
 const webRouter = express.Router()
 const privateApiRouter = express.Router()
 const publicApiRouter = express.Router()
+
+// Log hits to internal API paths at router level to see which router handles the request
+privateApiRouter.use((req, res, next) => {
+  try {
+    if (req.url && req.url.includes('/internal/api/')) {
+      try { console.error('[PRIVATE-API ROUTER] incoming', { method: req.method, url: req.url, headers: req.headers, cookies: req.cookies || null, signedCookies: req.signedCookies || null, sessionExists: !!req.session }) } catch (e) {}
+    }
+  } catch (e) {}
+  next()
+})
+publicApiRouter.use((req, res, next) => {
+  try {
+    if (req.url && req.url.includes('/internal/api/')) {
+      try { console.error('[PUBLIC-API ROUTER] incoming', { method: req.method, url: req.url, headers: req.headers, cookies: req.cookies || null, signedCookies: req.signedCookies || null, sessionExists: !!req.session }) } catch (e) {}
+    }
+  } catch (e) {}
+  next()
+})
+
+// Router-level early diagnostics: log any internal API user requests reaching the webRouter
+webRouter.use((req, res, next) => {
+  try {
+    if (req.url && req.url.includes('/internal/api/users/')) {
+      try { console.error('[WEBROUTER HIT] incoming', { method: req.method, url: req.url, headers: req.headers, sessionExists: !!req.session }) } catch (e) {}
+    }
+    if (req.url && req.url.includes('/internal/api/debug')) {
+      try { console.error('[WEBROUTER DEBUG PATH HIT] incoming', { method: req.method, url: req.url, headers: req.headers, cookies: req.cookies || null, signedCookies: req.signedCookies || null, sessionExists: !!req.session }) } catch (e) {}
+    }
+  } catch (e) {}
+  next()
+})
 
 if (Settings.behindProxy) {
   app.set('trust proxy', Settings.trustedProxyIps || true)
@@ -355,6 +433,21 @@ if (Settings.enabledServices.includes('web')) {
 
 app.use(metrics.http.monitor(logger))
 
+// Test-only: attach finish handler to log non-json 4xx/5xx responses for internal API paths
+app.use((req, res, next) => {
+  try {
+    res.on('finish', () => {
+      try {
+        if (process.env.NODE_ENV === 'test' && (req.originalUrl || req.url) && (req.originalUrl || req.url).includes('/internal/api/') && res.statusCode >= 400) {
+          const ct = (res.getHeader && res.getHeader('Content-Type')) || (res.get && res.get('Content-Type')) || ''
+          try { console.error('[FINISH DIAG] internal API finished with error', { method: req.method, url: req.originalUrl || req.url, status: res.statusCode, contentType: ct, sessionExists: !!req.session }) } catch (e) {}
+        }
+      } catch (e) {}
+    })
+  } catch (e) {}
+  next()
+})
+
 await Modules.applyMiddleware(app, 'appMiddleware')
 
 // Test-only: capture a final headers snapshot for SSH keys endpoints so
@@ -434,6 +527,17 @@ SessionAutostartMiddleware.applyInitialMiddleware(webRouter)
 await Modules.applyMiddleware(webRouter, 'sessionMiddleware', {
   store: sessionStore,
 })
+
+// Diagnostic: log request state immediately before session middleware runs
+webRouter.use((req, res, next) => {
+  try {
+    const cookieName = Settings.cookieName
+    const signed = req.signedCookies && req.signedCookies[cookieName]
+    try { console.error('[BEFORE-SESSION] incoming', { method: req.method, url: req.url, headers: req.headers, cookies: req.cookies || null, signedCookies: req.signedCookies || null, signedSessionCookie: signed || null }) } catch (e) {}
+  } catch (e) {}
+  next()
+})
+
 webRouter.use(
   session({
     resave: false,
@@ -451,6 +555,26 @@ webRouter.use(
     rolling: Settings.cookieRollingSession === true,
   })
 )
+
+// Diagnostic: log request state immediately after session middleware runs
+webRouter.use((req, res, next) => {
+  try {
+    const cookieName = Settings.cookieName
+    const signed = req.signedCookies && req.signedCookies[cookieName]
+    try { console.error('[AFTER-SESSION] incoming', { method: req.method, url: req.url, cookies: req.cookies || null, signedCookies: req.signedCookies || null, signedSessionCookie: signed || null, sessionID: req.sessionID || (req.session && req.session.id) || null, sessionExists: !!req.session, sessionUser: req.session && req.session.user ? { _id: req.session.user._id, email: req.session.user.email } : null }) } catch (e) {}
+  } catch (e) {}
+  next()
+})
+
+// POST-session diagnostics: log internal user API requests after session middleware runs
+webRouter.use((req, res, next) => {
+  try {
+    if (req.url && req.url.includes('/internal/api/users/')) {
+      try { console.error('[POST-SESSION] incoming', { method: req.method, url: req.url, cookies: req.cookies || null, signedCookies: req.signedCookies || null, sessionExists: !!req.session, sessionUser: req.session && req.session.user ? { _id: req.session.user._id, email: req.session.user.email } : null }) } catch (e) {}
+    }
+  } catch (e) {}
+  next()
+})
 
 // Test-only: allow setting a dev session user via header to make contract tests less flaky
 webRouter.use((req, res, next) => {
@@ -710,6 +834,11 @@ const server = http.createServer(app)
 // This helps verify whether test headers (eg. x-debug-echo, x-dev-user-id) arrive at the process
 server.on('request', (req, res) => {
   try { console.error('[HTTP SERVER EARLY REQUEST]', { method: req.method, url: req.url, rawHeaders: req.rawHeaders, headers: req.headers }) } catch (e) {}
+  try {
+    if (req.method === 'DELETE' && req.url && req.url.includes('/internal/api/users/')) {
+      try { console.error('[HTTP SERVER EARLY DELETE]', { method: req.method, url: req.url, rawHeaders: req.rawHeaders, headers: req.headers }) } catch (e) {}
+    }
+  } catch (e) {}
 })
 
 // provide settings for separate web and api processes
@@ -819,5 +948,48 @@ webRouter.get('/internal/api/debug/echo', (req, res) => {
     return res.sendStatus(500)
   }
 })
+
+// Test-only: inspect session cookie and redis store (debug endpoint)
+if (process.env.NODE_ENV === 'test') {
+  // Allow public access in tests to inspect session decoding
+  try { AuthenticationController.addEndpointToLoginWhitelist && AuthenticationController.addEndpointToLoginWhitelist('/internal/api/debug/inspect-session') } catch (e) {}
+  webRouter.get('/internal/api/debug/inspect-session', (req, res) => {
+    try {
+      const cookieName = Settings.cookieName
+      const signed = req.signedCookies && req.signedCookies[cookieName]
+      const rawCookie = req.headers && req.headers.cookie
+      const out = { signedSessionCookie: signed || null, rawCookie: rawCookie || null }
+      if (signed && sessionsRedisClient && sessionsRedisClient.get) {
+        // connect-redis stores with prefix 'sess:' by default
+        const redisKey = `sess:${signed}`
+        sessionsRedisClient.get(redisKey, (err, val) => {
+          try {
+            if (err) {
+              console.error('[INSPECT-SESSION] redis get error', { err, redisKey })
+              out.redisError = String(err)
+              return res.status(200).json(out)
+            }
+            try { out.redisVal = val ? JSON.parse(val) : null } catch (e) { out.redisVal = val }
+            return res.status(200).json(out)
+          } catch (e) {
+            console.error('[INSPECT-SESSION] inner error', e && (e.stack || e))
+            return res.status(200).json(out)
+          }
+        })
+      } else {
+        return res.status(200).json(out)
+      }
+    } catch (e) {
+      console.error('[INSPECT-SESSION] error', e && (e.stack || e))
+      return res.status(500).json({ error: String(e) })
+    }
+  })
+
+  // Test-only: final unmatched route handler to log 404s for easier triage
+  app.use((req, res) => {
+    try { console.error('[NOT-FOUND HANDLER] unmatched request', { method: req.method, url: req.originalUrl || req.url, headers: req.headers, sessionExists: !!req.session, sessionUser: req.session && req.session.user ? { _id: req.session.user._id, email: req.session.user.email } : null }) } catch (e) {}
+    return res.status(404).send('Not Found')
+  })
+}
 
 export default { app, server }

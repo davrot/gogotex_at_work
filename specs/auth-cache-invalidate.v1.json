@@ -1,0 +1,14 @@
+{
+  "$id": "auth.cache.invalidate.v1",
+  "type": "object",
+  "properties": {
+    "version": { "const": 1 },
+    "type": { "enum": ["token","ssh"] },
+    "id": { "type": "string" },
+    "hashPrefix": { "type": "string" },
+    "fingerprint": { "type": "string" },
+    "reason": { "type": ["string","null"] },
+    "timestamp": { "type": "string", "format": "date-time" }
+  },
+  "required": ["version","type","id","timestamp"]
+}

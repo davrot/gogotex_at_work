@@ -314,6 +314,16 @@ When enabled, `web` will call the Go shim for `introspect` and token create/list
 
 If the Node web instance requires authentication for POSTs, the script will seed keys directly into MongoDB (using `services/web/tools/seed_ssh_key.mjs`) and compare GET responses instead.
 
+Note: when a `develop` compose stack is running, the parity script prefers to run the seeder inside the running `web` container so the seeder runs on the compose network and can reach Mongo via the service hostname (avoids `127.0.0.1`/`localhost` pitfalls). Example:
+
+```bash
+# From the repository root (when the develop stack is up):
+# copies the public key into the `web` container and runs the seeder there
+docker compose -f develop/docker-compose.yml exec -T web sh -lc "cat > /tmp/seed_pub && MONGO_URI='mongodb://mongo:27017/sharelatex' node tools/seed_ssh_key.mjs \"<userId>\" /tmp/seed_pub && rm -f /tmp/seed_pub" < /path/to/testkey.pub
+```
+
+If compose is not available the script falls back to running the seeder in a dockerized node container or via the local `node` binary.
+
 CI behaviour: The `ssh_keys_parity_check` job will try to start the Go shim automatically in one of three ways (in order):
 
 - If `go` is installed in the runner, it builds and runs the binary locally.
@@ -376,6 +386,32 @@ docker compose -f develop/docker-compose.yml down -v
 # start again
 docker compose -f develop/docker-compose.yml up -d mongo
 ```
+
+### Running migrations (host vs in-container)
+
+When running migration scripts, be explicit about which Mongo host you target to avoid `127.0.0.1` pitfalls.
+
+- From the **host** (when mongo is published to the host):
+
+```bash
+# mongo published on host as 127.0.0.1:27017
+MONGO_CONNECTION_STRING='mongodb://127.0.0.1:27017/sharelatex' node services/web/migrations/backfill-token-expiry.js dryrun 90
+```
+
+- From **inside a container or a compose network** (use the service hostname `mongo`):
+
+```bash
+# run inside a container on the compose network (example uses a one-off node container)
+docker run --rm --network develop_default -v "$(pwd)":/workspace -w /workspace node:22 bash -lc "export MONGO_CONNECTION_STRING='mongodb://mongo:27017/sharelatex'; node services/web/migrations/backfill-token-expiry.js dryrun 90"
+```
+
+- If you're **connected to the mongo container** itself you can run equivalent operations directly with `mongosh` (no host binding required):
+
+```bash
+docker exec -it $(docker ps -qf 'name=mongo') mongosh /docker-entrypoint-initdb.d/backfill-token-algorithm.js --eval '...' # or run inline JS for small migrations
+```
+
+**Tip:** When running inside containers, _do not_ use `127.0.0.1` to refer to other services — use the compose service name (e.g., `mongo`) or connect through the host (127.0.0.1) only when running on the host itself.
 
 Notes:
 

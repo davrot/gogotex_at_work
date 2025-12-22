@@ -1,5 +1,6 @@
 import { expect } from 'chai'
 import request from '../../acceptance/src/helpers/request.js'
+import crypto from 'crypto'
 import Settings from '@overleaf/settings'
 
 // Tests rely on accepting `X-Service-Origin` headers in the test environment so
@@ -31,11 +32,29 @@ describe('Service-Origin Rate Limits (contract test scaffold)', function () {
       // ignore any issues clearing the rate limiter
     }
 
-    // perform 60 requests; expect 200s or 200 with active:false
+    // Perform an initial pre-check with a syntactically-valid token to ensure
+    // the introspect endpoint is accepting the token format and not returning
+    // 400 (invalid token format) which would cause warmup to miscount.
+    const preToken = crypto.randomBytes(12).toString('hex')
+    const preCheck = await new Promise((resolve, reject) => {
+      CLIENT.post({ url: TARGET, json: { token: preToken } }, (err, response, body) => {
+        if (err) reject(err)
+        else resolve({ response, body })
+      })
+    })
+    if (preCheck.response.statusCode === 400) {
+      // Fail fast with diagnostic info so we can understand why format is rejected
+      // eslint-disable-next-line no-console
+      console.error('[ServiceOriginRateLimitTests] pre-check failed: introspect rejecting valid token format', preCheck.body)
+      throw new Error('Introspect endpoint rejecting valid token format (400) during warmup pre-check')
+    }
+
+    // perform 60 requests using syntactically-valid tokens; expect 200s or 200 with active:false
     for (let i = 0; i < 60; i++) {
+      const token = crypto.randomBytes(12).toString('hex')
       const res = await new Promise((resolve, reject) => {
-        CLIENT.post({ url: TARGET, json: { token: `bad-${i}` } }, (err, response, body) => {
-          if (err) reject(err);
+        CLIENT.post({ url: TARGET, json: { token } }, (err, response, body) => {
+          if (err) reject(err)
           else resolve({ response, body })
         })
       })
@@ -48,8 +67,9 @@ describe('Service-Origin Rate Limits (contract test scaffold)', function () {
     }
 
     // 61st request SHOULD be throttled (429) by service-origin rate-limiter
+    const lastToken = crypto.randomBytes(12).toString('hex')
     const res61 = await new Promise((resolve, reject) => {
-      CLIENT.post({ url: TARGET, json: { token: 'bad-last' } }, (err, response, body) => {
+      CLIENT.post({ url: TARGET, json: { token: lastToken } }, (err, response, body) => {
         if (err) reject(err);
         else resolve({ response, body })
       })

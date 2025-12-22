@@ -1,0 +1,1 @@
+exports.getTotalSizeOfLines = (lines) => lines.reduce((s, l) => s + l.length, 0)

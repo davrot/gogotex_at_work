@@ -1,0 +1,3 @@
+FROM texlive/texlive:latest-full
+
+# RUN usermod -u 1001 tex

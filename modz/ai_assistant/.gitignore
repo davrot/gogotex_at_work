@@ -1,0 +1,2 @@
+# Local test configuration (contains secrets - do NOT commit)
+test/config.local.json

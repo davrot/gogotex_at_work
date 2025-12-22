@@ -135,12 +135,29 @@ if (!process.env.HTTP_TEST_HOST) {
   } catch (e) {
     // ignore; the detection will be retried in callers that can access docker
   }
-  // Fallback: if detection above failed (for example docker CLI unavailable
-  // inside the container), set a sensible default so tests can run locally
+
+  // Fallback: prefer a compose service hostname when running inside container,
+  // else default to the local 'web' host. Also default HTTP_TEST_PORT to 3000.
   if (!process.env.HTTP_TEST_HOST) {
+    try {
+      const fs = require('fs')
+      // crude docker/container detection: /.dockerenv or cgroup lookups
+      const isContainer = fs.existsSync('/.dockerenv') || (fs.existsSync('/proc/1/cgroup') && fs.readFileSync('/proc/1/cgroup', 'utf8').includes('docker'))
+      const fallbackHost = isContainer ? 'develop-web-1' : 'web'
+      // eslint-disable-next-line no-console
+      console.debug(`[bootstrap] HTTP_TEST_HOST not detected; defaulting to "${fallbackHost}". If running tests from host, set HTTP_TEST_HOST=localhost or use docker-compose to expose ports.`)
+      process.env.HTTP_TEST_HOST = fallbackHost
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.debug('[bootstrap] HTTP_TEST_HOST not detected; defaulting to "web"')
+      process.env.HTTP_TEST_HOST = 'web'
+    }
+  }
+
+  if (!process.env.HTTP_TEST_PORT) {
+    process.env.HTTP_TEST_PORT = process.env.WEB_PORT || '3000'
     // eslint-disable-next-line no-console
-    console.debug('[bootstrap] HTTP_TEST_HOST not detected, defaulting to "web"')
-    process.env.HTTP_TEST_HOST = 'web'
+    console.debug(`[bootstrap] defaulted HTTP_TEST_PORT to ${process.env.HTTP_TEST_PORT}`)
   }
 }
 
@@ -172,6 +189,18 @@ if (!process.env.HTTP_TEST_HOST) {
     // eslint-disable-next-line no-console
     console.debug('[bootstrap] pre-test rebuild helper threw', e && e.message ? e.message : e)
   }
+
+  // Default testing behavior: unless we're explicitly running the delegation parity
+  // tests (DELEGATION_PARITY=1), prefer the local Node implementations to avoid
+  // brittle external dependencies. Only set these defaults if not already specified.
+  if (process.env.DELEGATION_PARITY !== '1') {
+    if (typeof process.env.AUTH_SSH_USE_WEBPROFILE_API === 'undefined') process.env.AUTH_SSH_USE_WEBPROFILE_API = 'false'
+    if (typeof process.env.AUTH_TOKEN_USE_WEBPROFILE_API === 'undefined') process.env.AUTH_TOKEN_USE_WEBPROFILE_API = 'false'
+  }
+
+  // Allow bcrypt as a test-time fallback when argon2 isn't available to avoid
+  // 500s in environments without the native argon2 module (CI/dev images).
+  if (typeof process.env.AUTH_TOKEN_ALLOW_BCRYPT_FALLBACK === 'undefined') process.env.AUTH_TOKEN_ALLOW_BCRYPT_FALLBACK = 'true'
 
   // If token delegation to a webprofile API is requested, ensure the webprofile shim
   // is available on the compose network. This is best-effort and only runs when

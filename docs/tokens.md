@@ -22,4 +22,5 @@ Rate limits & observability
 Runbook notes
 
 - Plaintext token is only returned once at creation — store it securely in secrets manager if you need to save it for users.
+- For revocation troubleshooting and runbook, see `docs/revocation-runbook.md`.
 - For large-scale re-issues, use `rewrite-token-hashing.js` migration which can run in dry-run mode and supports chunking.

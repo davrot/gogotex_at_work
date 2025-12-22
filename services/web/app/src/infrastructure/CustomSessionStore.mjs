@@ -58,7 +58,10 @@ class CustomSessionStore extends RedisStore {
   }
 
   get(sid, cb) {
+    // Entrypoint log to confirm store.get invoked for the session id
+    try { console.error('[SessionStore] get invoked for sid', { sid }) } catch (e) {}
     super.get(sid, (err, sess) => {
+      try { console.error('[SessionStore] get', { sid, found: !!sess, validationOk: !!sess && checkValidationToken(sid, sess), sessSize: sess ? JSON.stringify(sess).length : 0, hasUser: !!(sess && sess.user) }) } catch (e) {}
       if (err || !sess || !checkValidationToken(sid, sess)) return cb(err, null)
       CustomSessionStore.metric('get', sess)
       cb(null, sess)

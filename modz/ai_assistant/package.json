@@ -1,0 +1,9 @@
+{
+  "name": "modz-ai-assistant",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "test": "node test/smoke.test.js",
+    "test:llm": "node test/llm-config.test.js"
+  }
+}

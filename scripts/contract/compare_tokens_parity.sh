@@ -8,6 +8,8 @@ set -euo pipefail
 NODE_BASE=${1:-${NODE_BASE:-}}
 GO_BASE=${2:-${GO_BASE:-}}
 USER_ID=${3:-${USER_ID:-test-compare}}
+# Docker network to attach dockerized seeders to so container hostnames resolve (override via env if needed)
+NETWORK=${NETWORK:-develop_default}
 
 if [ -z "$NODE_BASE" ] || [ -z "$GO_BASE" ]; then
   echo "Usage: $0 <node_base_url> <go_base_url> <userId>"
@@ -135,9 +137,11 @@ if [ "$NODE_STATUS" = "302" ] || [ "$NODE_STATUS" = "401" ] || [ "$NODE_STATUS" 
         echo "Warning: seeder script not visible inside docker at $SEED_TOKEN_ARG (mounted $SCRIPT_ROOT:/work)."
         echo "Docker may not be able to mount the repository path from this environment. Proceeding to run seeder to capture error output."
       fi
-      docker run --rm -e MONGO_URI="$MONGO_URI" -v "$SCRIPT_ROOT":/work -w /work node:20 node "$SEED_TOKEN_ARG" "$USER_ID" >"$NODE_SEED_OUT" 2>&1 || true
+      # Ensure the seeder sees the WebProfile base URL and a bcrypt fallback so hashing and webprofile calls work from inside docker
+      docker run --rm -e MONGO_URI="$MONGO_URI" -e AUTH_LOCAL_INTROSPECT_URL="$GO_BASE" -e AUTH_TOKEN_ALLOW_BCRYPT_FALLBACK="${AUTH_TOKEN_ALLOW_BCRYPT_FALLBACK:-1}" --network "$NETWORK" -v "$SCRIPT_ROOT":/work -w /work node:20 node "$SEED_TOKEN_ARG" "$USER_ID" >"$NODE_SEED_OUT" 2>&1 || true
     else
-      MONGO_URI="$MONGO_URI" $NODE_CMD "$SEED_TOKEN_ARG" "$USER_ID" >"$NODE_SEED_OUT" 2>&1 || true
+      # When running locally, export envs so the seeder will target the correct WebProfile URL and allow bcrypt fallback
+      AUTH_LOCAL_INTROSPECT_URL="$GO_BASE" AUTH_TOKEN_ALLOW_BCRYPT_FALLBACK="${AUTH_TOKEN_ALLOW_BCRYPT_FALLBACK:-1}" MONGO_URI="$MONGO_URI" $NODE_CMD "$SEED_TOKEN_ARG" "$USER_ID" >"$NODE_SEED_OUT" 2>&1 || true
     fi
   fi
   # For Go user, seed separate user id to avoid direct collision in same DB
@@ -155,9 +159,10 @@ if [ "$NODE_STATUS" = "302" ] || [ "$NODE_STATUS" = "401" ] || [ "$NODE_STATUS" 
     fi
   fi
   if echo "$NODE_CMD" | grep -q "docker run"; then
-    docker run --rm -e MONGO_URI="$MONGO_URI" -v "$SCRIPT_ROOT":/work -w /work node:20 node "$SEED_TOKEN_ARG" "$GO_USER_ID" >"$GO_SEED_OUT" 2>&1 || true
+    # Run Go-side seeder with network access to the webprofile container and bcrypt fallback enabled
+    docker run --rm -e MONGO_URI="$MONGO_URI" -e AUTH_LOCAL_INTROSPECT_URL="$GO_BASE" -e AUTH_TOKEN_ALLOW_BCRYPT_FALLBACK="${AUTH_TOKEN_ALLOW_BCRYPT_FALLBACK:-1}" --network "$NETWORK" -v "$SCRIPT_ROOT":/work -w /work node:20 node "$SEED_TOKEN_ARG" "$GO_USER_ID" >"$GO_SEED_OUT" 2>&1 || true
   else
-    MONGO_URI="$MONGO_URI" $NODE_CMD "$SEED_TOKEN_ARG" "$GO_USER_ID" >"$GO_SEED_OUT" 2>&1 || true || true
+    AUTH_LOCAL_INTROSPECT_URL="$GO_BASE" AUTH_TOKEN_ALLOW_BCRYPT_FALLBACK="${AUTH_TOKEN_ALLOW_BCRYPT_FALLBACK:-1}" MONGO_URI="$MONGO_URI" $NODE_CMD "$SEED_TOKEN_ARG" "$GO_USER_ID" >"$GO_SEED_OUT" 2>&1 || true
   fi
 
   # If caller provided NODE_SEED_ID/GO_SEED_ID externally, populate minimal seed output files so parsing below succeeds

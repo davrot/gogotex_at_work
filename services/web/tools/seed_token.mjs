@@ -22,7 +22,15 @@ try {
   const PAMod = await import(`file://${managersPath}`)
   const PAM = PAMod.default || PAMod
   const res = await PAM.createToken(userId, { label })
-  console.log(JSON.stringify(res))
+  // Normalize id to a plain 24-character hex string when possible so outside scripts can parse reliably
+  const out = Object.assign({}, res)
+  if (out && out.id && typeof out.id === 'string') {
+    const m = out.id.match(/ObjectID\("([0-9a-fA-F]{24})"\)/)
+    if (m) out.id = m[1]
+  } else if (out && out.id && typeof out.id === 'object' && typeof out.id.toString === 'function') {
+    out.id = out.id.toString()
+  }
+  console.log(JSON.stringify(out))
   await mongoose.disconnect()
   process.exit(0)
 } catch (e) {

@@ -1,0 +1,6 @@
+{
+  "runIntegration": false,
+  "LLM_API_URL": "https://api.example.com/v1",
+  "LLM_API_KEY": "YOUR_API_KEY_HERE",
+  "LLM_MODEL_NAME": "qwen3-32b"
+}

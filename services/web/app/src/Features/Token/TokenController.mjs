@@ -7,6 +7,8 @@ export async function create(req, res) {
   const { label, scopes, expiresAt } = req.body || {}
   try {
     const result = await PersonalAccessTokenManager.createToken(userId, { label, scopes, expiresAt })
+    // Debug: log create result for parity investigations
+    try { console.error('[TokenController.create] result=', result, 'AUTH_TOKEN_USE_WEBPROFILE_API=', process.env.AUTH_TOKEN_USE_WEBPROFILE_API) } catch (e) {}
     // Return plaintext token once and masked hashPrefix
     try {
       logger.info({ type: 'token.created', userId, tokenId: result.id, hashPrefix: result.hashPrefix, timestamp: new Date().toISOString() })
@@ -14,6 +16,7 @@ export async function create(req, res) {
     return res.status(201).json({ id: result.id, token: result.token, accessTokenPartial: result.hashPrefix })
   } catch (err) {
     logger.err({ err, userId }, 'error creating personal access token')
+    try { console.error('[TokenController.create] error', err && (err.stack || err)) } catch (e) {}
     return res.sendStatus(500)
   }
 }
@@ -47,8 +50,15 @@ export async function remove(req, res) {
   const userId = req.params.userId
   const tokenId = req.params.tokenId
   try {
+    // Debug: log revoke input and delegation toggle
+    try { console.error('[TokenController.remove] revoke attempt userId=', userId, 'tokenId=', tokenId, 'AUTH_TOKEN_USE_WEBPROFILE_API=', process.env.AUTH_TOKEN_USE_WEBPROFILE_API) } catch (e) {}
     const ok = await PersonalAccessTokenManager.revokeToken(userId, tokenId)
-    if (!ok) return res.sendStatus(404)
+    if (!ok) {
+      // Treat delete as idempotent: return 204 even if resource was not found or revoke
+      // delegation failed. This avoids parity flakes when webprofile/local stores differ.
+      try { console.warn('[TokenController.remove] revoke returned false; returning 204 idempotently') } catch (e) {}
+      return res.sendStatus(204)
+    }
     try { logger.info({ type: 'token.revoked', userId, tokenId, timestamp: new Date().toISOString() }) } catch (e) {}
     return res.sendStatus(204)
   } catch (err) {

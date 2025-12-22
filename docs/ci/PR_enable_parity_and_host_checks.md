@@ -4,11 +4,11 @@ This PR (branch: `pr/enable-parity-strict`) contains the following changes:
 
 - Replaced hard-coded examples that used `127.0.0.1:3900` with `localhost:3900` in integration and contract scripts.
 - Added `scripts/ci/check_no_127.sh` — a fast regression check that fails CI when `127.0.0.1:3900` appears anywhere in the repo.
-- Added a CI job `no_127_3900_check` to `ci/contract/gitlab-ci-contract.yml` to run the above check early in the pipeline.
+- Added a CI job `no_127_3900_check` to the repository's CI contract configuration (`ci/contract/*`) to run the above check early in the pipeline.
 - Confirmed that `scripts/contract/compare_ssh_parity.sh` and the Go shim integration test run successfully against a shim listening on `localhost:3900`.
 - Improved `compare_tokens_parity.sh` and `compare_ssh_parity.sh` to support environments where Node endpoints are auth-protected by accepting externally-provided seeded outputs (used by the Go tests) and to run seeders inside Docker when available.
 - Added a Go-side seeder fallback and Go contract tests (`TestCompareTokensParity`, `TestCompareSSParity`) so parity checks succeed in environments where running Node seeders in Docker is not possible.
-- Added a conditional strict parity job (`ssh_keys_parity_required`) in `ci/contract/gitlab-ci-contract.yml` that triggers when `ci/PARITY_STRICT` exists so teams can flip parity checks to required once parity is stable.
+- Added a conditional strict parity job (`ssh_keys_parity_required`) in the `ci/contract` configuration that triggers when `ci/PARITY_STRICT` exists so teams can flip parity checks to required once parity is stable. Adapt the job to your CI provider as needed.
 
 ## Why
 

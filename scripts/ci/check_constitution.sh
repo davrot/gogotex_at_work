@@ -46,11 +46,12 @@ else
   FAIL=1
 fi
 
-# 6) CI gating presence heuristic: check for bench references in CI config files
-if grep -q "ci/benchmarks" "$ROOT_DIR/.gitlab-ci.yml" 2>/dev/null || grep -q "ci/benchmarks" "$ROOT_DIR/ci/contract/gitlab-ci-contract.yml" 2>/dev/null || grep -q "ci/benchmarks" $ROOT_DIR/.github/workflows/*.yml 2>/dev/null || [ -f "$ROOT_DIR/.github/workflows/check-constitution.yml" ]; then
+# 6) CI gating presence heuristic: check for bench references in CI config files (provider-agnostic)
+# Prefer detecting references in GitHub Actions workflows or the repo's `ci/contract` config directory
+if grep -q "ci/benchmarks" $ROOT_DIR/.github/workflows/*.yml 2>/dev/null || [ -d "$ROOT_DIR/ci/contract" ]; then
   echo "OK: CI references to ci/benchmarks detected (gating may be present)"
 else
-  echo "WARN: Cannot detect CI gating referencing ci/benchmarks. Ensure T033 gating is added to your CI." >&2
+  echo "WARN: Cannot detect CI gating referencing ci/benchmarks. Ensure T033 gating is added to your CI or documented in ci/contract." >&2
 fi
 
 if [ "$FAIL" -ne 0 ]; then

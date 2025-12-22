@@ -1,0 +1,15 @@
+extends ../../../../../app/views/layout-marketing.pug
+include ../../../../../app/views/_mixins/bookmarkable_tabset
+
+block entrypointVar
+	- entrypoint = 'modules/user-activate/pages/user-activate-page'
+
+block append meta
+	meta(name='ol-user' data-type='json' content=user)
+	if typeof userList !== 'undefined'
+		meta(name='ol-userlist' data-type='json' content=userList)
+
+block content
+	#main-content.content.content-alt
+		.container
+			#user-activate-register-container

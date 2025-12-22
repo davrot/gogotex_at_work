@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Deprecated: GitLab-specific helper removed.
+# Deprecated: provider-specific helper removed.
 # This repo now uses a repository-controlled toggle `ci/PARITY_STRICT`.
 # To set strict mode, add the file `ci/PARITY_STRICT` with content `true` on the default branch via a PR.
 
