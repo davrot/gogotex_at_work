@@ -282,6 +282,21 @@ cd services/git-bridge/test/contract
 MONGO_URI=${MONGO_URI} TARGET_BASE_URL=${TARGET_BASE_URL} go test -run TestIntrospectIntegration_Bcrypt -v
 ```
 
+# Running tests inside the VS Code dev container or another container
+
+When you run tests from *inside* the VS Code dev container (or any other container attached to the `develop` compose network), `localhost` will refer to the container itself and will not reach the host-published Mongo port. In that case point tests at the compose service hostname instead (for example `develop-mongo-1`):
+
+```bash
+# from inside devcontainer or a container on the develop network
+export MONGO_URI=mongodb://develop-mongo-1:27017
+# If the Go shim is attached to the develop network as `webprofile-api-ci`, use that hostname for TARGET_BASE_URL
+export TARGET_BASE_URL=http://webprofile-api-ci:3900
+cd services/git-bridge/test/contract
+MONGO_URI=${MONGO_URI} TARGET_BASE_URL=${TARGET_BASE_URL} go test -run TestIntrospectIntegration_Bcrypt -v
+```
+
+This pattern also applies to other integration tests; prefer compose hostnames when running from inside containers or devcontainers.
+
 ### Use Go shim for token operations (optional)
 
 You can configure `web` to delegate token introspection and token management to the Go `webprofile-api` by setting:
