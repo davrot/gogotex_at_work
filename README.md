@@ -70,6 +70,8 @@ folder.
 
 Please see the [CONTRIBUTING](CONTRIBUTING.md) file for information on contributing to the development of Overleaf.
 
+**Developer tools:** For running CI workflows locally (required by the Spec Kit), see the Spec Kit guidance at `.specify/features/example/ci.md` and the local helper script `scripts/ci/run-actions-locally.sh` (do **not** commit secrets; see the Spec Kit for usage examples). This provides an `act`-based, reproducible way to run the `integration-web-mongo` job locally.
+
 ## Authors
 
 [The Overleaf Team](https://www.overleaf.com/about)
