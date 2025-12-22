@@ -28,4 +28,4 @@ PersonalAccessTokenSchema.pre('save', function (next) {
   next()
 })
 
-exports.PersonalAccessToken = mongoose.model('PersonalAccessToken', PersonalAccessTokenSchema)
+exports.PersonalAccessToken = mongoose.models.PersonalAccessToken || mongoose.model('PersonalAccessToken', PersonalAccessTokenSchema)
