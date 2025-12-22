@@ -23,12 +23,12 @@ Open follow-up items (created after import & initial tests):
     - reconcile auth/session shims used in ai_assistant tests with app-wide patterns
   - Blocking: review of auth session contract and available test doubles
 
-- logo_tools (T052g)
-  - Owner: TBD
-  - Effort: 1 day
-  - Tasks:
-    - add smoke/script tests that run transformation scripts and validate artifact outputs
-    - add CI job to run smoke scripts in GitHub Actions
+- logo_tools (T052g) — **Integrated into main; no follow-up required.**
+  - Owner: (integrated)
+  - Effort: 0 days
+  - Notes:
+    - The logo_tools module has already been integrated into the main project and no CI smoke tests are required per stakeholder direction.
+    - The scripts remain available in the repo for manual use and future adoption if desired.
   - Blocking: none
 
 - latex-editor accessibility tests (T052a follow-up)
@@ -47,14 +47,17 @@ Open follow-up items (created after import & initial tests):
   - Blocking: CI runner with docker privileges or dedicated job
 
 Notes & Recommendations:
+
 - Once PRs are opened and merged, delete `modz/` and migrate canonical files to top-level modules as intended.
 - For creating GitHub Issues automatically, provide a valid GITHUB_TOKEN with repo permissions or create them manually referencing this document.
 
 How to run current mod tests locally:
+
 - ai_assistant unit tests: npm run test:modz:ai_assistant
 - track-changes unit tests: npm run test:modz:track_changes
 - smoke tests: npm run test:modz:latex-editor && npm run test:modz:sandbox-compile
 
 If you want, I can:
+
 - Open the PR and create the issues automatically if you provide a GitHub token or the gh CLI.
 - Draft PR body and issue templates here for convenience (no action taken until you approve).
