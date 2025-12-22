@@ -37,8 +37,15 @@
 
 **Goal:** Migrate additional backend services to Go progressively. Each service migration is independently testable and should include a Go module, `cmd/` entrypoint, unit tests, CI build/test job(s), and contract parity checks where relevant.
 
-- [x] T047 [P] Migrate `chat` backend to Go — `services/chat`: add `go.mod`, `cmd/chat`, core handlers, unit tests, and CI job to build/test `services/chat`.
-  - Acceptance: `go test ./services/chat/...` passes locally and in CI; equivalent contract tests (chat message endpoints) pass against the Go binary. **Status:** scaffolding added (health endpoint, test, workflow template applies); further porting of business logic required.
+- [ ] T047 [P] Migrate `chat` backend to Go — `services/chat`: add `go.mod`, `cmd/chat`, core handlers, unit tests, and CI job to build/test `services/chat`.
+  - Acceptance: `go test ./services/chat/...` passes locally and in CI; equivalent contract tests (chat message endpoints) pass; production runtime is the Go binary and Docker/CI integrated to use it.
+  - Current: **scaffolded** — `cmd/chat` provides a health endpoint but the business logic and production runtime still run in Node (`app.js`).
+  - Subtasks:
+    - [ ] T047a Port business logic and endpoints from Node → Go (owner: TBD)
+    - [ ] T047b Add parity contract tests and benchmarks; ensure p95 SLOs are met (owner: TBD)
+    - [ ] T047c Update Dockerfile / docker-compose / runit / CI to run the Go binary (owner: TBD)
+    - [ ] T047d Rollout plan, rollback plan, and canary cutover (owner: TBD)
+    - [ ] T047e Validate migration in CI and close T047 (owner: TBD)
 
 - [x] T048 [P] Migrate `contacts` backend to Go — `services/contacts`: add `go.mod`, `cmd/contacts`, services for contact CRUD, unit tests, and CI job to build/test `services/contacts`.
   - Acceptance: `go test ./services/contacts/...` passes; contract tests for contact endpoints pass. **Status:** implemented (basic Go implementation + unit tests added; `go test` passes).
