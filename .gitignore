@@ -36,3 +36,9 @@ services/*/tmp/
 # Test artifacts
 services/web/test/integration/src/*.out
 services/web/test/unit/src/*.out
+
+# Local secrets used for running workflows locally (act helper)
+# Examples: .secrets, .secrets.local, .secrets.<env>
+.secrets
+.secrets.*
+.secrets.local
