@@ -1,16 +1,18 @@
 import { describe, it, expect, vi } from 'vitest'
 import mongoose from 'mongoose'
 
-// Prevent OverwriteModelError in the test environment by clearing previously compiled models
+// Prevent OverwriteModelError / module cache issues by clearing mongoose models and reset modules
 if (mongoose.models && mongoose.models.PersonalAccessToken) {
   delete mongoose.models.PersonalAccessToken
 }
 
-import PAM, { _setLookupCacheForTests } from '../../../../../app/src/Features/Token/PersonalAccessTokenManager.mjs'
-import * as PATModel from '../../../../../app/src/models/PersonalAccessToken'
-
 describe('revokeToken() synchronous eviction', () => {
   it('waits for lookupCache.invalidate to resolve', async () => {
+    // Reset module cache and dynamically import modules to avoid multiple model compilation
+    vi.resetModules()
+    const { default: PAM, _setLookupCacheForTests } = await import('../../../../../app/src/Features/Token/PersonalAccessTokenManager.mjs')
+    const PATModel = await import('../../../../../app/src/models/PersonalAccessToken')
+
     const mockInvalidate = vi.fn(() => Promise.resolve(true))
     _setLookupCacheForTests({ invalidate: mockInvalidate })
     // stub DB update to return a result with hashPrefix
