@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"github.com/davrot/gogotex_at_work/services/chat/internal/store"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -10,7 +11,8 @@ import (
 func TestThreadsHandler(t *testing.T) {
 	req := httptest.NewRequest("GET", "/project/abc123/threads", nil)
 	w := httptest.NewRecorder()
-	threadsHandler(w, req)
+	s := store.New()
+	threadsHandlerWithStore(s, w, req)
 
 	res := w.Result()
 	if res.StatusCode != http.StatusOK {
