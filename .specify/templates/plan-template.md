@@ -29,11 +29,12 @@
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+_GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
 [Gates determined based on constitution file]
 
-**Solo Developer Note:** If the repository contains `.specify/constitution-solo-mode.md`, the plan SHOULD document how the constitution gates will be validated locally (commands to run tests, benchmarks, and linters). In solo-mode, PR/CI requirements may be waived by the project's maintainers; however, the plan must still include a clear `Constitution Check` describing local validation steps and acceptance criteria.
+**Solo Developer Note & Autonomous Mode:** If the repository contains `.specify/constitution-solo-mode.md` and/or `.specify/autonomous-mode.md`, the plan SHOULD document how the constitution gates will be validated locally (commands to run tests, benchmarks, and linters). In solo-mode, PR/CI requirements may be waived by the project's maintainers; however, the plan must still include a clear `Constitution Check` describing local validation steps and acceptance criteria. When **Autonomous Mode** is active (see `.specify/autonomous-mode.md`), AI assistants MAY implement code, add tests, run local commands, and make local commits to the feature branch to advance work without asking for each change — but they MUST NOT push to remote, open PRs, or create workflows unless explicitly instructed by the developer.
+
 ## Project Structure
 
 ### Documentation (this feature)
@@ -49,6 +50,7 @@ specs/[###-feature]/
 ```
 
 ### Source Code (repository root)
+
 <!--
   ACTION REQUIRED: Replace the placeholder tree below with the concrete layout
   for this feature. Delete unused options and expand the chosen structure with
@@ -99,7 +101,7 @@ directories captured above]
 
 > **Fill ONLY if Constitution Check has violations that must be justified**
 
-| Violation | Why Needed | Simpler Alternative Rejected Because |
-|-----------|------------|-------------------------------------|
-| [e.g., 4th project] | [current need] | [why 3 projects insufficient] |
-| [e.g., Repository pattern] | [specific problem] | [why direct DB access insufficient] |
+| Violation                  | Why Needed         | Simpler Alternative Rejected Because |
+| -------------------------- | ------------------ | ------------------------------------ |
+| [e.g., 4th project]        | [current need]     | [why 3 projects insufficient]        |
+| [e.g., Repository pattern] | [specific problem] | [why direct DB access insufficient]  |

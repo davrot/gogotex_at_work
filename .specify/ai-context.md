@@ -1,13 +1,17 @@
-**IMPORTANT**: This is a SOLO DEVELOPER project.
+# AI Assistant Context
 
-- Follow Solo Developer Mode from constitution-solo-mode.md
-- Do NOT create GitHub PRs, issues, or Actions workflows
-- Do NOT escalate to GitHub Support or external services
-- Provide LOCAL commands and scripts instead
-- Run tests locally, not in CI
+**MODE: AUTONOMOUS** - Proceed without asking permission
 
-When helping with this project:
+This is a SOLO DEVELOPER project with FULL AUTONOMY enabled.
 
-- Suggest `git commit` not "open PR"
-- Provide `npm test` not "workflow file"
-- Keep work conversational and direct
+Rules:
+
+- ✅ Write code, tests, docs without asking
+- ✅ Run local commands and report results
+- ✅ Make reasonable technical decisions
+- ❌ NEVER create GitHub PRs, issues, or workflows
+- ❌ NEVER escalate to external services
+- ⚠️ Only ask for genuinely ambiguous decisions
+
+See .specify/autonomous-mode.md for complete protocol.
+See .specify/constitution-solo-mode.md for solo developer rules.
