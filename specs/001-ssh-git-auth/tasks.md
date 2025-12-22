@@ -39,7 +39,22 @@ description: "Tasks for SSH-only Git authentication feature"
     - [ ] T052i (P1) **Create follow-up issues/PRs** for modules where tests cannot be added immediately; include owner, estimated effort, and blocking dependencies.
       - Acceptance: Issues created and linked from this task for visibility.
 - [ ] T053 Open PR(s) for `integrate/modz` (or per-module integrate branches), request module-owner review, and add CI jobs to validate multi-instance tests where required (e.g., Redis-enabled jobs for pubsub tests).
-  - Acceptance: PR(s) created, CI jobs run and are green or have documented failures with mitigation plans.
+  - Procedure:
+    1. Ensure your SSH key is loaded and works; a normal `git push` is sufficient (no https credential prompts required):
+       - git checkout -b integrate/modz
+       - git push -u origin integrate/modz
+       - Note: we keep a draft PR body at `specs/modz_pr_body.md` to paste into the PR description.
+    2. Create the PR (pick one):
+       - Web UI (recommended): visit GitHub -> Compare & pull request for `integrate/modz` → paste the PR body from `specs/modz_pr_body.md` → select reviewers/labels/milestone.
+       - gh CLI (if available):
+         - gh pr create --title "Import reduced snapshots into modz/ (integrate/modz)" --body-file specs/modz_pr_body.md --base main --head integrate/modz
+       - API (if automating): set GITHUB_TOKEN (repo scope) and POST to `https://api.github.com/repos/:owner/:repo/pulls` with {"title","head","base","body"}.
+    3. Create follow-up issues for remaining subtasks (if you don't want to track them inline on the PR):
+       - gh issue create --title "T052e: Add refs worker/indexer tests" --body "See specs/modz_followups.md" --label "T052"
+       - Or: curl -H "Authorization: token $GITHUB_TOKEN" -X POST -d '{"title":"T052e: Add refs worker/indexer tests","body":"See specs/modz_followups.md","labels":["T052"]}' https://api.github.com/repos/:owner/:repo/issues
+    4. Verify CI runs on the PR and iterate on failures; if CI requires secrets for certain tests (LLM tests, Docker), gate those behind `RUN_LLM_TESTS` or document required secrets in the follow-up issue.
+
+  - Acceptance: PR(s) created, CI jobs run and are green or have documented failures with mitigation plans; follow-up issues created for outstanding items and linked from the PR.
 - [ ] T054 Archive or remove `other_mods/` after validation and confirmation that `modz/` contains canonical, approved snapshots.
   - Acceptance: `other_mods/` moved to an archive location or removed in a follow-up commit with a short justification in the PR.
 
