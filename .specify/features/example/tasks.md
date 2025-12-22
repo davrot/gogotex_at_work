@@ -39,7 +39,7 @@
 
 - [ ] T0A1 Audit & reconcile migrations T047–T057 — inspect each migration task and update statuses to accurately reflect whether business logic, runtime flip, Docker/CI changes, and parity tests are complete.
   - Acceptance: Each task T047..T057 is updated with a clear status and subtasks where work remains; issue links and owners assigned; issue #9 links to the audit results.
-  - Current: **open** — audit not yet performed.
+  - Current: **in progress** — audit performed; per-service follow-up issues created: #11 (chat), #12 (contacts), #13 (document-updater), #14 (filestore), #15 (docstore), #16 (notifications), #17 (real-time), #18 (clsi), #19 (history-v1), #20 (project-history), #21 (web). Owners & estimates TBD.
 
 ## Phase 0b: Additional service migrations — Backends → Go
 
