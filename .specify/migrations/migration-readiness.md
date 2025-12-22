@@ -1,6 +1,6 @@
 # Migration Readiness Checklist
 
-This document defines the canonical checklist that each service migration from Node → Go must satisfy *before* the production runtime is flipped.
+This document defines the canonical checklist that each service migration from Node → Go must satisfy _before_ the production runtime is flipped.
 
 ## Per-service readiness checklist
 
