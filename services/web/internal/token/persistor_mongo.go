@@ -2,8 +2,6 @@ package token
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"time"
 
@@ -33,11 +31,6 @@ func NewMongoPersistor(ctx context.Context, uri, dbName, collName string) (*Mong
 		return nil, err
 	}
 	return &MongoPersistor{col: col}, nil
-}
-
-func sha256Hex(s string) string {
-	h := sha256.Sum256([]byte(s))
-	return hex.EncodeToString(h[:])
 }
 
 // Save stores a token (plaintext) by hashing and saving metadata.

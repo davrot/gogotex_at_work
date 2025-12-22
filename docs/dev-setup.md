@@ -341,6 +341,7 @@ bin/up
 # or start only mongo
 docker compose -f develop/docker-compose.yml up -d mongo
 ````
+
 If you prefer to run a lightweight standalone Mongo for quick integration tests, you may also run:
 
 ```bash
@@ -348,8 +349,7 @@ If you prefer to run a lightweight standalone Mongo for quick integration tests,
 docker run -d --name mongo-test -p 27017:27017 mongo:6
 ```
 
-> Note: prefer using `MONGO_URI` as the canonical environment variable name for configuration and scripts instead of `MONGO_URL`. The codebase accepts `MONGO_URI` and will fall back to `MONGO_URL` temporarily for compatibility; please standardize tooling and CI to use `MONGO_URI` moving forward.
-2. Wait for the container to accept connections and for the init script to run. You can follow the logs:
+> Note: prefer using `MONGO_URI` as the canonical environment variable name for configuration and scripts instead of `MONGO_URL`. The codebase accepts `MONGO_URI` and will fall back to `MONGO_URL` temporarily for compatibility; please standardize tooling and CI to use `MONGO_URI` moving forward. 2. Wait for the container to accept connections and for the init script to run. You can follow the logs:
 
 ```bash
 docker compose -f develop/docker-compose.yml logs -f mongo

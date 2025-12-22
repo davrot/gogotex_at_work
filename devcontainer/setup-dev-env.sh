@@ -33,6 +33,44 @@ else
   echo "GitHub CLI (gh) already installed"
 fi
 
+# Install Go toolchain, linters, benchtools and utilities
+echo "Installing Go 1.25 and tooling..."
+sudo apt-get update -y
+sudo apt-get install -y jq curl unzip build-essential ca-certificates
+
+# Install Go 1.25
+GO_VERSION=1.25.0
+if [ ! -x /usr/local/go/bin/go ] || [ "$(/usr/local/go/bin/go version 2>/dev/null | awk '{print $3}')" != "go$GO_VERSION" ]; then
+  echo "Installing Go $GO_VERSION..."
+  curl -fsSL https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz -o /tmp/go.tgz
+  sudo rm -rf /usr/local/go
+  sudo tar -C /usr/local -xzf /tmp/go.tgz
+fi
+export PATH="/usr/local/go/bin:$PATH"
+mkdir -p "$HOME/go"
+# Persist GOPATH and PATH for future shells
+if ! grep -q "export GOPATH=\$HOME/go" ~/.bashrc 2>/dev/null; then
+  echo 'export GOPATH=$HOME/go' >> ~/.bashrc
+fi
+if ! grep -q "/usr/local/go/bin" ~/.bashrc 2>/dev/null; then
+  echo 'export PATH=$GOPATH/bin:/usr/local/go/bin:$PATH' >> ~/.bashrc
+fi
+
+# Install golangci-lint
+curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sudo sh -s -- -b /usr/local/bin || true
+
+# Install benchstat
+export PATH="/usr/local/go/bin:$GOPATH/bin:$PATH"
+$(/usr/local/go/bin/go install golang.org/x/perf/cmd/benchstat@latest) || true
+
+# Install act (optional) for local Actions runs
+curl -s https://raw.githubusercontent.com/nektos/act/master/install.sh | sudo bash || true
+
+# Ensure tools are on PATH for this session
+export PATH="$HOME/go/bin:/usr/local/go/bin:$PATH"
+
+
+
 # Populate helpful .bash_history entries for vscode and root so developers can see common setup/test commands
 HIST_ADD=$(cat <<'HIST'
 # Overleaf dev container - essential commands and notes
