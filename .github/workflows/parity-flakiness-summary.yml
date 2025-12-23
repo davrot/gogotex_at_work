@@ -1,0 +1,54 @@
+name: Parity flakiness summary
+
+on:
+  schedule:
+    - cron: '0 4 * * 1' # weekly on Monday 04:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  actions: read
+  contents: read
+  issues: write
+
+jobs:
+  collect-flakiness:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure tools
+        run: |
+          sudo apt-get update && sudo apt-get install -y unzip jq
+
+      - name: Collect flakiness artifacts
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          ./scripts/contract/collect_flakiness.sh
+
+      - name: Upload aggregate report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: parity-flakiness-aggregate
+          path: ci/flakiness/
+
+      - name: Create issue if failures exist
+        if: always()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs')
+            const report = fs.existsSync('ci/flakiness/report.txt') ? fs.readFileSync('ci/flakiness/report.txt','utf8') : 'no report'
+            const aggPath = 'ci/flakiness/aggregate.json'
+            let agg = []
+            if (fs.existsSync(aggPath)) agg = JSON.parse(fs.readFileSync(aggPath,'utf8'))
+            const failures = agg.filter(x => x.success !== true).length
+            if (failures > 0) {
+              const body = `Automated weekly parity flakiness report:\n\n${report}\n\nAttached aggregate JSON.`
+              await github.rest.issues.create({ owner: github.context.repo.owner, repo: github.context.repo.repo, title: `Parity flakiness weekly summary (${new Date().toISOString().slice(0,10)})`, body })
+            } else {
+              core.info('No failures detected this week; no issue created')
+            }

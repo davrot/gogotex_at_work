@@ -1,8 +1,9 @@
 FROM node:18-alpine
 WORKDIR /workspace
 
-# Copy parity script and ensure ci dir available
+# Copy parity script and rerunner into the image so CI can run retries deterministically
 COPY scripts/contract/node_parity.js /usr/local/bin/node_parity.js
-RUN chmod +x /usr/local/bin/node_parity.js
+COPY scripts/contract/rerun_with_retries.sh /usr/local/bin/rerun_with_retries.sh
+RUN chmod +x /usr/local/bin/node_parity.js /usr/local/bin/rerun_with_retries.sh
 
 ENTRYPOINT ["node", "/usr/local/bin/node_parity.js"]

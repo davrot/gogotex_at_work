@@ -73,15 +73,24 @@ jobs:
           # Build a small image containing the parity script to avoid workspace bind issues
           docker build -t webprofile-node-parity:${{ github.sha }} -f scripts/contract/Dockerfile.node-parity .
 
-      - name: Run Node parity smoke test (non-blocking, via image)
+      - name: Run Node parity smoke test (non-blocking, via image + retried)
         continue-on-error: true
         run: |
           mkdir -p ci/flakiness || true
+          # Run the container which includes a rerunner to produce ci/flakiness/flakiness.json
           timeout 180s docker run --rm \
             --network ${NETWORK} \
             -e TARGET_BASE_URL="http://${IMAGE_TAG}:3900" \
             -v "${{ github.workspace }}/ci:/workspace/ci" \
-            webprofile-node-parity:${{ github.sha }} > ci/webprofile-parity/node.parity.out 2>&1 || true
+            webprofile-node-parity:${{ github.sha }} \
+            /usr/local/bin/rerun_with_retries.sh 3 /workspace/ci -- node /usr/local/bin/node_parity.js > ci/webprofile-parity/node.parity.out 2>&1 || true
+
+      - name: Upload flakiness report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: webprofile-flakiness
+          path: ci/flakiness/flakiness.json || true
 
       - name: Upload Node parity artifact
         if: always()
