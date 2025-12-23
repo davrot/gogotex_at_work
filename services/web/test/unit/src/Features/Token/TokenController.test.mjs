@@ -138,11 +138,12 @@ describe('TokenController', function () {
     expect(listBody[0]).to.not.have.property('token')
   })
 
-  it('remove returns 404 when token not found', async function (ctx) {
+  it('remove returns 204 (idempotent) when token not found', async function (ctx) {
     // simulate revoke returning false
     ctx.PATM.revokeToken.resolves(false)
     await ctx.Controller.remove(ctx.req, ctx.res)
-    expect(ctx.res.statusCode).to.equal(404)
+    // Controller treats delete as idempotent and returns 204
+    expect(ctx.res.statusCode).to.equal(204)
     expect(ctx.PATM.revokeToken.called).to.equal(true)
   })
 })

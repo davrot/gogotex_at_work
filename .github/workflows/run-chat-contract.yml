@@ -1,0 +1,72 @@
+# Manual workflow to run chat contract tests and collect artifacts
+# Trigger: manually via workflow_dispatch. This workflow is NOT run automatically on PRs/merges.
+# Purpose: Run `scripts/contract/run_chat_contract.sh` in CI (NO_DOCKER=1, provided Mongo service)
+# and upload `ci/chat-contract/` as job artifacts for inspection.
+
+name: "Chat contract — manual run"
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Run mode (ci|docker) - for CI use `ci` which uses the provided Mongo service"
+        required: false
+        default: "ci"
+
+jobs:
+  run-contract:
+    name: Run Chat contract and collect artifacts
+    runs-on: ubuntu-latest
+
+    # We provide a MongoDB service so the wrapper can run in NO_DOCKER=1 mode
+    services:
+      mongodb:
+        image: mongo:6.0
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongo --eval 'db.runCommand({ ping: 1 })' || exit 1"
+          --health-interval 5s --health-timeout 2s --health-retries 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.25"
+
+      - name: Install project Node deps (if present)
+        run: |
+          if [ -f package.json ]; then npm ci --no-audit --no-fund; fi
+
+      - name: Run chat contract wrapper (NO_DOCKER=1)
+        id: run_contract
+        env:
+          NO_DOCKER: "1"
+          MONGO_URI: "mongodb://127.0.0.1:27017/chat_test"
+          ARTIFACT_DIR: ci/chat-contract
+        run: |
+          mkdir -p "$ARTIFACT_DIR"
+          # Run wrapper and capture output to artifact dir
+          if ./scripts/contract/run_chat_contract.sh 2>&1 | tee "$ARTIFACT_DIR/contract-run.log"; then
+            echo "Contract run succeeded"
+          else
+            echo "Contract run failed (see $ARTIFACT_DIR/contract-run.log)" >&2
+            exit 2
+          fi
+
+      - name: Upload contract artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chat-contract-artifacts
+          path: ci/chat-contract/**
+# NOTE: This workflow is intentionally manual. Do NOT enable automatic runs as part of gating
+# without explicit sign-off from migration owners and CI leads.

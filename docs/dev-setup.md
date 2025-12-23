@@ -8,6 +8,23 @@ This document provides a concise overview for getting the development environmen
 - Start a local MongoDB (via `docker compose` or your preferred method).
 - Build and run `webprofile-api` shim for contract/consistency checks: see **Spec Kit** later in this doc.
 
+### Webprofile parity checks (Go shim) 🔁
+
+We run a non-blocking parity check that builds and starts the Go `webprofile-api` shim and runs small integration tests against it to verify token create/introspect/revoke parity with the Node implementation.
+
+Quick local steps:
+
+- Start a Mongo instance attached to a Docker network: `docker run -d --name webprofile-parity-mongo --network webprofile-parity-net mongo:6.0.5`
+- Start the Go shim attached to the same network (helper script): `NETWORK=webprofile-parity-net MONGO_URI="mongodb://webprofile-parity-mongo:27017/sharelatex" ./scripts/contract/run_webprofile_in_network.sh webprofile-api-parity`
+- Run the Go integration test against the running shim:
+
+```bash
+cd services/git-bridge
+TARGET_BASE_URL=http://webprofile-api-parity:3900 MONGO_URI=mongodb://webprofile-parity-mongo:27017 go test ./test/contract -run TestTokenCreateIntrospectRevokeIntegration -v
+```
+
+CI note: a non-blocking GitHub Actions workflow (`.github/workflows/webprofile-parity.yml`) has been added to run these parity checks on PRs (the job is allowed to fail while parity stabilizes).
+
 ## Prerequisites
 
 - Install Node.js via `nvm` (recommended):
@@ -311,7 +328,7 @@ export AUTH_TOKEN_USE_WEBPROFILE_API=true
 
 When enabled, `web` will call the Go shim for `introspect` and token create/list/revoke; this helps test parity and enables a phased cutover (the legacy Node manager is used as a fallback if the Go shim is unavailable).
 
-````
+`````
 
 If the Node web instance requires authentication for POSTs, the script will seed keys directly into MongoDB (using `services/web/tools/seed_ssh_key.mjs`) and compare GET responses instead.
 
@@ -350,8 +367,13 @@ The development compose setup provides a MongoDB service (`mongo`) configured to
 cd develop
 bin/up
 # or start only mongo
-docker compose -f develop/docker-compose.yml up -d mongo
-````
+docker compose -f develop/docker-compose.yml up -d mongo# Alternatively, a lightweight helper to start a single Mongo container is available:
+# It accepts an optional host port override via env var MONGO_HOST_PORT or an explicit port argument.
+# If the requested port is in use it will find a free port in the 27017-27117 range and print the MONGO_URI to use.
+# Example (use host port 27018):
+./dev/setup-dev-db.sh start 27018
+# Or via env var:
+MONGO_HOST_PORT=27018 ./dev/setup-dev-db.sh start````
 
 2. Wait for the container to accept connections and for the init script to run. You can follow the logs:
 
@@ -520,3 +542,4 @@ Some local builds of the dev containers can fail because `libraries/eslint-plugi
 - If the full frontend test suite fails locally due to missing generated artifacts (for example, `lezer-latex/latex.mjs`), regenerate them with `cd services/web && npm run lezer-latex:generate`. If you just want an automated fallback that writes minimal stubs, run `cd services/web && npm run lezer-latex:ensure` (this runs automatically before `npm run test:frontend`). For focused tests, you can still use the lightweight bootstrap: `cd services/web && npm run test:frontend:lite -- path/to/test-file.tsx`.
 - See `develop/README.md` for more details and runtime tips (TeX Live build, Docker socket, and debugging ports).
 - The Playwright e2e runbook is at `docs/runbooks/playwright-e2e.md` for end-to-end test setup and commands.
+`````

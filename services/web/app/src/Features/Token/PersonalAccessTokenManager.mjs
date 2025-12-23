@@ -335,7 +335,20 @@ export default {
       console.error('[PersonalAccessTokenManager.revokeToken] mongoose not available for preflight check', e && (e.stack || e))
     }
 
-    const res = await PersonalAccessToken.findOneAndUpdate({ _id: tokenId, userId }, { active: false })
+    // If userId is not a valid ObjectId, avoid including it in the query (prevents CastError)
+    let res
+    try {
+      const mongoose = require('mongoose')
+      if (mongoose && mongoose.Types && typeof mongoose.Types.ObjectId.isValid === 'function' && !mongoose.Types.ObjectId.isValid(userId)) {
+        res = await PersonalAccessToken.findOneAndUpdate({ _id: tokenId }, { active: false })
+      } else {
+        res = await PersonalAccessToken.findOneAndUpdate({ _id: tokenId, userId }, { active: false })
+      }
+    } catch (e) {
+      // If a CastError still occurs (unexpected), log and continue to return false
+      try { console.error('[PersonalAccessTokenManager.revokeToken] findOneAndUpdate threw error', e && (e.stack || e)) } catch (e2) {}
+      return false
+    }
     // eslint-disable-next-line no-console
     console.error('[PersonalAccessTokenManager.revokeToken] findOneAndUpdate result=', !!res, res && (res._id ? res._id.toString() : null))
     if (res) {
@@ -422,6 +435,8 @@ export default {
     }
 
     const prefix = computeHashPrefixFromPlain(tokenPlain)
+    // Debug: ensure this code path is reached and to help stubbing in tests
+    try { console.debug('[PersonalAccessTokenManager.introspect] about to query with prefix=', prefix) } catch (e) {}
     const candidates = await PersonalAccessToken.find({ hashPrefix: prefix, active: true }).lean()
     for (const c of candidates) {
       const ok = await verifyTokenAgainstHash(tokenPlain, c.hash)

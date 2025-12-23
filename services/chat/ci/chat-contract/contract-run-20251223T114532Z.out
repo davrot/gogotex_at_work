@@ -1,0 +1,2 @@
+Running local contract runner (docker-backed); output -> ci/chat-contract/contract-run-20251223T114532Z.out
+Local contract runner not found: services/chat/scripts/run_contract_local.sh

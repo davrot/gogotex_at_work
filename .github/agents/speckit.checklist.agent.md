@@ -2,6 +2,8 @@
 description: Generate a custom checklist for the current feature based on user requirements.
 ---
 
+> **NOTE (SOLO MODE):** Solo Developer Mode is active. Do **not** create GitHub PRs, issues, or GitHub Actions workflows unless explicitly requested. Prefer providing local scripts and commands for the user to run.
+
 ## Checklist Purpose: "Unit Tests for English"
 
 **CRITICAL CONCEPT**: Checklists are **UNIT TESTS FOR REQUIREMENTS WRITING** - they validate the quality, clarity, and completeness of requirements in a given domain.

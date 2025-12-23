@@ -1,0 +1,181 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Collect recent webprofile-parity workflow runs' flakiness.json artifacts and produce an aggregate summary
+# Requires: GITHUB_TOKEN, GITHUB_REPOSITORY (owner/repo)
+
+REPO=${GITHUB_REPOSITORY:-}
+TOKEN=${GITHUB_TOKEN:-}
+OUT_DIR=${OUT_DIR:-ci/flakiness/collected}
+mkdir -p "$OUT_DIR"
+
+if [ -n "$REPO" ] && [ -n "$TOKEN" ]; then
+  # get workflow runs for the webprofile-parity workflow
+  runs_url="https://api.github.com/repos/${REPO}/actions/workflows/webprofile-parity.yml/runs?per_page=50"
+  runs_json=$(curl -sS -H "Authorization: token ${TOKEN}" "$runs_url")
+  run_ids=$(echo "$runs_json" | jq -r '.workflow_runs[] | select(.created_at >= "'$(date -I -d '30 days ago')'" ) | .id')
+
+  for rid in $run_ids; do
+    echo "Processing run $rid"
+    art_url="https://api.github.com/repos/${REPO}/actions/runs/${rid}/artifacts"
+    arts=$(curl -sS -H "Authorization: token ${TOKEN}" "$art_url")
+    # find artifact named webprofile-flakiness or any artifact and try to extract flakiness.json
+    echo "$arts" | jq -r '.artifacts[] | "\(.id)\t\(.name)\t\(.archive_download_url)"' | while IFS=$'\t' read -r aid aname aurl; do
+      echo "Found artifact $aname ($aid)"
+      tmpzip="/tmp/artifact_${rid}_${aid}.zip"
+      curl -sL -H "Authorization: token ${TOKEN}" -o "$tmpzip" "$aurl"
+      tmpdir="/tmp/artifact_${rid}_${aid}"
+      mkdir -p "$tmpdir"
+      unzip -q "$tmpzip" -d "$tmpdir" || true
+      found=$(find "$tmpdir" -type f -name 'flakiness.json' -print -quit || true)
+      if [ -n "$found" ]; then
+        echo "Extracted flakiness.json from $aname"
+        cp "$found" "$OUT_DIR/run_${rid}.json"
+        # continue: also look for cross-instance results
+      fi
+      found_cross=$(find "$tmpdir" -type f -name 'cross-instance-results.json' -print -quit || true)
+      if [ -n "$found_cross" ]; then
+        echo "Extracted cross-instance results from $aname"
+        cp "$found_cross" "$OUT_DIR/run_${rid}_cross.json"
+      fi
+      # also capture any cross-instance raw outputs for manual triage
+      found_cross_out=$(find "$tmpdir" -type f -name 'cross-instance-iter-*.out' -print -quit || true)
+      if [ -n "$found_cross_out" ]; then
+        mkdir -p "$OUT_DIR/raw/$rid"
+        find "$tmpdir" -type f -name 'cross-instance-iter-*.out' -exec cp {} "$OUT_DIR/raw/$rid/" \; || true
+      fi
+    done
+  done
+else
+  echo "GITHUB_REPOSITORY or GITHUB_TOKEN not set, skipping remote artifact collection; aggregating local collected files only"
+fi
+
+# Aggregate
+mkdir -p ci/flakiness
+# Aggregate only the main run JSONs (exclude cross-instance *_cross.json which are arrays of iterations)
+run_files=$(ls -1 $OUT_DIR/*.json 2>/dev/null | grep -v '_cross.json' || true)
+if [ -n "$run_files" ]; then
+  jq -s '.' $run_files > ci/flakiness/aggregate.json || echo '[]' > ci/flakiness/aggregate.json
+else
+  echo '[]' > ci/flakiness/aggregate.json
+fi
+
+# Aggregate cross-instance results if present
+mkdir -p ci/flakiness/cross
+cross_files=$(ls -1 $OUT_DIR/*_cross.json 2>/dev/null || true)
+if [ -n "$cross_files" ]; then
+  jq -s '.' $OUT_DIR/*_cross.json > ci/flakiness/cross/aggregate_cross.json || echo '[]' > ci/flakiness/cross/aggregate_cross.json
+  # compute summary counts
+  python3 - <<PY
+import json
+from pathlib import Path
+agg=json.load(open('ci/flakiness/cross/aggregate_cross.json'))
+# agg is list of per-run cross-instance results (each is array of iterations)
+# For each run, determine if any iteration failed
+run_failures = sum(1 for run in agg if any(not it.get('success',False) for it in run))
+run_total = len(agg)
+iter_total = sum(len(run) for run in agg)
+iter_failures = sum(sum(1 for it in run if not it.get('success',False)) for run in agg)
+run_failure_rate = 0.0 if run_total == 0 else run_failures / run_total
+iter_failure_rate = 0.0 if iter_total == 0 else iter_failures / iter_total
+print('cross_runs=%d run_failures=%d iter_total=%d iter_failures=%d' % (run_total, run_failures, iter_total, iter_failures))
+# write human-readable report
+with open('ci/flakiness/cross/report.txt','w') as f:
+    f.write('cross_runs=%d\n' % run_total)
+    f.write('run_failures=%d\n' % run_failures)
+    f.write('iter_total=%d\n' % iter_total)
+    f.write('iter_failures=%d\n' % iter_failures)
+# write machine-readable JSON summary for threshold checks
+summary = {
+    'run_total': run_total,
+    'run_failures': run_failures,
+    'iter_total': iter_total,
+    'iter_failures': iter_failures,
+    'run_failure_rate': run_failure_rate,
+    'iter_failure_rate': iter_failure_rate,
+}
+Path('ci/flakiness/cross').mkdir(parents=True, exist_ok=True)
+Path('ci/flakiness/cross/summary.json').write_text(json.dumps(summary))
+PY
+
+  # generate a minimal HTML dashboard for quick inspection (kept for compatibility)
+  CROSS_SUMMARY=$(cat ci/flakiness/cross/report.txt || true)
+  cat > ci/flakiness/cross/dashboard.html <<HTML
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Parity Cross-Instance Dashboard</title></head>
+<body>
+<h1>Parity Cross-Instance Summary</h1>
+<pre>
+$CROSS_SUMMARY
+</pre>
+<p>Artifacts:</p>
+<ul>
+  <li><a href="aggregate_cross.json">aggregate_cross.json</a></li>
+  <li>Raw per-run outputs in <code>raw/</code> (from artifact bundle)</li>
+</ul>
+</body>
+</html>
+HTML
+
+  # Optionally notify Slack immediately when thresholds exceeded (local or CI run of collector)
+  if command -v python3 >/dev/null 2>&1; then
+    python3 scripts/contract/check_cross_thresholds.py || true
+    rc=$?
+    if [ "$rc" -eq 2 ]; then
+      if [ -n "${SLACK_WEBHOOK:-}" ]; then
+        CROSS_SUMMARY_TEXT=$(cat ci/flakiness/cross/report.txt || true)
+        SLACK_MSG="Parity cross-instance threshold exceeded:\n\n${CROSS_SUMMARY_TEXT}\n\nArtifacts available in CI artifacts (if run via CI)."
+        echo "Posting Slack notification..."
+        curl -sS -X POST -H 'Content-Type: application/json' --data "{\"text\": \"${SLACK_MSG}\"}" "${SLACK_WEBHOOK}" || echo "Slack notify failed"
+      else
+        echo "SLACK_WEBHOOK not set; skipping immediate Slack notify"
+      fi
+    fi
+  fi
+
+  # generate a small status SVG for live badges
+  if command -v python3 >/dev/null 2>&1; then
+    python3 scripts/contract/generate_status_badge.py || echo "generate_status_badge.py failed"
+  fi
+
+  # also attempt to generate a richer trend dashboard using Chart.js (requires Python 3)
+  if command -v python3 >/dev/null 2>&1; then
+    echo "Generating trend dashboard..."
+    ./scripts/contract/generate_cross_dashboard.py || echo "generate_cross_dashboard.py failed; keeping minimal dashboard"
+  else
+    echo "python3 not available; skipping trend dashboard generation"
+  fi
+
+  # optionally publish dashboard to a persistent host (S3 or gh-pages) if configured
+  if [ "${PUBLISH_DASHBOARD:-""}" = "true" ] || [ "${1:-}" = "--publish" ]; then
+    echo "Publishing dashboard (PUBLISH_DASHBOARD=${PUBLISH_DASHBOARD:-})"
+    ./scripts/contract/publish_cross_dashboard.sh || echo "publish_cross_dashboard.sh failed"
+  fi
+else
+  echo '[]' > ci/flakiness/cross/aggregate_cross.json
+fi
+
+# Make a simple textual report
+python3 - <<PY
+import json
+from pathlib import Path
+agg=json.load(open('ci/flakiness/aggregate.json'))
+count=len(agg)
+success=sum(1 for x in agg if x.get('success')==True)
+fail=count-success
+print('Collected %d flakiness reports: %d success, %d failure' % (count, success, fail))
+with open('ci/flakiness/report.txt','w') as f:
+    f.write('Collected %d reports\n' % count)
+    f.write('success=%d\n' % success)
+    f.write('failure=%d\n' % fail)
+
+    # append cross-instance summary if present
+    if Path('ci/flakiness/cross/report.txt').exists():
+        cross_report = open('ci/flakiness/cross/report.txt').read()
+        f.write('\n# cross-instance summary\n')
+        f.write(cross_report)
+        print('Cross-instance summary appended')
+PY
+
+echo "Wrote ci/flakiness/aggregate.json and ci/flakiness/report.txt"

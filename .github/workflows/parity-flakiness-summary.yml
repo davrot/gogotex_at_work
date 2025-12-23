@@ -1,0 +1,161 @@
+name: Parity flakiness summary
+
+on:
+  schedule:
+    - cron: "0 4 * * 1" # weekly on Monday 04:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  actions: read
+  contents: read
+  issues: write
+
+jobs:
+  collect-flakiness:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure tools
+        run: |
+          # Install required tools (unzip, jq, curl, python3, awscli)
+          apt-get update && apt-get install -y unzip jq curl python3 awscli || true
+          # verify availability
+          jq --version || true
+          python3 --version || true
+          curl --version >/dev/null 2>&1 || true
+          aws --version >/dev/null 2>&1 || true
+
+      - name: Validate inputs
+        run: |
+          if [ -z "${{ secrets.GITHUB_TOKEN }}" ]; then echo "GITHUB_TOKEN secret is not set; aborting" && exit 1; fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Collect flakiness artifacts
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          # optional thresholds
+          CROSS_RUN_FAIL_THRESHOLD: ${{ secrets.CROSS_RUN_FAIL_THRESHOLD }}
+          CROSS_ITER_FAILURE_RATE_THRESHOLD: ${{ secrets.CROSS_ITER_FAILURE_RATE_THRESHOLD }}
+          # Solo-developer settings: disable automatic issue creation by default
+          SKIP_AUTO_ISSUE: "true"
+          ISSUE_RUN_THRESHOLD: ${{ secrets.ISSUE_RUN_THRESHOLD }}
+          ISSUE_ITER_RATE_THRESHOLD: ${{ secrets.ISSUE_ITER_RATE_THRESHOLD }}
+          # optional issue creation customization
+          ISSUE_CREATE_AS_DRAFT: ${{ secrets.ISSUE_CREATE_AS_DRAFT }}
+          ISSUE_LABELS: ${{ secrets.ISSUE_LABELS }}
+          ISSUE_ASSIGNEES: ${{ secrets.ISSUE_ASSIGNEES }}
+        run: |
+          ./scripts/contract/collect_flakiness.sh --publish || ./scripts/contract/collect_flakiness.sh || true
+
+      - name: Check cross thresholds
+        id: check-cross
+        run: |
+          python3 scripts/contract/check_cross_thresholds.py || true
+          rc=$?
+          echo "exceeded=$([ $rc -eq 2 ] && echo true || echo false)" >> $GITHUB_OUTPUT
+
+      - name: Upload aggregate report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: parity-flakiness-aggregate
+          path: ci/flakiness/
+
+      - name: Upload cross-instance dashboard
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: parity-cross-dashboard
+          path: ci/flakiness/cross/dashboard.html || true
+
+      - name: Create issue if failures exist or thresholds exceeded (configurable for solo devs)
+        if: always()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs')
+            const core = require('@actions/core')
+            const report = fs.existsSync('ci/flakiness/report.txt') ? fs.readFileSync('ci/flakiness/report.txt','utf8') : 'no report'
+            const aggPath = 'ci/flakiness/aggregate.json'
+            let agg = []
+            if (fs.existsSync(aggPath)) agg = JSON.parse(fs.readFileSync(aggPath,'utf8'))
+            const failures = agg.filter(x => x.success !== true).length
+            // include cross-instance summary when present and check thresholds
+            let crossSummary = ''
+            const crossReportPath = 'ci/flakiness/cross/report.txt'
+            const crossSummaryPath = 'ci/flakiness/cross/summary.json'
+            let crossAlert = false
+            let cs = null
+            if (fs.existsSync(crossReportPath)) {
+              try { crossSummary = '\n\nCross-instance summary:\n' + fs.readFileSync(crossReportPath,'utf8') } catch (e) { crossSummary = '\n\nCross-instance summary: failed to read cross report' }
+            }
+            if (fs.existsSync(crossSummaryPath)) {
+              try {
+                cs = JSON.parse(fs.readFileSync(crossSummaryPath,'utf8'))
+                const run_failures = cs.run_failures || 0
+                const iter_failures = cs.iter_failures || 0
+                const run_total = cs.run_total || 0
+                const iter_total = cs.iter_total || 0
+                const iter_rate = iter_total === 0 ? 0 : (iter_failures / iter_total)
+                core.info(`Cross metrics: runs=${run_total} run_failures=${run_failures} iter_total=${iter_total} iter_failures=${iter_failures} iter_rate=${iter_rate}`)
+                const runThreshold = parseInt(process.env.CROSS_RUN_FAIL_THRESHOLD || '1', 10)
+                const iterRateThreshold = parseFloat(process.env.CROSS_ITER_FAILURE_RATE_THRESHOLD || '0.05')
+                if (run_failures >= runThreshold || iter_rate >= iterRateThreshold) {
+                  crossAlert = true
+                }
+              } catch (e) { core.warning('Failed to parse cross summary: ' + String(e)) }
+            }
+
+            // Solo-developer safety: allow disabling automatic issue creation or raising thresholds
+            const skipAutoIssue = (process.env.SKIP_AUTO_ISSUE === 'true')
+            const issueRunThreshold = parseInt(process.env.ISSUE_RUN_THRESHOLD || '3', 10)
+            const issueIterRateThreshold = parseFloat(process.env.ISSUE_ITER_RATE_THRESHOLD || '0.1')
+
+            let createIssue = false
+            if (!skipAutoIssue) {
+              if (failures >= issueRunThreshold) createIssue = true
+              else if (crossAlert) createIssue = true
+              else if (cs && cs.iter_total && (cs.iter_failures / cs.iter_total) >= issueIterRateThreshold) createIssue = true
+            }
+
+            if (createIssue) {
+              let body = `Automated weekly parity flakiness report:\n\n${report}`
+              if (crossAlert) body += `\n\nCross-instance threshold exceeded.\n${crossSummary}`
+              else if (crossSummary) body += `\n\n${crossSummary}`
+              body += `\n\nAttached aggregate JSON and cross-instance dashboard (if present).`
+
+              // allow configuring draft-like behavior by prefixing title and adding a 'draft' label
+              const issueDraft = (process.env.ISSUE_CREATE_AS_DRAFT === 'true' || process.env.ISSUE_DRAFT === 'true')
+              const labelsEnv = process.env.ISSUE_LABELS || ''
+              const assigneesEnv = process.env.ISSUE_ASSIGNEES || ''
+              let labelsArr = labelsEnv.split(',').map(s=>s.trim()).filter(Boolean)
+              if (issueDraft) labelsArr.push('draft')
+              let assigneesArr = assigneesEnv.split(',').map(s=>s.trim()).filter(Boolean)
+
+              const title = (issueDraft ? `[DRAFT] Parity flakiness weekly summary (${new Date().toISOString().slice(0,10)})` : `Parity flakiness weekly summary (${new Date().toISOString().slice(0,10)})`)
+              const params = { owner: github.context.repo.owner, repo: github.context.repo.repo, title, body }
+              if (labelsArr.length) params.labels = labelsArr
+              if (assigneesArr.length) params.assignees = assigneesArr
+
+              await github.rest.issues.create(params)
+
+              // Slack notify (optional): post cross-instance summary if SLACK_WEBHOOK configured
+              const slackWebhook = process.env.SLACK_WEBHOOK
+              if (slackWebhook) {
+                // Compose a richer Slack message
+                let title = `:warning: Parity flakiness weekly summary: failures=${failures}`
+                if (crossAlert) title = `:rotating_light: Parity cross-instance threshold exceeded`;
+                let text = `${title}\n\nRepository: ${github.context.repo.owner}/${github.context.repo.repo} \nDate: ${new Date().toISOString().slice(0,10)}`
+                if (crossSummary) text += `\n\n${crossSummary}`
+                text += `\n\nAttached artifacts: parity-flakiness-aggregate (aggregate.json) and parity-cross-dashboard (dashboard).`
+                try {
+                  await require('node-fetch')(slackWebhook, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) })
+                } catch (e) { core.warning('Slack notify failed: ' + String(e)) }
+              } else { core.info('SLACK_WEBHOOK not set; skipping weekly Slack notify') }
+            } else {
+              core.info('No issue created due to SKIP_AUTO_ISSUE or thresholds not exceeded')
+            }

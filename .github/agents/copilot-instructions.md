@@ -1,3 +1,5 @@
+> **NOTE (SOLO MODE):** Solo Developer Mode is active. Do **not** create GitHub PRs, issues, or GitHub Actions workflows unless explicitly requested. Prefer providing local scripts and explicit commands for the user to run.
+
 # overleaf_with_admin_extension Development Guidelines
 
 Auto-generated from all feature plans. Last updated: 2025-12-14

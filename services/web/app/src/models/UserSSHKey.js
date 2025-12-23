@@ -60,9 +60,11 @@ try {
 if (process.env.NODE_ENV === 'test') {
   ;(async () => {
     try {
-      // Skip dedupe if collection.aggregate is not available in this environment
-      if (!exports.UserSSHKey || !exports.UserSSHKey.collection || typeof exports.UserSSHKey.collection.aggregate !== 'function') {
-        try { console.debug('UserSSHKey startup dedupe skipped: collection.aggregate not available') } catch (e) {}
+      // Skip dedupe if collection.aggregate is not available or if mongoose isn't connected yet.
+      // In some test environments aggregator functions exist but will buffer/timeout until a real
+      // connection is available; avoid running dedupe in that case.
+      if (!exports.UserSSHKey || !exports.UserSSHKey.collection || typeof exports.UserSSHKey.collection.aggregate !== 'function' || !mongoose || !mongoose.connection || mongoose.connection.readyState !== 1) {
+        try { console.debug('UserSSHKey startup dedupe skipped: collection.aggregate not available or mongoose not connected') } catch (e) {}
         return
       }
 
