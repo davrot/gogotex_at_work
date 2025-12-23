@@ -5,6 +5,7 @@ process.chdir(path.resolve(__dirname, '..', '..'))
 
 require('@babel/register')({
   extensions: ['.ts', '.tsx', '.js', '.jsx', '.mjs'],
+  presets: ['@babel/preset-env', '@babel/preset-react', '@babel/preset-typescript'],
   plugins: [
     // Map '@' alias to the frontend JS folder so imports like '@/foo' resolve in tests
     ['module-resolver', { alias: { '@': path.resolve(__dirname, '../../frontend/js') } }],

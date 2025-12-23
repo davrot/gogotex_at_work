@@ -1,0 +1,25 @@
+name: CI - {{SERVICE_NAME}}-go (template)
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.25
+      - name: Run go tests
+        run: go test ./...
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: v1.59.0
+      - name: Build Docker image
+        run: docker build -t {{SERVICE_NAME}}-go:ci .
+      - name: Run integration script (optional DB checks)
+        run: bash test/integration/run_integration.sh --remote-db-test
+        env:
+          RUN_DB_INTEGRATION: 1
