@@ -4,17 +4,51 @@ set -euo pipefail
 # Collect recent webprofile-parity workflow runs' flakiness.json artifacts and produce an aggregate summary
 # Requires: GITHUB_TOKEN, GITHUB_REPOSITORY (owner/repo)
 
-REPO=${GITHUB_REPOSITORY:?}
-TOKEN=${GITHUB_TOKEN:?}
+REPO=${GITHUB_REPOSITORY:-}
+TOKEN=${GITHUB_TOKEN:-}
 OUT_DIR=${OUT_DIR:-ci/flakiness/collected}
 mkdir -p "$OUT_DIR"
 
-# get workflow runs for the webprofile-parity workflow
-runs_url="https://api.github.com/repos/${REPO}/actions/workflows/webprofile-parity.yml/runs?per_page=50"
-runs_json=$(curl -sS -H "Authorization: token ${TOKEN}" "$runs_url")
-run_ids=$(echo "$runs_json" | jq -r '.workflow_runs[] | select(.created_at >= "'$(date -I -d '30 days ago')'" ) | .id')
+if [ -n "$REPO" ] && [ -n "$TOKEN" ]; then
+  # get workflow runs for the webprofile-parity workflow
+  runs_url="https://api.github.com/repos/${REPO}/actions/workflows/webprofile-parity.yml/runs?per_page=50"
+  runs_json=$(curl -sS -H "Authorization: token ${TOKEN}" "$runs_url")
+  run_ids=$(echo "$runs_json" | jq -r '.workflow_runs[] | select(.created_at >= "'$(date -I -d '30 days ago')'" ) | .id')
 
-for rid in $run_ids; do
+  for rid in $run_ids; do
+    echo "Processing run $rid"
+    art_url="https://api.github.com/repos/${REPO}/actions/runs/${rid}/artifacts"
+    arts=$(curl -sS -H "Authorization: token ${TOKEN}" "$art_url")
+    # find artifact named webprofile-flakiness or any artifact and try to extract flakiness.json
+    echo "$arts" | jq -r '.artifacts[] | "\(.id)\t\(.name)\t\(.archive_download_url)"' | while IFS=$'\t' read -r aid aname aurl; do
+      echo "Found artifact $aname ($aid)"
+      tmpzip="/tmp/artifact_${rid}_${aid}.zip"
+      curl -sL -H "Authorization: token ${TOKEN}" -o "$tmpzip" "$aurl"
+      tmpdir="/tmp/artifact_${rid}_${aid}"
+      mkdir -p "$tmpdir"
+      unzip -q "$tmpzip" -d "$tmpdir" || true
+      found=$(find "$tmpdir" -type f -name 'flakiness.json' -print -quit || true)
+      if [ -n "$found" ]; then
+        echo "Extracted flakiness.json from $aname"
+        cp "$found" "$OUT_DIR/run_${rid}.json"
+        # continue: also look for cross-instance results
+      fi
+      found_cross=$(find "$tmpdir" -type f -name 'cross-instance-results.json' -print -quit || true)
+      if [ -n "$found_cross" ]; then
+        echo "Extracted cross-instance results from $aname"
+        cp "$found_cross" "$OUT_DIR/run_${rid}_cross.json"
+      fi
+      # also capture any cross-instance raw outputs for manual triage
+      found_cross_out=$(find "$tmpdir" -type f -name 'cross-instance-iter-*.out' -print -quit || true)
+      if [ -n "$found_cross_out" ]; then
+        mkdir -p "$OUT_DIR/raw/$rid"
+        find "$tmpdir" -type f -name 'cross-instance-iter-*.out' -exec cp {} "$OUT_DIR/raw/$rid/" \; || true
+      fi
+    done
+  done
+else
+  echo "GITHUB_REPOSITORY or GITHUB_TOKEN not set, skipping remote artifact collection; aggregating local collected files only"
+fi
   echo "Processing run $rid"
   art_url="https://api.github.com/repos/${REPO}/actions/runs/${rid}/artifacts"
   arts=$(curl -sS -H "Authorization: token ${TOKEN}" "$art_url")
