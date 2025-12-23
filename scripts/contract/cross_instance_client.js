@@ -12,13 +12,24 @@
   const createResp = await fetch(base1 + '/internal/api/users/' + userId + '/git-tokens', { method: 'POST', headers, body: JSON.stringify({ label: 'cross', scopes: ['repo:read'] }) })
   console.log('create status', createResp.status)
   const createBody = await createResp.json()
+  const util = (await import('util')).default
+  console.log('create body:', util.inspect(createBody, { depth: null }))
   const token = createBody.token || createBody.plaintext
   const id = createBody.id && String(createBody.id)
+  console.log('token:', !!token, 'id:', id)
   if (!token || !id) { console.error('missing token/id', createBody); process.exit(2) }
 
   console.log('revoke via', base2)
-  const revoke = await fetch(base2 + `/internal/api/users/${userId}/git-tokens/${id}`, { method: 'DELETE', headers })
-  console.log('revoke status', revoke.status)
+  // Some servers reject DELETE with an empty body and Content-Type: application/json. Remove content-type for DELETE.
+  const headersDelete = Object.assign({}, headers)
+  delete headersDelete['Content-Type']
+  // attempt DELETE by sending an explicit empty JSON body ({}), which some parsers accept
+  headersDelete['Content-Type'] = 'application/json'
+  const revoke = await fetch(base2 + `/internal/api/users/${userId}/git-tokens/${id}`, { method: 'DELETE', headers: headersDelete, body: '{}' })
+  console.log('used headers for delete (truncated):', Object.keys(headersDelete))
+  let revokeBody = null
+  try { revokeBody = await revoke.json().catch(() => null) } catch (e) { revokeBody = { error: String(e) } }
+  console.log('revoke status', revoke.status, 'body=', JSON.stringify(revokeBody))
 
   console.log('poll introspect on', base1)
   const deadline = Date.now() + 15000
