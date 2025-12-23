@@ -19,12 +19,13 @@ jobs:
 
       - name: Ensure tools
         run: |
-          # Install required tools (unzip, jq, curl, python3)
-          apt-get update && apt-get install -y unzip jq curl python3 || true
+          # Install required tools (unzip, jq, curl, python3, awscli)
+          apt-get update && apt-get install -y unzip jq curl python3 awscli || true
           # verify availability
           jq --version || true
           python3 --version || true
           curl --version >/dev/null 2>&1 || true
+          aws --version >/dev/null 2>&1 || true
 
       - name: Validate inputs
         run: |
@@ -36,8 +37,18 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
+          # optional thresholds
+          CROSS_RUN_FAIL_THRESHOLD: ${{ secrets.CROSS_RUN_FAIL_THRESHOLD }}
+          CROSS_ITER_FAILURE_RATE_THRESHOLD: ${{ secrets.CROSS_ITER_FAILURE_RATE_THRESHOLD }}
         run: |
-          ./scripts/contract/collect_flakiness.sh
+          ./scripts/contract/collect_flakiness.sh --publish || ./scripts/contract/collect_flakiness.sh || true
+
+      - name: Check cross thresholds
+        id: check-cross
+        run: |
+          python3 scripts/contract/check_cross_thresholds.py || true
+          rc=$?
+          echo "exceeded=$([ $rc -eq 2 ] && echo true || echo false)" >> $GITHUB_OUTPUT
 
       - name: Upload aggregate report
         if: always()

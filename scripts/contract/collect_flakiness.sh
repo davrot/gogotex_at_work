@@ -143,7 +143,7 @@ HTML
   fi
 
   # optionally publish dashboard to a persistent host (S3 or gh-pages) if configured
-  if [ "${PUBLISH_DASHBOARD:-""}" = "true" ] || [ "$1" = "--publish" ]; then
+  if [ "${PUBLISH_DASHBOARD:-""}" = "true" ] || [ "${1:-}" = "--publish" ]; then
     echo "Publishing dashboard (PUBLISH_DASHBOARD=${PUBLISH_DASHBOARD:-})"
     ./scripts/contract/publish_cross_dashboard.sh || echo "publish_cross_dashboard.sh failed"
   fi
