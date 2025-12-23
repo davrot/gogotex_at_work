@@ -89,12 +89,21 @@ jobs:
             webprofile-node-parity:${{ github.sha }} \
             /usr/local/bin/rerun_with_retries.sh 3 /workspace/ci -- node /usr/local/bin/node_parity.js > ci/webprofile-parity/node.parity.out 2>&1 || true
 
-      - name: Run cross-instance revocation immediacy test (non-blocking)
+      - name: Run cross-instance revocation immediacy test (non-blocking, iterated)
         continue-on-error: true
+        env:
+          CROSS_INSTANCE_ITERATIONS: 5
         run: |
           mkdir -p ci/webprofile-parity || true
-          # Run the cross-instance client via a node:18 container mounting the workspace (more robust than in-image)
-          timeout 120s ./scripts/contract/run_cross_instance_in_ci.sh ${NETWORK} "http://${IMAGE_TAG}:3900" "http://${IMAGE_TAG}-node2:3900" > ci/webprofile-parity/cross-instance.out 2>&1 || true
+          # Run the cross-instance CI runner with $CROSS_INSTANCE_ITERATIONS iterations
+          timeout 240s ./scripts/contract/cross_instance_ci_runner.sh "http://${IMAGE_TAG}:3900" "http://${IMAGE_TAG}-node2:3900" "$CROSS_INSTANCE_ITERATIONS" > ci/webprofile-parity/cross-instance.out 2>&1 || true
+
+      - name: Upload cross-instance artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: webprofile-cross-instance
+          path: ci/webprofile-parity/cross-instance-*.out,ci/webprofile-parity/cross-instance-results.json || true
 
       - name: Upload flakiness report
         if: always()

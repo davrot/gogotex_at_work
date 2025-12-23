@@ -16,4 +16,5 @@ Slack alerting:
 Runbook for maintainers:
 
 - For revocation immediacy failures, collect a packet: `node.parity.json`, `test.parity.out`, `webprofile.log`, `mongo.log`, and the failing request/response pairs (if present).
-- Attempt local repro with `./scripts/contract/run_parity_locally.sh --no-cleanup` and attach `ci/webprofile-parity-<TIMESTAMP>.tar.gz` to the issue.
+- For cross-instance failures include `ci/webprofile-parity/cross-instance-results.json` (per-run iterations), `cross-instance-iter-*.out`, and `cross-instance-introspect-iter-*.raw` for full request/response traces.
+- Attempt local repro with `./scripts/contract/run_parity_locally.sh --no-cleanup` and run `./scripts/contract/run_cross_instance_locally.sh --no-cleanup` to reproduce; attach `ci/webprofile-parity-<TIMESTAMP>.tar.gz` to the issue.
