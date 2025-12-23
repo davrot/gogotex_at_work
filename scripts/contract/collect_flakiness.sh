@@ -118,6 +118,22 @@ $CROSS_SUMMARY
 </html>
 HTML
 
+  # Optionally notify Slack immediately when thresholds exceeded (local or CI run of collector)
+  if command -v python3 >/dev/null 2>&1; then
+    python3 scripts/contract/check_cross_thresholds.py || true
+    rc=$?
+    if [ "$rc" -eq 2 ]; then
+      if [ -n "${SLACK_WEBHOOK:-}" ]; then
+        CROSS_SUMMARY_TEXT=$(cat ci/flakiness/cross/report.txt || true)
+        SLACK_MSG="Parity cross-instance threshold exceeded:\n\n${CROSS_SUMMARY_TEXT}\n\nArtifacts available in CI artifacts (if run via CI)."
+        echo "Posting Slack notification..."
+        curl -sS -X POST -H 'Content-Type: application/json' --data "{\"text\": \"${SLACK_MSG}\"}" "${SLACK_WEBHOOK}" || echo "Slack notify failed"
+      else
+        echo "SLACK_WEBHOOK not set; skipping immediate Slack notify"
+      fi
+    fi
+  fi
+
   # also attempt to generate a richer trend dashboard using Chart.js (requires Python 3)
   if command -v python3 >/dev/null 2>&1; then
     echo "Generating trend dashboard..."

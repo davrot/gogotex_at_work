@@ -100,9 +100,15 @@ jobs:
               // Slack notify (optional): post cross-instance summary if SLACK_WEBHOOK configured
               const slackWebhook = process.env.SLACK_WEBHOOK
               if (slackWebhook) {
-                let slackMsg = `Parity flakiness weekly summary: failures=${failures}`
-                if (crossSummary) slackMsg += `\n\n${crossSummary}`
-                try { await require('node-fetch')(slackWebhook, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: slackMsg }) }) } catch (e) { core.warning('Slack notify failed: ' + String(e)) }
+                // Compose a richer Slack message
+                let title = `:warning: Parity flakiness weekly summary: failures=${failures}`
+                if (crossAlert) title = `:rotating_light: Parity cross-instance threshold exceeded`;
+                let text = `${title}\n\nRepository: ${github.context.repo.owner}/${github.context.repo.repo} \nDate: ${new Date().toISOString().slice(0,10)}`
+                if (crossSummary) text += `\n\n${crossSummary}`
+                text += `\n\nAttached artifacts: parity-flakiness-aggregate (aggregate.json) and parity-cross-dashboard (dashboard).`
+                try {
+                  await require('node-fetch')(slackWebhook, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) })
+                } catch (e) { core.warning('Slack notify failed: ' + String(e)) }
               } else { core.info('SLACK_WEBHOOK not set; skipping weekly Slack notify') }
             } else {
               core.info('No failures or threshold violations detected this week; no issue created')
