@@ -13,14 +13,16 @@ if [ -d "$DEST" ]; then
   exit 1
 fi
 mkdir -p "$DEST"
-cp "$TEMPLATEDIR/README_TEMPLATE.md" "$DEST/README_POC.md"
+# Substitute service name into README template
+sed -e "s/{{SERVICE_NAME}}/$NAME/g" "$TEMPLATEDIR/README_TEMPLATE.md" > "$DEST/README_POC.md"
 sed -e "s/{{SERVICE_NAME}}/$NAME/g" "$TEMPLATEDIR/Dockerfile.template" > "$DEST/Dockerfile"
 mkdir -p "$DEST/test/integration"
 echo "# ${NAME}-go
 
 This is a stub service. Replace with actual implementation.
 " > "$DEST/README.md"
-cat > "$DEST/main.go" <<'EOF'
+# Create a minimal main.go with the service name expanded
+cat > "$DEST/main.go" <<EOF
 package main
 
 import "fmt"
