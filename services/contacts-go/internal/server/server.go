@@ -11,15 +11,20 @@ import (
 	"github.com/overleaf/contacts-go/internal/store"
 )
 
-// RegisterRoutes registers HTTP routes for the PoC
+// RegisterRoutes registers HTTP routes for the PoC (default uses in-memory store)
 func RegisterRoutes(r *gin.Engine) {
+	RegisterWithStore(r, store.NewMemStore())
+}
+
+// RegisterWithStore registers routes using the provided Store implementation.
+func RegisterWithStore(r *gin.Engine, s store.Store) {
 	// metrics endpoint
 	r.GET("/metrics", gin.WrapH(metrics.Handler()))
 
 	r.GET("/health", healthHandler)
 
-	// contacts handlers (in-memory PoC)
-	contactsHandler := contacts.NewHandler(store.NewMemStore())
+	// contacts handlers (store provided)
+	contactsHandler := contacts.NewHandler(s)
 	contactsHandler.Register(r)
 	// future: register other handlers or middleware here
 }
