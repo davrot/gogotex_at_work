@@ -31,6 +31,12 @@ Checklist Summary:
 - [ ] CI builds/tests/bench runs added (spike CI added for PRs touching services/chat)
 - [ ] Rollout plan + rollback plan
 
+Artifacts & local CI runner
+
+- Local contract run output and artifacts are written to `ci/chat-contract/` when running `scripts/contract/run_chat_contract.sh`.
+- Use `NO_DOCKER=1 MONGO_URI="mongodb://host:27017/chat_test" scripts/contract/run_chat_contract.sh` to run against an existing Mongo in CI without Docker.
+- `scripts/ci/tests/test_run_chat_contract.sh` validates wrapper behavior in environments without Docker (ensures explicit MONGO_URI requirement).
+
 Notes:
 
 - Spike validates approach by porting `/status` endpoint. Next step: port a read-only thread endpoint or similar.
