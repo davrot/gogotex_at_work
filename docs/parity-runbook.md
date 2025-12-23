@@ -28,4 +28,19 @@ Runbook for maintainers:
   This copies `ci/webprofile-parity/cross-instance-results.json` into `ci/flakiness/collected/` and regenerates `ci/flakiness/cross/aggregate_cross.json` and `ci/flakiness/cross/dashboard.html` for quick inspection.
 
 - The weekly flakiness summary includes a <code>ci/flakiness/cross/dashboard.html</code> dashboard (uploaded as artifact `parity-cross-dashboard`) that provides a quick snapshot of cross-instance metrics; download it from the weekly job artifacts for visual inspection. The dashboard now includes a **historical trend** chart (success rate and failed iterations) generated from `ci/flakiness/collected/*_cross.json` when the collector runs locally or in CI. The collector also writes a machine-readable `ci/flakiness/cross/trend.json` that contains the raw time series used by the dashboard for debugging or further analysis.
+
+Publishing dashboards:
+
+- You can publish dashboards automatically from the collector by setting `PUBLISH_DASHBOARD=true` in the environment run for `collect_flakiness.sh` (CI or local).
+- To publish to **S3**, set `AWS_S3_BUCKET` and optionally `AWS_S3_PREFIX` and ensure `aws` CLI is configured with credentials. The collector will `aws s3 cp` the dashboard and `trend.json`.
+- To publish to **GitHub Pages**, set `GITHUB_PAGES_REPO` (e.g., `owner/repo`) and `GITHUB_TOKEN` with push permission; the collector will push to the `gh-pages` branch under `parity-cross/`.
+
+Example (local):
+
+```sh
+PUBLISH_DASHBOARD=true AWS_S3_BUCKET=my-bucket ./scripts/contract/collect_local_cross_runs.sh --copy
+```
+
+Example (CI): set `PUBLISH_DASHBOARD=true` and `AWS_S3_BUCKET` or `GITHUB_PAGES_REPO` in the scheduled workflow step environment or secrets.
+
 - Attempt local repro with `./scripts/contract/run_parity_locally.sh --no-cleanup` and run `./scripts/contract/run_cross_instance_locally.sh --no-cleanup` to reproduce; attach `ci/webprofile-parity-<TIMESTAMP>.tar.gz` to the issue.
