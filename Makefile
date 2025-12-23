@@ -3,8 +3,13 @@
 # Run integration for all services/*-go directories (local only)
 integration-go:
 	@for d in $(shell find services -maxdepth 1 -type d -name '*-go' | sort); do \
-		echo "=== running integration for $$d ==="; \
-		make -C $$d integration || exit $$?; \
+		echo "=== checking integration script for $$d ==="; \
+		if [ -x "$$d/test/integration/run_integration.sh" ]; then \
+			echo "=== running integration for $$d ==="; \
+			make -C $$d integration || exit $$?; \
+		else \
+			echo "skipping $$d (no test/integration/run_integration.sh)"; \
+		fi; \
 	done
 
 # Run remote integration (includes optional networked Go DB validation) for all *-go services
