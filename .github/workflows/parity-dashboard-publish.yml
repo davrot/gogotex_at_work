@@ -1,0 +1,38 @@
+name: Publish parity cross dashboard
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # weekly on Monday 06:00 UTC (after aggregation job at 04:00)
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure tools
+        run: |
+          apt-get update && apt-get install -y unzip jq curl python3 git || true
+          python3 --version || true
+
+      - name: Collect flakiness and publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PUBLISH_DASHBOARD: true
+          GITHUB_PAGES_REPO: ${{ github.repository }}
+        run: |
+          set -x
+          ./scripts/contract/collect_flakiness.sh --publish || (echo 'collect/publish failed' && exit 0)
+
+      - name: Upload snapshot artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: parity-cross-archives
+          path: ci/flakiness/cross/archives || true

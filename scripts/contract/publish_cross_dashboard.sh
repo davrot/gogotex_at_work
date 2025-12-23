@@ -45,17 +45,26 @@ if [ -n "${GITHUB_PAGES_REPO:-}" ] && [ -n "${GITHUB_TOKEN:-}" ]; then
     echo "gh-pages branch not found; creating a new branch in $tmpdir" && git clone "$repo_url" "$tmpdir"
   )
   mkdir -p "$tmpdir/parity-cross"
+  # write the current dashboard
   cp "$DASH_HTML" "$tmpdir/parity-cross/dashboard.html"
   if [ -f "$TREND_JSON" ]; then
     cp "$TREND_JSON" "$tmpdir/parity-cross/trend.json"
   fi
+  # also create a timestamped archive snapshot for retention
+  TIMESTAMP=$(date -u +%Y%m%dT%H%M%SZ)
+  mkdir -p "$tmpdir/parity-cross/archives/$TIMESTAMP"
+  cp "$DASH_HTML" "$tmpdir/parity-cross/archives/$TIMESTAMP/dashboard.html"
+  if [ -f "$TREND_JSON" ]; then
+    cp "$TREND_JSON" "$tmpdir/parity-cross/archives/$TIMESTAMP/trend.json"
+  fi
+
   pushd "$tmpdir" >/dev/null
-  git add parity-cross/dashboard.html parity-cross/trend.json || true
-  git commit -m "chore: update parity cross-instance dashboard" || echo "No changes to commit"
+  git add parity-cross/dashboard.html parity-cross/trend.json parity-cross/archives/$TIMESTAMP || true
+  git commit -m "chore: update parity cross-instance dashboard and archive $TIMESTAMP" || echo "No changes to commit"
   git push origin gh-pages || true
   popd >/dev/null
   rm -rf "$tmpdir"
-  echo "Pushed dashboard to gh-pages branch in ${GITHUB_PAGES_REPO}"
+  echo "Pushed dashboard and archive $TIMESTAMP to gh-pages branch in ${GITHUB_PAGES_REPO}"
   exit 0
 fi
 

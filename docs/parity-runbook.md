@@ -51,6 +51,18 @@ env:
   CROSS_ITER_FAILURE_RATE_THRESHOLD: 0.05
 ```
 
+Publishing & archival:
+
+- A scheduled job `parity-dashboard-publish.yml` runs weekly and will call the collector with `--publish` to publish the dashboard to the `gh-pages` branch (if `GITHUB_PAGES_REPO` and `GITHUB_TOKEN` are configured).
+- The publisher archives snapshots under `parity-cross/archives/<TIMESTAMP>/dashboard.html` and `trend.json` so you can inspect historical dashboards per-week.
+- Artifacts containing recent archived snapshots are uploaded as the `parity-cross-archives` artifact for the weekly run.
+
+Example: the published live dashboard URL will be:
+
+```
+https://<your-org-or-user>.github.io/<repo>/parity-cross/dashboard.html
+```
+
 Slack notifications:
 
 - If `secrets.SLACK_WEBHOOK` is set in the workflow, the weekly summary job will post a short message with failure counts and cross-instance metrics. If the cross thresholds are exceeded, the message will be prefixed with an alert emoji and include the cross summary.
