@@ -150,6 +150,8 @@ make docker-go-test
 
 CI note: DB-backed Go unit tests are gated and do **not** run automatically. To execute DB-backed unit tests across all `*-go` services, use the manual GitHub Actions workflow named "Go DB unit tests (manual)" (`.github/workflows/go-unit-tests-db.yml`) and trigger it with `run-db: true` from the Actions UI; the workflow will set `RUN_DB_FORCE=1` to allow the run when explicitly requested.
 
+Service-level DB checks: some `*-go` services (for example `services/chat-go`) provide service-level integration scripts (`test/integration/run_integration.sh`) and per-service CI snippets under `services/<name>-go/ci` to opt into Postgres-backed validation. Run the service-level smoke/integration flow locally with `bash services/chat-go/test/integration/run_integration.sh` and enable `RUN_DB_INTEGRATION=1` to run the in-container DB checks.
+
 Local helper: there's also a local script to run DB-backed unit tests across all `*-go` services: `scripts/run_all_go_unit_tests_db.sh`. It will refuse to run inside a dev container unless you explicitly set `RUN_DB_FORCE=1` to avoid accidental runs in environments where localhost access may not work.
 
 ## Build & Start Services

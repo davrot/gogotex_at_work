@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       run-db:
-        description: 'Whether to run DB-backed unit tests (RUN_DB_INTEGRATION=1)'
+        description: "Whether to run DB-backed unit tests (RUN_DB_INTEGRATION=1)"
         required: true
-        default: 'false'
+        default: "false"
         type: boolean
 
 jobs:
@@ -17,7 +17,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.25'
+          go-version: "1.25"
       - name: Cache Go modules
         uses: actions/cache@v4
         with:
@@ -30,7 +30,7 @@ jobs:
       - name: Run DB-backed unit tests (manual trigger)
         env:
           RUN_DB: ${{ github.event.inputs.run-db }}
-          RUN_DB_FORCE: '1'
+          RUN_DB_FORCE: "1"
         run: |
           if [ "$RUN_DB" = "true" ]; then
             bash scripts/run_all_go_unit_tests.sh --run-db

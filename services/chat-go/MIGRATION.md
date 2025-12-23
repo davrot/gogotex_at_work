@@ -14,8 +14,16 @@ Minimal scope (PoC)
 
 DB & Persistence
 
-- Initially in-memory store for PoC
-- If persistence needed later: add Postgres store using pgx and `services/chat-go/internal/store/postgres_store.go` with schema migrations
+- Initially in-memory store for PoC (done)
+- Postgres-backed store added using `database/sql` with `pgx` stdlib driver and `services/chat-go/internal/store/postgres_store.go` (schema + Create/List implemented)
+
+Run DB integration tests:
+
+- Local (ephemeral container):
+  - RUN_DB_INTEGRATION=1 go test ./internal/store -run TestPostgresStoreIntegration -v
+- Remote networked helper (runs Go-level tests inside helper container):
+  - RUN_DB_INTEGRATION_REMOTE=1 go test ./internal/store -run TestPostgresStoreNetworked -v
+- For CI/automation see `services/chat-go/ci/ci-snippet.template` for an example job snippet that runs `test/integration/run_integration.sh` with `RUN_DB_INTEGRATION=1`.
 
 Observability & CI
 
