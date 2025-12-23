@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+set -euo pipefail
+if [ "$#" -ne 1 ]; then
+  echo "Usage: create-go-service <service-name>"
+  exit 2
+fi
+NAME=$1
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+TEMPLATEDIR="$ROOT/docs/templates/service-go"
+DEST="$ROOT/services/${NAME}-go"
+if [ -d "$DEST" ]; then
+  echo "Destination $DEST already exists"
+  exit 1
+fi
+mkdir -p "$DEST"
+cp "$TEMPLATEDIR/README_TEMPLATE.md" "$DEST/README_POC.md"
+sed -e "s/{{SERVICE_NAME}}/$NAME/g" "$TEMPLATEDIR/Dockerfile.template" > "$DEST/Dockerfile"
+mkdir -p "$DEST/test/integration"
+echo "# ${NAME}-go
+
+This is a stub service. Replace with actual implementation.
+" > "$DEST/README.md"
+cat > "$DEST/main.go" <<'EOF'
+package main
+
+import "fmt"
+
+func main() {
+    fmt.Println("TODO: implement ${NAME}-go service")
+}
+EOF
+chmod +x "$DEST"
+cat <<EOF
+Created $DEST
+
+Next steps:
+ - Implement the Go service in $DEST/internal
+ - Add tests and CI snippet from docs/templates/service-go/ci-snippet.template
+EOF
