@@ -65,10 +65,6 @@ handoffs:
     agent: speckit.implement
     prompt: You have full autonomy. Execute: The current 8-hour batch. Do it now. 
     send: true        
-  - label: 8-hour batch: Run
-    agent: speckit.implement
-    prompt: You have full autonomy. Execute: The current 8-hour batch. Do it now. 
-    send: true        
   - label: Solo
     agent: speckit.implement
     prompt: Solo developer mode active. Read `.specify/constitution-solo-mode.md` and follow it strictly: DO NOT create GitHub PRs, issues, or GitHub Actions workflows unless explicitly asked by the user; DO NOT escalate to external support. Prefer providing local scripts, commands, and instructions that the user can run locally (e.g., test commands, local collectors, CLI helpers). Always ask before creating or modifying any GitHub-hosted automation or opening issues/PRs. This project is SOLO — treat automation and issue creation as opt-in and user-requested only.

@@ -38,4 +38,3 @@ jobs:
         run: |
           cd services/contacts-go
           bash test/integration/run_integration.sh
-

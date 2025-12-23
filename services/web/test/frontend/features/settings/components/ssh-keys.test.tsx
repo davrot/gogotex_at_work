@@ -170,5 +170,4 @@ it('delete uses effectiveUserId when available', async () => {
   // cleanup
   const m2 = document.querySelector('meta[name="ol-user_id"]')
   if (m2 && m2.parentNode) m2.parentNode.removeChild(m2)
-})
-)
+});

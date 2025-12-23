@@ -29,7 +29,7 @@ func main() {
 	// Attach request logging middleware globally
 	r.Use(middleware.RequestLogger())
 
-	// Choose store implementation via env STORE ("mem" or "postgres")	
+	// Choose store implementation via env STORE ("mem" or "postgres")
 	storeType := os.Getenv("STORE")
 	var s store.Store
 	if storeType == "postgres" {
