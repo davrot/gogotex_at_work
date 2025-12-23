@@ -46,6 +46,13 @@ jobs:
           name: parity-flakiness-aggregate
           path: ci/flakiness/
 
+      - name: Upload cross-instance dashboard
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: parity-cross-dashboard
+          path: ci/flakiness/cross/dashboard.html || true
+
       - name: Create issue if failures exist
         if: always()
         uses: actions/github-script@v6
@@ -58,8 +65,14 @@ jobs:
             let agg = []
             if (fs.existsSync(aggPath)) agg = JSON.parse(fs.readFileSync(aggPath,'utf8'))
             const failures = agg.filter(x => x.success !== true).length
+            // include cross-instance summary when present
+            let crossSummary = ''
+            const crossReportPath = 'ci/flakiness/cross/report.txt'
+            if (fs.existsSync(crossReportPath)) {
+              try { crossSummary = '\n\nCross-instance summary:\n' + fs.readFileSync(crossReportPath,'utf8') } catch (e) { crossSummary = '\n\nCross-instance summary: failed to read cross report' }
+            }
             if (failures > 0) {
-              const body = `Automated weekly parity flakiness report:\n\n${report}\n\nAttached aggregate JSON.`
+              const body = `Automated weekly parity flakiness report:\n\n${report}${crossSummary}\n\nAttached aggregate JSON and cross-instance dashboard (if present).`
               await github.rest.issues.create({ owner: github.context.repo.owner, repo: github.context.repo.repo, title: `Parity flakiness weekly summary (${new Date().toISOString().slice(0,10)})`, body })
             } else {
               core.info('No failures detected this week; no issue created')
