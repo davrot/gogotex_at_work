@@ -19,3 +19,12 @@ Notes
 
 - Follow repository `docs/go-migration-guidelines.md` and the `services/<name>-go` convention.
 - Add a `README_POC.md` if this is a PoC.
+
+## Integration & Makefile
+
+Add `Makefile` targets (if applicable) to make running integration checks easy locally:
+
+- `make -C services/{{SERVICE_NAME}}-go integration`
+- `make -C services/{{SERVICE_NAME}}-go integration-remote`
+
+The `integration-remote` target runs `test/integration/run_integration.sh --remote-db-test` to perform an optional networked Go-level DB validation inside a helper container. Use these commands locally for fast feedback; CI can optionally invoke the same targets.
