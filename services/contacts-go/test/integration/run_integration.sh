@@ -37,6 +37,22 @@ if ! docker run --network container:$CONTAINER --rm curlimages/curl:latest -sS h
   exit 2
 fi
 
+# test contacts create & list
+create_code=$(docker run --network container:$CONTAINER --rm curlimages/curl:latest -sS -o /dev/null -w "%{http_code}" -H 'Content-Type: application/json' -d '{"name":"Integration","email":"int@e.com"}' http://localhost:8080/contacts) || true
+if [ "$create_code" != "201" ]; then
+  echo "contacts create failed (code: $create_code)"
+  docker logs "$CONTAINER" || true
+  docker rm -f "$CONTAINER" || true
+  exit 3
+fi
+
+if ! docker run --network container:$CONTAINER --rm curlimages/curl:latest -sS http://localhost:8080/contacts | grep -q Integration; then
+  echo "contacts list missing created contact"
+  docker logs "$CONTAINER" || true
+  docker rm -f "$CONTAINER" || true
+  exit 4
+fi
+
 echo "integration succeeded"
 
 docker rm -f "$CONTAINER" >/dev/null

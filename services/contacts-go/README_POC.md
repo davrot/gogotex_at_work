@@ -1,5 +1,7 @@
 PoC Notes:
 
+- Requires Go >= 1.25 (tested with `go1.25.5`).
+
 - Logging: `go.uber.org/zap` used with `internal/logging` wrapper. Logger is initialized at startup (in `main`) and is optional for handlers (guarded for tests).
 - Metrics: `internal/metrics` registers a `contacts_health_checks_total` counter and exposes `/metrics`.
 - Lint: `.golangci.yml` included; CI runs `golangci-lint`.

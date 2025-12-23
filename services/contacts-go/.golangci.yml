@@ -1,3 +1,5 @@
+version: 2
+
 run:
   timeout: 3m
 
@@ -5,9 +7,6 @@ linters:
   enable:
     - govet
     - staticcheck
-    - deadcode
-    - gosimple
-    - gofmt
     - revive
 
 issues:

@@ -1,3 +1,4 @@
+// Package config provides environment-based configuration helpers for the service.
 package config
 
 import "os"
