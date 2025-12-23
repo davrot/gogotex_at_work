@@ -53,6 +53,15 @@ if ! docker run --network container:$CONTAINER --rm curlimages/curl:latest -sS h
   exit 4
 fi
 
+# invalid JSON should return 400
+bad_code=$(docker run --network container:$CONTAINER --rm curlimages/curl:latest -sS -o /dev/null -w "%{http_code}" -H 'Content-Type: application/json' -d '{name:bad}' http://localhost:8080/contacts) || true
+if [ "$bad_code" != "400" ]; then
+  echo "contacts invalid create did not return 400 (code: $bad_code)"
+  docker logs "$CONTAINER" || true
+  docker rm -f "$CONTAINER" || true
+  exit 5
+fi
+
 echo "integration succeeded"
 
 docker rm -f "$CONTAINER" >/dev/null
