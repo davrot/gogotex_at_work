@@ -58,6 +58,29 @@ Publishing & archival:
 - Artifacts containing recent archived snapshots are uploaded as the `parity-cross-archives` artifact for the weekly run.
 - A daily `parity-dashboard-status` workflow generates `ci/flakiness/cross/status.json` and uploads it as artifact `parity-cross-status`. This file includes a timestamp, the aggregated summary, an `iter_rate` and a `threshold_exceeded` boolean so automation or dashboards can poll a small status artifact.
 
+Badge CLI & customization:
+
+- You can generate a small status SVG badge locally using the CLI helper:
+
+```sh
+python3 scripts/contract/generate_status_badge.py --out ci/flakiness/cross/status.svg
+```
+
+- The badge CLI supports customization flags to override label, colors, size, and input files:
+  - `--label` (default: `parity`) — left label
+  - `--ok-text` / `--alert-text` / `--unknown-text` — text variants
+  - `--ok-color` / `--alert-color` / `--unknown-color` — color hex codes
+  - `--status` / `--summary` — input files to read (`status.json` preferred)
+  - `--width` / `--height` — SVG size
+
+- The CLI respects `threshold_exceeded` when present in `status.json`, otherwise it computes the iteration failure rate from `summary.json` and compares against `CROSS_RUN_FAIL_THRESHOLD` and `CROSS_ITER_FAILURE_RATE_THRESHOLD` environment variables.
+
+Example: generate a small custom badge (green with "healthy"):
+
+```sh
+python3 scripts/contract/generate_status_badge.py --out ci/flakiness/cross/status.svg --label parity --ok-text healthy --ok-color "#0b0" --width 140
+```
+
 Example: the published live dashboard URL will be:
 
 ```
