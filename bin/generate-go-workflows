@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+TEMPLATE="$ROOT/docs/templates/service-go/ci-workflow.template"
+WORKDIR="$ROOT/.github/workflows"
+mkdir -p "$WORKDIR"
+for d in "$ROOT"/services/*-go; do
+  [ -d "$d" ] || continue
+  name=$(basename "$d")
+  out="$WORKDIR/ci-${name}.yml"
+  sed -e "s/{{SERVICE_NAME}}/${name}/g" "$TEMPLATE" > "$out"
+  echo "created $out"
+done
+echo "Done"
