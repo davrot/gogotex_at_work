@@ -35,7 +35,29 @@ Publishing dashboards:
 - To publish to **S3**, set `AWS_S3_BUCKET` and optionally `AWS_S3_PREFIX` and ensure `aws` CLI is configured with credentials. The collector will `aws s3 cp` the dashboard and `trend.json`.
 - To publish to **GitHub Pages**, set `GITHUB_PAGES_REPO` (e.g., `owner/repo`) and `GITHUB_TOKEN` with push permission; the collector will push to the `gh-pages` branch under `parity-cross/`.
 
+Thresholds & alerts:
+
+- The collector writes `ci/flakiness/cross/summary.json` containing aggregated cross-instance metrics (run_total, run_failures, iter_total, iter_failures, run_failure_rate, iter_failure_rate).
+- The weekly summary job will evaluate thresholds and create an issue when thresholds are exceeded. Configure the checks with these environment variables:
+  - `CROSS_RUN_FAIL_THRESHOLD` (default `1`) — number of runs with failures that triggers an alert
+  - `CROSS_ITER_FAILURE_RATE_THRESHOLD` (default `0.05`) — fraction of iterations failed across aggregated runs (e.g., `0.05` for 5%) that triggers an alert
+
+Example (CI):
+
+```yaml
+# in .github/workflows/parity-flakiness-summary.yml job step environment
+env:
+  CROSS_RUN_FAIL_THRESHOLD: 1
+  CROSS_ITER_FAILURE_RATE_THRESHOLD: 0.05
+```
+
 Example (local):
+
+```sh
+CROSS_RUN_FAIL_THRESHOLD=2 CROSS_ITER_FAILURE_RATE_THRESHOLD=0.1 ./scripts/contract/collect_local_cross_runs.sh --copy
+```
+
+Example (local publish):
 
 ```sh
 PUBLISH_DASHBOARD=true AWS_S3_BUCKET=my-bucket ./scripts/contract/collect_local_cross_runs.sh --copy
