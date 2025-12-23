@@ -93,13 +93,8 @@ jobs:
         continue-on-error: true
         run: |
           mkdir -p ci/webprofile-parity || true
-          timeout 120s docker run --rm \
-            --network ${NETWORK} \
-            -e INSTANCE1="http://${IMAGE_TAG}:3900" \
-            -e INSTANCE2="http://${IMAGE_TAG}-node2:3900" \
-            -v "${{ github.workspace }}/ci:/workspace/ci" \
-            webprofile-node-parity:${{ github.sha }} \
-            node /usr/local/bin/cross_instance_client.js > ci/webprofile-parity/cross-instance.out 2>&1 || true
+          # Run the cross-instance client via a node:18 container mounting the workspace (more robust than in-image)
+          timeout 120s ./scripts/contract/run_cross_instance_in_ci.sh ${NETWORK} "http://${IMAGE_TAG}:3900" "http://${IMAGE_TAG}-node2:3900" > ci/webprofile-parity/cross-instance.out 2>&1 || true
 
       - name: Upload flakiness report
         if: always()
