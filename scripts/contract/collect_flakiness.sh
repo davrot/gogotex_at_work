@@ -68,6 +68,7 @@ if [ -n "$cross_files" ]; then
   # compute summary counts
   python3 - <<PY
 import json
+from pathlib import Path
 agg=json.load(open('ci/flakiness/cross/aggregate_cross.json'))
 # agg is list of per-run cross-instance results (each is array of iterations)
 # For each run, determine if any iteration failed
@@ -75,12 +76,26 @@ run_failures = sum(1 for run in agg if any(not it.get('success',False) for it in
 run_total = len(agg)
 iter_total = sum(len(run) for run in agg)
 iter_failures = sum(sum(1 for it in run if not it.get('success',False)) for run in agg)
+run_failure_rate = 0.0 if run_total == 0 else run_failures / run_total
+iter_failure_rate = 0.0 if iter_total == 0 else iter_failures / iter_total
 print('cross_runs=%d run_failures=%d iter_total=%d iter_failures=%d' % (run_total, run_failures, iter_total, iter_failures))
+# write human-readable report
 with open('ci/flakiness/cross/report.txt','w') as f:
     f.write('cross_runs=%d\n' % run_total)
     f.write('run_failures=%d\n' % run_failures)
     f.write('iter_total=%d\n' % iter_total)
     f.write('iter_failures=%d\n' % iter_failures)
+# write machine-readable JSON summary for threshold checks
+summary = {
+    'run_total': run_total,
+    'run_failures': run_failures,
+    'iter_total': iter_total,
+    'iter_failures': iter_failures,
+    'run_failure_rate': run_failure_rate,
+    'iter_failure_rate': iter_failure_rate,
+}
+Path('ci/flakiness/cross').mkdir(parents=True, exist_ok=True)
+Path('ci/flakiness/cross/summary.json').write_text(json.dumps(summary))
 PY
 
   # generate a minimal HTML dashboard for quick inspection (kept for compatibility)
