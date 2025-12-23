@@ -3,10 +3,10 @@ package store
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 
-	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/google/uuid"
+	_ "github.com/jackc/pgx/v5/stdlib" // required to register pgx driver with database/sql
 )
 
 // PostgresStore is a minimal PostgreSQL-backed store implementation.
@@ -42,7 +42,7 @@ func (p *PostgresStore) List(_ context.Context) ([]Contact, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := []Contact{}
 	for rows.Next() {
 		var c Contact
@@ -56,10 +56,9 @@ func (p *PostgresStore) List(_ context.Context) ([]Contact, error) {
 
 // Create inserts a contact into Postgres and returns the created record.
 func (p *PostgresStore) Create(_ context.Context, c Contact) (Contact, error) {
+	// Ensure ID exists; generate server-side UUID if absent
 	if c.ID == "" {
-		// let Postgres generate a UUID via gen_random_uuid() if available
-		// but to keep dependency minimal, generate a UUID in Go
-		return Contact{}, errors.New("contact ID must be provided in Postgres mode")
+		c.ID = uuid.New().String()
 	}
 	_, err := p.db.Exec("INSERT INTO contacts (id, name, email) VALUES ($1, $2, $3)", c.ID, c.Name, c.Email)
 	if err != nil {

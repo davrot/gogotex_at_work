@@ -50,6 +50,10 @@ for i in {1..20}; do
   sleep 1
 done
 
+# run minimal DB migrations (create extension if available and ensure table)
+docker run --network $NETWORK --rm postgres:15-alpine psql postgresql://postgres:pass@${PG_CONTAINER}:5432/contacts -c "CREATE EXTENSION IF NOT EXISTS pgcrypto;" || true
+docker run --network $NETWORK --rm postgres:15-alpine psql postgresql://postgres:pass@${PG_CONTAINER}:5432/contacts -c "CREATE TABLE IF NOT EXISTS contacts (id UUID PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL);" || true
+
 # Run the service in postgres mode on the same network
 docker rm -f "$CONTAINER" 2>/dev/null || true
 docker run -d --name "$CONTAINER" --network $NETWORK -p ${PORT}:8080 -e STORE=postgres -e DATABASE_URL=postgres://postgres:pass@${PG_CONTAINER}:5432/contacts?sslmode=disable "$IMAGE"
