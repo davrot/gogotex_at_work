@@ -78,7 +78,18 @@ import os
 iter_rate_threshold = float(os.environ.get('CROSS_ITER_FAILURE_RATE_THRESHOLD', '0.05'))
 run_fail_threshold = int(os.environ.get('CROSS_RUN_FAIL_THRESHOLD', '1'))
 
-data_payload = {'labels': labels, 'success_rates': success_rates, 'failures': failures, 'iter_rate_threshold': iter_rate_threshold, 'run_fail_threshold': run_fail_threshold}
+# prepare per-label styling: mark any run with failures > 0
+fail_colors = ["rgba(200,50,50,0.9)" if f and f > 0 else "rgba(120,120,120,0.6)" for f in failures]
+
+data_payload = {
+    'labels': labels,
+    'success_rates': success_rates,
+    'failures': failures,
+    'fail_colors': fail_colors,
+    'iter_rate_threshold': iter_rate_threshold,
+    'run_fail_threshold': run_fail_threshold,
+}
+
 data_json = json.dumps(data_payload)
 
 # compute a success-rate threshold (100 * (1 - iter_threshold)) to render as a line
@@ -142,7 +153,9 @@ html = (
     '        datasets: [{\n'
     '          label: "Failed iterations",\n'
     '          data: data.failures,\n'
-    '          backgroundColor: "rgba(200,50,50,0.9)"\n'
+    '          backgroundColor: data.fail_colors,\n'
+    '          borderColor: data.fail_colors,\n'
+    '          borderWidth: 1\n'
     '        }]\n'
     '      },\n'
     '      options: {scales: {y: {suggestedMin: 0}}}\n'
