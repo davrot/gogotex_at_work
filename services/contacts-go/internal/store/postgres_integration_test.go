@@ -27,22 +27,22 @@ func TestPostgresStoreIntegration(t *testing.T) {
 		t.Fatalf("docker run failed: %v: %s", err, string(out))
 	}
 	defer func() {
-		exec.Command("docker", "rm", "-f", container).Run()
+		_ = exec.Command("docker", "rm", "-f", container).Run()
 	}()
 
 	// wait for Postgres to accept connections by executing psql inside docker using the container's namespace
-	max := 60
-	for i := 0; i < max; i++ {
+	retries := 60
+	for i := 0; i < retries; i++ {
 		check := exec.Command("docker", "run", "--rm", "--network", "container:"+container, "postgres:15-alpine", "psql", "postgresql://postgres:pass@localhost:5432/contacts", "-c", "\\l")
 		if out, err := check.CombinedOutput(); err == nil {
 			// now try to connect from Go to the container via host port fallback (not needed) by using the container's internal interface via 'localhost' inside container; we can open DB using host port 5432 via container namespace using 'host' mapping is not accessible, so we will connect using database/sql against the container by using 'host.docker.internal' where available; as a simpler approach, open DB via 'pgx' to the container through localhost:5432 on the docker host only if mapped—since we didn't map ports, we'll instead run test queries via 'docker run --network container:...' psql commands above. But for the Go-level PostgresStore we need a database/sql connection; to get that we'll map a random host port."
 			_ = out
 			break
 		}
-		if i == max-1 {
+		if i == retries-1 {
 			t.Fatalf("waiting for postgres failed: %v: %s", err, string(out))
 		}
-		t.Logf("waiting for postgres... (%d/%d)", i+1, max)
+		t.Logf("waiting for postgres... (%d/%d)", i+1, retries)
 		time.Sleep(1 * time.Second)
 	}
 
@@ -68,7 +68,7 @@ func TestPostgresStoreIntegration(t *testing.T) {
 	// DB integration is validated without requiring host port mapping.
 	// Note: we prefer in-container `psql` checks because host-port mapping can be
 	// flaky in some environments (host networking / port routing may be restricted).
-	return
+
 }
 
 // Optional networked validation: runs the Go-level PostgresStore inside a helper
@@ -87,20 +87,20 @@ func TestPostgresStoreNetworked(t *testing.T) {
 	if err != nil {
 		t.Fatalf("docker run failed: %v: %s", err, string(out))
 	}
-	defer exec.Command("docker", "rm", "-f", container).Run()
+	defer func() { _ = exec.Command("docker", "rm", "-f", container).Run() }()
 
 	// wait for Postgres to accept connections via in-container psql
-	max := 60
-	for i := 0; i < max; i++ {
+	retries := 60
+	for i := 0; i < retries; i++ {
 		check := exec.Command("docker", "run", "--rm", "--network", "container:"+container, "postgres:15-alpine", "psql", "postgresql://postgres:pass@localhost:5432/contacts", "-c", "\\l")
 		if out, err := check.CombinedOutput(); err == nil {
 			_ = out
 			break
 		}
-		if i == max-1 {
+		if i == retries-1 {
 			t.Fatalf("waiting for postgres failed: %v: %s", err, string(out))
 		}
-		t.Logf("waiting for postgres... (%d/%d)", i+1, max)
+		t.Logf("waiting for postgres... (%d/%d)", i+1, retries)
 		time.Sleep(1 * time.Second)
 	}
 
@@ -128,7 +128,7 @@ func TestPostgresStoreRemoteInner(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	ps, err := NewPostgresStore(db)
 	if err != nil {
 		t.Fatalf("NewPostgresStore: %v", err)
