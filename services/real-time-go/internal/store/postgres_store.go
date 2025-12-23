@@ -35,12 +35,12 @@ CREATE TABLE IF NOT EXISTS messages (
 	return err
 }
 
-func (p *PostgresStore) List(_ context.Context) ([]Message, error) {
-	rows, err := p.db.Query("SELECT id, channel, body, created_at FROM messages")
+func (p *PostgresStore) List(ctx context.Context) ([]Message, error) {
+	rows, err := p.db.QueryContext(ctx, "SELECT id, channel, body, created_at FROM messages")
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = rows.Close() }()
+	defer rows.Close()
 	out := []Message{}
 	for rows.Next() {
 		var m Message
@@ -49,19 +49,22 @@ func (p *PostgresStore) List(_ context.Context) ([]Message, error) {
 		}
 		out = append(out, m)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
-func (p *PostgresStore) Publish(_ context.Context, m Message) (Message, error) {
+func (p *PostgresStore) Publish(ctx context.Context, m Message) (Message, error) {
 	if m.ID == "" {
 		m.ID = uuid.NewString()
 	}
 	if m.CreatedAt == 0 {
 		m.CreatedAt = time.Now().Unix()
 	}
-	_, err := p.db.Exec("INSERT INTO messages (id, channel, body, created_at) VALUES ($1, $2, $3, $4)", m.ID, m.Channel, m.Body, m.CreatedAt)
+	_, err := p.db.ExecContext(ctx, "INSERT INTO messages (id, channel, body, created_at) VALUES ($1, $2, $3, $4)", m.ID, m.Channel, m.Body, m.CreatedAt)
 	if err != nil {
 		return Message{}, err
 	}
 	return m, nil
-}
+} 

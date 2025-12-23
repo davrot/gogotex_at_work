@@ -38,12 +38,12 @@ CREATE TABLE IF NOT EXISTS events (
 }
 
 // List returns all events.
-func (p *PostgresStore) List(_ context.Context) ([]Event, error) {
-	rows, err := p.db.Query("SELECT id, project_id, type, payload, created_at FROM events")
+func (p *PostgresStore) List(ctx context.Context) ([]Event, error) {
+	rows, err := p.db.QueryContext(ctx, "SELECT id, project_id, type, payload, created_at FROM events")
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = rows.Close() }()
+	defer rows.Close()
 	out := []Event{}
 	for rows.Next() {
 		var e Event
@@ -52,20 +52,23 @@ func (p *PostgresStore) List(_ context.Context) ([]Event, error) {
 		}
 		out = append(out, e)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
 // Create inserts an event and returns the created record.
-func (p *PostgresStore) Create(_ context.Context, e Event) (Event, error) {
+func (p *PostgresStore) Create(ctx context.Context, e Event) (Event, error) {
 	if e.ID == "" {
 		e.ID = uuid.NewString()
 	}
 	if e.CreatedAt == 0 {
 		e.CreatedAt = time.Now().Unix()
 	}
-	_, err := p.db.Exec("INSERT INTO events (id, project_id, type, payload, created_at) VALUES ($1, $2, $3, $4, $5)", e.ID, e.ProjectID, e.Type, e.Payload, e.CreatedAt)
+	_, err := p.db.ExecContext(ctx, "INSERT INTO events (id, project_id, type, payload, created_at) VALUES ($1, $2, $3, $4, $5)", e.ID, e.ProjectID, e.Type, e.Payload, e.CreatedAt)
 	if err != nil {
 		return Event{}, err
 	}
 	return e, nil
-}
+} 

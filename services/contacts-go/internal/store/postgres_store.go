@@ -37,12 +37,12 @@ func (p *PostgresStore) ensureSchema() error {
 }
 
 // List returns all contacts from Postgres.
-func (p *PostgresStore) List(_ context.Context) ([]Contact, error) {
-	rows, err := p.db.Query("SELECT id, name, email FROM contacts")
+func (p *PostgresStore) List(ctx context.Context) ([]Contact, error) {
+	rows, err := p.db.QueryContext(ctx, "SELECT id, name, email FROM contacts")
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = rows.Close() }()
+	defer rows.Close()
 	out := []Contact{}
 	for rows.Next() {
 		var c Contact
@@ -51,16 +51,19 @@ func (p *PostgresStore) List(_ context.Context) ([]Contact, error) {
 		}
 		out = append(out, c)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
 // Create inserts a contact into Postgres and returns the created record.
-func (p *PostgresStore) Create(_ context.Context, c Contact) (Contact, error) {
+func (p *PostgresStore) Create(ctx context.Context, c Contact) (Contact, error) {
 	// Ensure ID exists; generate server-side UUID if absent
 	if c.ID == "" {
 		c.ID = uuid.New().String()
 	}
-	_, err := p.db.Exec("INSERT INTO contacts (id, name, email) VALUES ($1, $2, $3)", c.ID, c.Name, c.Email)
+	_, err := p.db.ExecContext(ctx, "INSERT INTO contacts (id, name, email) VALUES ($1, $2, $3)", c.ID, c.Name, c.Email)
 	if err != nil {
 		return Contact{}, err
 	}

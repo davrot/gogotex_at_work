@@ -37,12 +37,12 @@ func (p *PostgresStore) ensureSchema() error {
 }
 
 // List returns all documents from Postgres.
-func (p *PostgresStore) List(_ context.Context) ([]Document, error) {
-	rows, err := p.db.Query("SELECT id, title, body, created_at FROM documents")
+func (p *PostgresStore) List(ctx context.Context) ([]Document, error) {
+	rows, err := p.db.QueryContext(ctx, "SELECT id, title, body, created_at FROM documents")
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = rows.Close() }()
+	defer rows.Close()
 	out := []Document{}
 	for rows.Next() {
 		var d Document
@@ -51,18 +51,21 @@ func (p *PostgresStore) List(_ context.Context) ([]Document, error) {
 		}
 		out = append(out, d)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	return out, nil
-}
+} 
 
 // Create inserts a document into Postgres and returns the created record.
-func (p *PostgresStore) Create(_ context.Context, d Document) (Document, error) {
+func (p *PostgresStore) Create(ctx context.Context, d Document) (Document, error) {
 	if d.ID == "" {
 		d.ID = uuid.NewString()
 	}
 	if d.CreatedAt == 0 {
 		d.CreatedAt = time.Now().Unix()
 	}
-	_, err := p.db.Exec("INSERT INTO documents (id, title, body, created_at) VALUES ($1, $2, $3, $4)", d.ID, d.Title, d.Body, d.CreatedAt)
+	_, err := p.db.ExecContext(ctx, "INSERT INTO documents (id, title, body, created_at) VALUES ($1, $2, $3, $4)", d.ID, d.Title, d.Body, d.CreatedAt)
 	if err != nil {
 		return Document{}, err
 	}

@@ -36,12 +36,12 @@ CREATE TABLE IF NOT EXISTS notifications (
 	return err
 }
 
-func (p *PostgresStore) List(_ context.Context) ([]Notification, error) {
-	rows, err := p.db.Query("SELECT id, recipient, message, status, created_at FROM notifications")
+func (p *PostgresStore) List(ctx context.Context) ([]Notification, error) {
+	rows, err := p.db.QueryContext(ctx, "SELECT id, recipient, message, status, created_at FROM notifications")
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = rows.Close() }()
+	defer rows.Close()
 	out := []Notification{}
 	for rows.Next() {
 		var n Notification
@@ -50,10 +50,13 @@ func (p *PostgresStore) List(_ context.Context) ([]Notification, error) {
 		}
 		out = append(out, n)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
-func (p *PostgresStore) Create(_ context.Context, n Notification) (Notification, error) {
+func (p *PostgresStore) Create(ctx context.Context, n Notification) (Notification, error) {
 	if n.ID == "" {
 		n.ID = uuid.NewString()
 	}
@@ -63,9 +66,9 @@ func (p *PostgresStore) Create(_ context.Context, n Notification) (Notification,
 	if n.Status == "" {
 		n.Status = "queued"
 	}
-	_, err := p.db.Exec("INSERT INTO notifications (id, recipient, message, status, created_at) VALUES ($1, $2, $3, $4, $5)", n.ID, n.Recipient, n.Message, n.Status, n.CreatedAt)
+	_, err := p.db.ExecContext(ctx, "INSERT INTO notifications (id, recipient, message, status, created_at) VALUES ($1, $2, $3, $4, $5)", n.ID, n.Recipient, n.Message, n.Status, n.CreatedAt)
 	if err != nil {
 		return Notification{}, err
 	}
 	return n, nil
-}
+} 
