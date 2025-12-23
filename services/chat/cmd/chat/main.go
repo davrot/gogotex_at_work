@@ -33,6 +33,85 @@ func threadsHandlerWithStore(s *store.Store, w http.ResponseWriter, r *http.Requ
 	}
 	projectId := parts[2]
 
+	// POST actions on threads: resolve, reopen, delete, duplicate, generate
+	if r.Method == http.MethodPost {
+		if len(parts) >= 5 {
+			action := parts[4]
+			if action == "duplicate" {
+				// body: { threads: [id, ...] }
+				var body struct{ Threads []string `json:"threads"` }
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+					w.WriteHeader(http.StatusBadRequest)
+					w.Write([]byte("Invalid JSON"))
+					return
+				}
+				result := map[string]interface{}{}
+				for _, id := range body.Threads {
+					// duplicate: create new id by appending "-dup" and copy messages
+					srcKey := "messages:" + projectId + ":" + id
+					if val, ok := s.Get(srcKey); ok {
+						newId := id + "-dup"
+						targetKey := "messages:" + projectId + ":" + newId
+						s.Put(targetKey, val)
+						result[id] = map[string]string{"duplicateId": newId}
+					} else {
+						result[id] = map[string]string{"error": "not found"}
+					}
+				}
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{"newThreads": result})
+				return
+			}
+			// generate thread data: mirror Node behaviour by returning grouped messages for provided thread ids
+			if action == "generate" {
+				var body struct{ Threads []string `json:"threads"` }
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+					w.WriteHeader(http.StatusBadRequest)
+					w.Write([]byte("Invalid JSON"))
+					return
+				}
+				out := map[string]interface{}{}
+				for _, id := range body.Threads {
+					key := "messages:" + projectId + ":" + id
+					if val, ok := s.Get(key); ok {
+						var arr []map[string]interface{}
+						_ = json.Unmarshal([]byte(val), &arr)
+						out[id] = map[string]interface{}{"messages": arr}
+					} else {
+						out[id] = map[string]interface{}{"messages": []interface{}{}}
+					}
+				}
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				_ = json.NewEncoder(w).Encode(out)
+				return
+			}
+		}
+	}
+
+	// resolve / reopen / delete operations on specific thread id
+	if r.Method == http.MethodPost && len(parts) >= 6 {
+		action := parts[5]
+		threadId := parts[4]
+		if action == "resolve" {
+			// set resolved marker
+			s.Put("resolved:"+projectId+":"+threadId, "1")
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		if action == "reopen" {
+			s.Delete("resolved:"+projectId+":"+threadId)
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		if action == "delete" {
+			s.Delete("messages:"+projectId+":"+threadId)
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+	}
+
 	// check for seeded threads in the in-memory store
 	key := "threads:" + projectId
 	if _, ok := s.Get(key); ok {
