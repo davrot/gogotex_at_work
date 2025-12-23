@@ -18,5 +18,14 @@ Runbook for maintainers:
 
 - For revocation immediacy failures, collect a packet: `node.parity.json`, `test.parity.out`, `webprofile.log`, `mongo.log`, and the failing request/response pairs (if present).
 - For cross-instance failures include `ci/webprofile-parity/cross-instance-results.json` (per-run iterations), `cross-instance-iter-*.out`, and `cross-instance-introspect-iter-*.raw` for full request/response traces.
+
+  To collect local cross-instance results into the flakiness aggregator, run:
+
+  ```sh
+  ./scripts/contract/collect_local_cross_runs.sh --copy
+  ```
+
+  This copies `ci/webprofile-parity/cross-instance-results.json` into `ci/flakiness/collected/` and regenerates `ci/flakiness/cross/aggregate_cross.json` and `ci/flakiness/cross/dashboard.html` for quick inspection.
+
 - The weekly flakiness summary includes a <code>ci/flakiness/cross/dashboard.html</code> dashboard (uploaded as artifact `parity-cross-dashboard`) that provides a quick snapshot of cross-instance metrics; download it from the weekly job artifacts for visual inspection.
 - Attempt local repro with `./scripts/contract/run_parity_locally.sh --no-cleanup` and run `./scripts/contract/run_cross_instance_locally.sh --no-cleanup` to reproduce; attach `ci/webprofile-parity-<TIMESTAMP>.tar.gz` to the issue.
