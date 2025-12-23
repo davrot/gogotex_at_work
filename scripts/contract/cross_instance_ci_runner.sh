@@ -64,7 +64,7 @@ for iter in $(seq 1 $ITERATIONS); do
   done
 
   if [ "$ok" = true ]; then
-    python3 -c "import json,sys; json.dump({'iteration': %s, 'success': True}, sys.stdout)" > "ci/webprofile-parity/cross-instance-iter-$iter.json" || true
+    python3 -c "import json,sys; json.dump({'iteration': $iter, 'success': True}, sys.stdout)" > "ci/webprofile-parity/cross-instance-iter-$iter.json" || true
   else
     # encode last_resp as base64 to avoid JSON quoting issues
     last_b64=$(printf '%s' "$last_resp" | python3 -c "import sys,base64;print(base64.b64encode(sys.stdin.buffer.read()).decode())")
