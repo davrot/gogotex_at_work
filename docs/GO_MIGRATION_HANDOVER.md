@@ -25,3 +25,15 @@ Front-end handover (paused work brief):
 - Recommended next steps for front-end team: add minimal stubs for heavy imports, tighten Babel/register presets, and run scoped mocha tests until collection stops failing; I left a focused branch and tests in `feat/ci-ssh-smoke`.
 
 Contact me (or pick up the branch `feat/go-contacts-poc`) to continue: implement middleware request IDs across the app, add more metrics, add integration test coverage, and begin migrating a real endpoint with DB access.
+
+---
+
+## Migration directory convention (project-wide)
+
+When migrating a Node.js microservice to Go, use the following directory convention to keep both implementations side-by-side and to make migration/reversion easy:
+
+- Place the Go version in a new directory named `services/<name>-go`, e.g. `services/contacts-go` for the `services/contacts` service.
+- Keep service-specific documentation and CI steps inside the new `-go` directory (Dockerfile, README, test scripts, workflow snippets), and reference the migration in `docs/GO_MIGRATION_HANDOVER.md`.
+- Use the `-go` suffix consistently for all future Go migrations to make tooling, discovery, and migration automation straightforward.
+
+Rationale: this keeps both language implementations clearly separated, avoids name collisions, and makes it simple to run both implementations during migration periods and experiments.
