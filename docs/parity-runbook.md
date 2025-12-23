@@ -38,9 +38,12 @@ Publishing dashboards:
 Thresholds & alerts:
 
 - The collector writes `ci/flakiness/cross/summary.json` containing aggregated cross-instance metrics (run_total, run_failures, iter_total, iter_failures, run_failure_rate, iter_failure_rate).
-- The weekly summary job will evaluate thresholds and create an issue when thresholds are exceeded. Configure the checks with these environment variables:
-  - `CROSS_RUN_FAIL_THRESHOLD` (default `1`) — number of runs with failures that triggers an alert
-  - `CROSS_ITER_FAILURE_RATE_THRESHOLD` (default `0.05`) — fraction of iterations failed across aggregated runs (e.g., `0.05` for 5%) that triggers an alert
+- The weekly summary job will evaluate thresholds and can create an issue when thresholds are exceeded. For solo developers we **disable automatic issue creation by default** to reduce noise; you can configure the behavior via these environment variables (set as workflow `env` or repository `secrets`):
+  - `SKIP_AUTO_ISSUE` (default `true`) — when `true` the weekly job will **not** create issues automatically (set to `false` to enable automatic issue creation)
+  - `ISSUE_RUN_THRESHOLD` (default `3`) — number of failing runs that will trigger issue creation when `SKIP_AUTO_ISSUE` is `false`
+  - `ISSUE_ITER_RATE_THRESHOLD` (default `0.1`) — iteration-failure rate threshold that will trigger issue creation when `SKIP_AUTO_ISSUE` is `false`
+  - `CROSS_RUN_FAIL_THRESHOLD` (default `1`) — number of runs with failures that triggers a cross-instance alert (used for crossAlert evaluation)
+  - `CROSS_ITER_FAILURE_RATE_THRESHOLD` (default `0.05`) — fraction of iterations failed across aggregated runs (e.g., `0.05` for 5%) that triggers a cross-instance alert
 
 Example (CI):
 

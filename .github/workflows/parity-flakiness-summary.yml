@@ -40,6 +40,10 @@ jobs:
           # optional thresholds
           CROSS_RUN_FAIL_THRESHOLD: ${{ secrets.CROSS_RUN_FAIL_THRESHOLD }}
           CROSS_ITER_FAILURE_RATE_THRESHOLD: ${{ secrets.CROSS_ITER_FAILURE_RATE_THRESHOLD }}
+          # Solo-developer settings: disable automatic issue creation by default
+          SKIP_AUTO_ISSUE: 'true'
+          ISSUE_RUN_THRESHOLD: ${{ secrets.ISSUE_RUN_THRESHOLD }}
+          ISSUE_ITER_RATE_THRESHOLD: ${{ secrets.ISSUE_ITER_RATE_THRESHOLD }}
         run: |
           ./scripts/contract/collect_flakiness.sh --publish || ./scripts/contract/collect_flakiness.sh || true
 
@@ -64,7 +68,7 @@ jobs:
           name: parity-cross-dashboard
           path: ci/flakiness/cross/dashboard.html || true
 
-      - name: Create issue if failures exist or thresholds exceeded
+      - name: Create issue if failures exist or thresholds exceeded (configurable for solo devs)
         if: always()
         uses: actions/github-script@v6
         with:
@@ -81,12 +85,13 @@ jobs:
             const crossReportPath = 'ci/flakiness/cross/report.txt'
             const crossSummaryPath = 'ci/flakiness/cross/summary.json'
             let crossAlert = false
+            let cs = null
             if (fs.existsSync(crossReportPath)) {
               try { crossSummary = '\n\nCross-instance summary:\n' + fs.readFileSync(crossReportPath,'utf8') } catch (e) { crossSummary = '\n\nCross-instance summary: failed to read cross report' }
             }
             if (fs.existsSync(crossSummaryPath)) {
               try {
-                const cs = JSON.parse(fs.readFileSync(crossSummaryPath,'utf8'))
+                cs = JSON.parse(fs.readFileSync(crossSummaryPath,'utf8'))
                 const run_failures = cs.run_failures || 0
                 const iter_failures = cs.iter_failures || 0
                 const run_total = cs.run_total || 0
@@ -101,7 +106,19 @@ jobs:
               } catch (e) { core.warning('Failed to parse cross summary: ' + String(e)) }
             }
 
-            if (failures > 0 || crossAlert) {
+            // Solo-developer safety: allow disabling automatic issue creation or raising thresholds
+            const skipAutoIssue = (process.env.SKIP_AUTO_ISSUE === 'true')
+            const issueRunThreshold = parseInt(process.env.ISSUE_RUN_THRESHOLD || '3', 10)
+            const issueIterRateThreshold = parseFloat(process.env.ISSUE_ITER_RATE_THRESHOLD || '0.1')
+
+            let createIssue = false
+            if (!skipAutoIssue) {
+              if (failures >= issueRunThreshold) createIssue = true
+              else if (crossAlert) createIssue = true
+              else if (cs && cs.iter_total && (cs.iter_failures / cs.iter_total) >= issueIterRateThreshold) createIssue = true
+            }
+
+            if (createIssue) {
               let body = `Automated weekly parity flakiness report:\n\n${report}`
               if (crossAlert) body += `\n\nCross-instance threshold exceeded.\n${crossSummary}`
               else if (crossSummary) body += `\n\n${crossSummary}`
@@ -122,5 +139,5 @@ jobs:
                 } catch (e) { core.warning('Slack notify failed: ' + String(e)) }
               } else { core.info('SLACK_WEBHOOK not set; skipping weekly Slack notify') }
             } else {
-              core.info('No failures or threshold violations detected this week; no issue created')
+              core.info('No issue created due to SKIP_AUTO_ISSUE or thresholds not exceeded')
             }
