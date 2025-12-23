@@ -17,20 +17,33 @@ mkdir -p "$DEST"
 sed -e "s/{{SERVICE_NAME}}/$NAME/g" "$TEMPLATEDIR/README_TEMPLATE.md" > "$DEST/README_POC.md"
 sed -e "s/{{SERVICE_NAME}}/$NAME/g" "$TEMPLATEDIR/Dockerfile.template" > "$DEST/Dockerfile"
 mkdir -p "$DEST/test/integration"
-echo "# ${NAME}-go
+# copy CI snippet as a local template (do not create repo-level workflow automatically)
+mkdir -p "$DEST/ci"
+sed -e "s/{{SERVICE_NAME}}/$NAME/g" "$TEMPLATEDIR/ci-snippet.template" > "$DEST/ci/ci-snippet.template"
+# create a minimal Makefile for local workflows
+cat > "$DEST/Makefile" <<'MAKE'
+.PHONY: all build test lint docker integration integration-remote
+all: build
 
-This is a stub service. Replace with actual implementation.
-" > "$DEST/README.md"
-# Create a minimal main.go with the service name expanded
-cat > "$DEST/main.go" <<EOF
-package main
+build:
+	go build ./...
 
-import "fmt"
+test:
+	go test ./... -v
 
-func main() {
-    fmt.Println("TODO: implement ${NAME}-go service")
-}
-EOF
+lint:
+	golangci-lint run || true
+
+docker:
+	docker build -t ${NAME}-go:local .
+
+# Integration helpers
+integration:
+	bash test/integration/run_integration.sh
+
+integration-remote:
+	bash test/integration/run_integration.sh --remote-db-test
+MAKE
 chmod +x "$DEST"
 cat <<EOF
 Created $DEST
