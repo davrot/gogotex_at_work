@@ -26,3 +26,10 @@ integration-go-remote:
 			echo "skipping $$d (no test/integration/run_integration.sh)"; \
 		fi; \
 	done
+# Run unit tests for all -go services
+test-go-units:
+	@bash scripts/run_all_go_unit_tests.sh
+
+# Run unit tests with optional DB integration
+test-go-units-db:
+	@bash scripts/run_all_go_unit_tests.sh --run-db
