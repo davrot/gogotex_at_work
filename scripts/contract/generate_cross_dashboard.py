@@ -73,7 +73,17 @@ OUT_DIR.joinpath('trend.json').write_text(json.dumps({
 }, indent=2))
 
 # generate HTML with Chart.js
-data_json = json.dumps({'labels': labels, 'success_rates': success_rates, 'failures': failures})
+# include thresholds if provided via env
+import os
+iter_rate_threshold = float(os.environ.get('CROSS_ITER_FAILURE_RATE_THRESHOLD', '0.05'))
+run_fail_threshold = int(os.environ.get('CROSS_RUN_FAIL_THRESHOLD', '1'))
+
+data_payload = {'labels': labels, 'success_rates': success_rates, 'failures': failures, 'iter_rate_threshold': iter_rate_threshold, 'run_fail_threshold': run_fail_threshold}
+data_json = json.dumps(data_payload)
+
+# compute a success-rate threshold (100 * (1 - iter_threshold)) to render as a line
+success_threshold_pct = 100.0 * (1.0 - iter_rate_threshold)
+
 html = (
     '<!doctype html>\n'
     '<html>\n'
@@ -86,6 +96,7 @@ html = (
     '<body>\n'
     '  <h1>Parity Cross-Instance Trend</h1>\n'
     '  <p>Generated: ' + datetime.utcnow().isoformat() + 'Z</p>\n'
+    '  <p>Thresholds: iter failure rate >= ' + str(iter_rate_threshold) + ' (shows as success >= ' + ('%.1f' % (success_threshold_pct)) + '%), run failures >= ' + str(run_fail_threshold) + '</p>\n'
     '  <div style="width: 100%; max-width: 900px">\n'
     '    <canvas id="successChart" height="120"></canvas>\n'
     '  </div>\n'
@@ -96,6 +107,7 @@ html = (
     '  <script>\n'
     '    const data = ' + data_json + ';\n'
     '    const ctxS = document.getElementById("successChart").getContext("2d");\n'
+    '    const thresholdLine = Array(data.labels.length).fill(' + str(success_threshold_pct) + ');\n'
     '    const successChart = new Chart(ctxS, {\n'
     '      type: "line",\n'
     '      data: {\n'
@@ -107,6 +119,13 @@ html = (
     '          backgroundColor: "rgba(20,150,70,0.2)",\n'
     '          fill: true,\n'
     '          tension: 0.2\n'
+    '        }, {\n'
+    '          label: "Threshold (success %)",\n'
+    '          data: thresholdLine,\n'
+    '          borderColor: "rgba(0,0,200,0.7)",\n'
+    '          borderDash: [6,3],\n'
+    '          pointRadius: 0,\n'
+    '          fill: false\n'
     '        }]\n'
     '      },\n'
     '      options: {\n'
