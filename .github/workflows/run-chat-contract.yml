@@ -9,9 +9,9 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'Run mode (ci|docker) - for CI use `ci` which uses the provided Mongo service'
+        description: "Run mode (ci|docker) - for CI use `ci` which uses the provided Mongo service"
         required: false
-        default: 'ci'
+        default: "ci"
 
 jobs:
   run-contract:
@@ -35,12 +35,12 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
 
       - name: Setup Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.25'
+          go-version: "1.25"
 
       - name: Install project Node deps (if present)
         run: |
@@ -49,8 +49,8 @@ jobs:
       - name: Run chat contract wrapper (NO_DOCKER=1)
         id: run_contract
         env:
-          NO_DOCKER: '1'
-          MONGO_URI: 'mongodb://127.0.0.1:27017/chat_test'
+          NO_DOCKER: "1"
+          MONGO_URI: "mongodb://127.0.0.1:27017/chat_test"
           ARTIFACT_DIR: ci/chat-contract
         run: |
           mkdir -p "$ARTIFACT_DIR"
@@ -68,6 +68,5 @@ jobs:
         with:
           name: chat-contract-artifacts
           path: ci/chat-contract/**
-
 # NOTE: This workflow is intentionally manual. Do NOT enable automatic runs as part of gating
 # without explicit sign-off from migration owners and CI leads.

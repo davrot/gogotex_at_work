@@ -1,0 +1,65 @@
+# Manual workflow to run chat multi-instance integration and collect artifacts
+# Trigger: manually via workflow_dispatch. This workflow is NOT run automatically on PRs/merges.
+# Purpose: Run `scripts/contract/run_chat_multi_instance.sh` in CI (NO_DOCKER=1, provided Mongo service)
+# and upload `ci/chat-multi-instance/` as job artifacts for inspection.
+
+name: "Chat multi-instance contract — manual run"
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Run mode (ci|docker) - for CI use `ci` which uses the provided Mongo service"
+        required: false
+        default: "ci"
+
+jobs:
+  run-multi-instance:
+    name: Run Chat multi-instance and collect artifacts
+    runs-on: ubuntu-latest
+
+    services:
+      mongodb:
+        image: mongo:6.0
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongo --eval 'db.runCommand({ ping: 1 })' || exit 1"
+          --health-interval 5s --health-timeout 2s --health-retries 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.25"
+
+      - name: Run multi-instance wrapper (NO_DOCKER=1)
+        id: run_multi
+        env:
+          NO_DOCKER: "1"
+          MONGO_URI: "mongodb://127.0.0.1:27017/chat_test"
+          ARTIFACT_DIR: ci/chat-multi-instance
+        run: |
+          mkdir -p "$ARTIFACT_DIR"
+          if ./scripts/contract/run_chat_multi_instance.sh 2>&1 | tee "$ARTIFACT_DIR/multi-instance-run.log"; then
+            echo "Multi-instance run succeeded"
+          else
+            echo "Multi-instance run failed (see $ARTIFACT_DIR/multi-instance-run.log)" >&2
+            exit 2
+          fi
+
+      - name: Upload multi-instance artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chat-multi-instance-artifacts
+          path: ci/chat-multi-instance/**
+# NOTE: Manual workflow, do not enable automatic gating without explicit owner sign-off.

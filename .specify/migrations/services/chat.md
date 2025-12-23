@@ -30,6 +30,7 @@ Checklist Summary:
 - [x] Dockerfile added for Go runtime (`Dockerfile.go`, static binary); default Node Dockerfile not overwritten
 - [ ] CI builds/tests/bench runs added (spike CI added for PRs touching services/chat)
 - [x] Rollout plan + rollback plan (drafted: `.specify/migrations/services/chat-rollout.md`)
+- [ ] Multi-instance integration harness added (T047f)
 
 Artifacts & local CI runner
 
