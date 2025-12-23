@@ -51,6 +51,11 @@ env:
   CROSS_ITER_FAILURE_RATE_THRESHOLD: 0.05
 ```
 
+Slack notifications:
+
+- If `secrets.SLACK_WEBHOOK` is set in the workflow, the weekly summary job will post a short message with failure counts and cross-instance metrics. If the cross thresholds are exceeded, the message will be prefixed with an alert emoji and include the cross summary.
+- The local collector can also post an immediate Slack notification when thresholds are exceeded if the `SLACK_WEBHOOK` environment variable is set locally when running `collect_local_cross_runs.sh` or `collect_flakiness.sh`.
+
 Example (local):
 
 ```sh
