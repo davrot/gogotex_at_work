@@ -75,6 +75,8 @@ handoffs:
     send: true          
 ---
 
+> **NOTE (SOLO MODE):** Solo Developer Mode is active. Do **not** create GitHub PRs, issues, or GitHub Actions workflows unless explicitly requested. Prefer providing local scripts and commands for the user to run.
+
 ## User Input
 
 ```text
