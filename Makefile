@@ -15,6 +15,11 @@ integration-go:
 # Run remote integration (includes optional networked Go DB validation) for all *-go services
 integration-go-remote:
 	@for d in $(shell find services -maxdepth 1 -type d -name '*-go' | sort); do \
-		echo "=== running remote integration for $$d ==="; \
-		make -C $$d integration-remote || exit $$?; \
+		echo "=== checking integration script for $$d ==="; \
+		if [ -x "$$d/test/integration/run_integration.sh" ]; then \
+			echo "=== running remote integration for $$d ==="; \
+			make -C $$d integration-remote || exit $$?; \
+		else \
+			echo "skipping $$d (no test/integration/run_integration.sh)"; \
+		fi; \
 	done
