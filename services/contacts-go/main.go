@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"github.com/gin-gonic/gin"
+	"github.com/overleaf/contacts-go/internal/config"
 	"github.com/overleaf/contacts-go/internal/logging"
 	"github.com/overleaf/contacts-go/internal/metrics"
 	"github.com/overleaf/contacts-go/internal/middleware"
@@ -25,7 +26,8 @@ func main() {
 	r.Use(middleware.RequestLogger())
 	server.RegisterRoutes(r)
 
-	if err := r.Run(); err != nil {
+	addr := ":" + config.Port()
+	if err := r.Run(addr); err != nil {
 		logging.Logger.Sugar().Fatalf("server exit: %v", err)
 	}
 }

@@ -18,6 +18,8 @@ func RequestLogger() gin.HandlerFunc {
 			reqID = uuid.New().String()
 			c.Request.Header.Set("X-Request-ID", reqID)
 		}
+		// also echo request id back to client
+		c.Header("X-Request-ID", reqID)
 
 		start := time.Now()
 		c.Next()
