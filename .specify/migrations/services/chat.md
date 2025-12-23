@@ -11,7 +11,7 @@ Checklist:
 - [ ] Benchmarks + SLO validated
 - [ ] Dockerfile updated to run Go binary
 - [ ] CI builds/tests/bench runs added (spike CI added for PRs touching services/chat)
-- [ ] Rollout plan + rollback plan
+- [x] Rollout plan + rollback plan (drafted: `.specify/migrations/services/chat-rollout.md`)
 
 Notes:
 
@@ -29,7 +29,7 @@ Checklist Summary:
 - [x] Benchmarks + SLO validated (basic harness added; CI job pending)
 - [x] Dockerfile added for Go runtime (`Dockerfile.go`, static binary); default Node Dockerfile not overwritten
 - [ ] CI builds/tests/bench runs added (spike CI added for PRs touching services/chat)
-- [ ] Rollout plan + rollback plan
+- [x] Rollout plan + rollback plan (drafted: `.specify/migrations/services/chat-rollout.md`)
 
 Artifacts & local CI runner
 
