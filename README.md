@@ -16,6 +16,7 @@
 
 <p align="center">
   <a href="https://davrot.github.io/gogotex_at_work/parity-cross/dashboard.html"><img src="https://img.shields.io/badge/parity-cross-dashboard-blue.svg" alt="Parity Cross Dashboard"></a>
+  <a href="https://davrot.github.io/gogotex_at_work/parity-cross/status.svg"><img src="https://davrot.github.io/gogotex_at_work/parity-cross/status.svg" alt="Parity Cross Status"></a>
 </p>
 
 <img src="doc/screenshot.png" alt="A screenshot of a project being edited in Overleaf Community Edition">
@@ -68,7 +69,6 @@ We use the [Phusion base-image](https://github.com/phusion/baseimage-docker)
 in which to run the Overleaf services. Baseimage uses the `runit` service
 manager to manage services, and we add our init-scripts from the `server-ce/runit`
 folder.
-
 
 ## Contributing
 
