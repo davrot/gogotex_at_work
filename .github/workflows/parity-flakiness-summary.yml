@@ -53,7 +53,7 @@ jobs:
           name: parity-cross-dashboard
           path: ci/flakiness/cross/dashboard.html || true
 
-      - name: Create issue if failures exist
+      - name: Create issue if failures exist or thresholds exceeded
         if: always()
         uses: actions/github-script@v6
         with:
@@ -65,15 +65,38 @@ jobs:
             let agg = []
             if (fs.existsSync(aggPath)) agg = JSON.parse(fs.readFileSync(aggPath,'utf8'))
             const failures = agg.filter(x => x.success !== true).length
-            // include cross-instance summary when present
+            // include cross-instance summary when present and check thresholds
             let crossSummary = ''
             const crossReportPath = 'ci/flakiness/cross/report.txt'
+            const crossSummaryPath = 'ci/flakiness/cross/summary.json'
+            let crossAlert = false
             if (fs.existsSync(crossReportPath)) {
               try { crossSummary = '\n\nCross-instance summary:\n' + fs.readFileSync(crossReportPath,'utf8') } catch (e) { crossSummary = '\n\nCross-instance summary: failed to read cross report' }
             }
-            if (failures > 0) {
-              const body = `Automated weekly parity flakiness report:\n\n${report}${crossSummary}\n\nAttached aggregate JSON and cross-instance dashboard (if present).`
+            if (fs.existsSync(crossSummaryPath)) {
+              try {
+                const cs = JSON.parse(fs.readFileSync(crossSummaryPath,'utf8'))
+                const run_failures = cs.run_failures || 0
+                const iter_failures = cs.iter_failures || 0
+                const run_total = cs.run_total || 0
+                const iter_total = cs.iter_total || 0
+                const iter_rate = iter_total === 0 ? 0 : (iter_failures / iter_total)
+                core.info(`Cross metrics: runs=${run_total} run_failures=${run_failures} iter_total=${iter_total} iter_failures=${iter_failures} iter_rate=${iter_rate}`)
+                const runThreshold = parseInt(process.env.CROSS_RUN_FAIL_THRESHOLD || '1', 10)
+                const iterRateThreshold = parseFloat(process.env.CROSS_ITER_FAILURE_RATE_THRESHOLD || '0.05')
+                if (run_failures >= runThreshold || iter_rate >= iterRateThreshold) {
+                  crossAlert = true
+                }
+              } catch (e) { core.warning('Failed to parse cross summary: ' + String(e)) }
+            }
+
+            if (failures > 0 || crossAlert) {
+              let body = `Automated weekly parity flakiness report:\n\n${report}`
+              if (crossAlert) body += `\n\nCross-instance threshold exceeded.\n${crossSummary}`
+              else if (crossSummary) body += `\n\n${crossSummary}`
+              body += `\n\nAttached aggregate JSON and cross-instance dashboard (if present).`
               await github.rest.issues.create({ owner: github.context.repo.owner, repo: github.context.repo.repo, title: `Parity flakiness weekly summary (${new Date().toISOString().slice(0,10)})`, body })
+
               // Slack notify (optional): post cross-instance summary if SLACK_WEBHOOK configured
               const slackWebhook = process.env.SLACK_WEBHOOK
               if (slackWebhook) {
@@ -82,5 +105,5 @@ jobs:
                 try { await require('node-fetch')(slackWebhook, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: slackMsg }) }) } catch (e) { core.warning('Slack notify failed: ' + String(e)) }
               } else { core.info('SLACK_WEBHOOK not set; skipping weekly Slack notify') }
             } else {
-              core.info('No failures detected this week; no issue created')
+              core.info('No failures or threshold violations detected this week; no issue created')
             }
