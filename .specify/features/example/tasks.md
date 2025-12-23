@@ -37,7 +37,7 @@
   - Acceptance: A document `.specify/migrations/migration-readiness.md` exists listing per-service criteria: parity contract tests, bench + SLO validation, Docker/CI updated to run Go binary, documented rollout & rollback steps, and an owner for the migration. CI must fail PRs attempting to flip runtime if any checklist item is missing.
   - Current: **open** — Checklist file not present; owners & automation TBD.
 
-- [ ] T0A1 Audit & reconcile migrations T047–T057 — inspect each migration task and update statuses to accurately reflect whether business logic, runtime flip, Docker/CI changes, and parity tests are complete.
+- [ ] T0A1 Audit & reconcile migrations T047–T057 — inspect each migration task and update statuses to accurately reflect whether business logic, runtime flip, Docker/CI changes, and parity tests are complete. Owner: @migration-owner
   - Acceptance: Each task T047..T057 is updated with a clear status and subtasks where work remains; issue links and owners assigned; issue #9 links to the audit results.
   - Current: **in progress** — audit performed; per-service follow-up issues created: #11 (chat), #12 (contacts), #13 (document-updater), #14 (filestore), #15 (docstore), #16 (notifications), #17 (real-time), #18 (clsi), #19 (history-v1), #20 (project-history), #21 (web). Owners & estimates TBD.
 
