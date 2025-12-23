@@ -146,6 +146,11 @@ func main() {
 	mux.HandleFunc("/status", statusHandler)
 	mux.HandleFunc("/project/", func(w http.ResponseWriter, r *http.Request) {
 		// inject store into closure for handlers
+		// route messages endpoint to messagesHandler; otherwise threads
+		if strings.Contains(r.URL.Path, "/messages") {
+			messagesHandlerWithStore(s, w, r)
+			return
+		}
 		threadsHandlerWithStore(s, w, r)
 	})
 
