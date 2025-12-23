@@ -55,7 +55,7 @@ func (p *PostgresStore) List(ctx context.Context) ([]Document, error) {
 		return nil, err
 	}
 	return out, nil
-} 
+}
 
 // Create inserts a document into Postgres and returns the created record.
 func (p *PostgresStore) Create(ctx context.Context, d Document) (Document, error) {

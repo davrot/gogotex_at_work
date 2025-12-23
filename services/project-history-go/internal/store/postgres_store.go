@@ -71,4 +71,4 @@ func (p *PostgresStore) Create(ctx context.Context, e Event) (Event, error) {
 		return Event{}, err
 	}
 	return e, nil
-} 
+}

@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"os"
 
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/overleaf/project-history-go/internal/events"
 	"github.com/overleaf/project-history-go/internal/store"
-	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 func main() {

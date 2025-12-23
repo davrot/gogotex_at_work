@@ -18,14 +18,3 @@ type Store interface {
 	List(ctx context.Context) ([]Event, error)
 	Create(ctx context.Context, e Event) (Event, error)
 }
-
-
-
-
-
-
-
-
-
-
-

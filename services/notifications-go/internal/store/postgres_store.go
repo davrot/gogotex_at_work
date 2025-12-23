@@ -71,4 +71,4 @@ func (p *PostgresStore) Create(ctx context.Context, n Notification) (Notificatio
 		return Notification{}, err
 	}
 	return n, nil
-} 
+}

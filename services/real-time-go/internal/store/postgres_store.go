@@ -67,4 +67,4 @@ func (p *PostgresStore) Publish(ctx context.Context, m Message) (Message, error)
 		return Message{}, err
 	}
 	return m, nil
-} 
+}

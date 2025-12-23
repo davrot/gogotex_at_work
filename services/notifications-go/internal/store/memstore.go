@@ -10,7 +10,7 @@ import (
 
 // MemStore is an in-memory store for PoC and tests.
 type MemStore struct {
-	mu    sync.Mutex
+	mu     sync.Mutex
 	notifs []Notification
 }
 

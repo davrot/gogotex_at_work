@@ -24,20 +24,18 @@ Observability
 
 Checklist
 
-- [X] implement in-memory store
-- [X] implement handlers and tests
-- [X] add integration script and CI snippet
-- [X] implement Postgres store and integration tests (opt-in)
+- [x] implement in-memory store
+- [x] implement handlers and tests
+- [x] add integration script and CI snippet
+- [x] implement Postgres store and integration tests (opt-in)
 
 How to run integration tests
 
 - Build and run the full integration flow (includes Postgres smoke tests and optional remote Go helper):
-
-  - make integration        # smoke test (starts service image and Postgres, runs API checks)
+  - make integration # smoke test (starts service image and Postgres, runs API checks)
   - make integration-remote # same as above + runs helper Go-level DB test inside helper container
 
 - Direct tests inside module:
-
   - RUN_DB_INTEGRATION=1 go test ./internal/store -run TestPostgresStoreIntegration -v
   - RUN_DB_INTEGRATION_REMOTE=1 go test ./internal/store -run TestPostgresStoreNetworked -v
 

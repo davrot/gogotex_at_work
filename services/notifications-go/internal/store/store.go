@@ -18,14 +18,3 @@ type Store interface {
 	List(ctx context.Context) ([]Notification, error)
 	Create(ctx context.Context, n Notification) (Notification, error)
 }
-
-
-
-
-
-
-
-
-
-
-

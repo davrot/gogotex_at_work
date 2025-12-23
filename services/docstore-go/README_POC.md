@@ -33,5 +33,6 @@ How to run the tests directly:
 - RUN_DB_INTEGRATION_REMOTE=1 go test ./internal/store -run TestPostgresStoreNetworked -v
 
 Notes:
+
 - The integration scripts prefer in-container `psql` checks as a robust fallback when host port mapping or environment restrictions make direct DB connections unreliable.
 - When `--remote-db-test` is used, the script will attempt to run Go tests inside a helper container; if the helper cannot access `go.mod` (mounting not supported), the script will detect and skip the remote helper tests with a helpful message.
