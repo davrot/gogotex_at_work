@@ -148,6 +148,8 @@ make go-test
 make docker-go-test
 ```
 
+CI note: DB-backed Go unit tests are gated and do **not** run automatically. To execute DB-backed unit tests across all `*-go` services, use the manual GitHub Actions workflow named "Go DB unit tests (manual)" (`.github/workflows/go-unit-tests-db.yml`) and trigger it with `run-db: true` from the Actions UI; the workflow will set `RUN_DB_FORCE=1` to allow the run when explicitly requested.
+
 ## Build & Start Services
 
 From the `develop` directory, build and start services:
