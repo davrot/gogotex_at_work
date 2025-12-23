@@ -83,7 +83,7 @@ with open('ci/flakiness/cross/report.txt','w') as f:
     f.write('iter_failures=%d\n' % iter_failures)
 PY
 
-  # generate a minimal HTML dashboard for quick inspection
+  # generate a minimal HTML dashboard for quick inspection (kept for compatibility)
   CROSS_SUMMARY=$(cat ci/flakiness/cross/report.txt || true)
   cat > ci/flakiness/cross/dashboard.html <<HTML
 <!doctype html>
@@ -102,6 +102,14 @@ $CROSS_SUMMARY
 </body>
 </html>
 HTML
+
+  # also attempt to generate a richer trend dashboard using Chart.js (requires Python 3)
+  if command -v python3 >/dev/null 2>&1; then
+    echo "Generating trend dashboard..."
+    ./scripts/contract/generate_cross_dashboard.py || echo "generate_cross_dashboard.py failed; keeping minimal dashboard"
+  else
+    echo "python3 not available; skipping trend dashboard generation"
+  fi
 else
   echo '[]' > ci/flakiness/cross/aggregate_cross.json
 fi
