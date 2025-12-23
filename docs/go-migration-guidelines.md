@@ -15,6 +15,7 @@ Contents and responsibilities
 - The `-go` directory should contain the Go service implementation and any service-specific artifacts:
   - `main.go`, `internal/` package layout, `Dockerfile`, `README_POC.md`, `test/integration/` scripts, and CI snippets if required.
   - Add a GitHub Actions workflow using `docs/templates/service-go/ci-workflow.template` (or adapt your own). The workflow can optionally run `test/integration/run_integration.sh --remote-db-test` to execute the optional networked Go-level DB test via a helper container.
+  - Add a local Makefile target (e.g., `integration` and `integration-remote`) to make it easier to run integration checks: `make -C services/<name>-go integration-remote`.
 - Document the migration-specific decisions in `docs/GO_MIGRATION_HANDOVER.md` and link to the service-level README.
 
 Testing & CI
