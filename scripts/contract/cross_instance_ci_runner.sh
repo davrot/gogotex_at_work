@@ -29,7 +29,10 @@ for iter in $(seq 1 $ITERATIONS); do
   token=$(echo "$create_resp" | jq -r '.token // .plaintext // empty')
   if [ -z "$id" ] || [ -z "$token" ]; then
     echo "Iteration $iter: Failed to create token"
-    jq --argjson obj '{iteration:'$iter', success:false, reason:"create_failed"}' '. + [$obj]' "$results_file" > "$results_file.tmp" && mv "$results_file.tmp" "$results_file"
+    python3 - <<PY > "ci/webprofile-parity/cross-instance-iter-$iter.json"
+import json
+json.dump({"iteration": %d, "success": False, "reason": "create_failed"}, sys.stdout)
+PY
     continue
   fi
 
@@ -40,7 +43,10 @@ for iter in $(seq 1 $ITERATIONS); do
   echo "$revoke_status" > "ci/webprofile-parity/cross-instance-revoke-iter-$iter.txt"
   if [ "$revoke_status" != "204" ]; then
     echo "Iteration $iter: Revoke failed with status $revoke_status"
-    jq --argjson obj '{iteration:'$iter', success:false, reason:"revoke_failed", revoke_status:'$revoke_status'}' '. + [$obj]' "$results_file" > "$results_file.tmp" && mv "$results_file.tmp" "$results_file"
+    python3 - <<PY > "ci/webprofile-parity/cross-instance-iter-$iter.json"
+import json
+json.dump({"iteration": %d, "success": False, "reason": "revoke_failed", "revoke_status": %d}, sys.stdout)
+PY
     continue
   fi
 
@@ -64,10 +70,19 @@ for iter in $(seq 1 $ITERATIONS); do
   done
 
   if [ "$ok" = true ]; then
-    jq --argjson obj '{iteration:'$iter', success:true}' '. + [$obj]' "$results_file" > "$results_file.tmp" && mv "$results_file.tmp" "$results_file"
+    python3 - <<PY > "ci/webprofile-parity/cross-instance-iter-$iter.json"
+import json
+json.dump({"iteration": %d, "success": True}, sys.stdout)
+PY
   else
-    jq --argjson obj '{iteration:'$iter', success:false, reason:"revocation_not_observed", last:'"$(echo "$last_resp" | sed "s/'/\\'/'/g" )"'}' '. + [$obj]' "$results_file" > "$results_file.tmp" && mv "$results_file.tmp" "$results_file"
+    python3 - <<PY > "ci/webprofile-parity/cross-instance-iter-$iter.json"
+import json
+json.dump({"iteration": %d, "success": False, "reason": "revocation_not_observed", "last": %s}, sys.stdout)
+PY
   fi
+
+# after loop, aggregate per-iteration json files into results_file
+jq -s '.' ci/webprofile-parity/cross-instance-iter-*.json > "$results_file" || echo '[]' > "$results_file"
 
 done
 
