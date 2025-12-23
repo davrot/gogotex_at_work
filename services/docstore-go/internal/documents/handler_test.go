@@ -2,14 +2,13 @@ package documents
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/overleaf/docstore-go/internal/store"
+	"github.com/stretchr/testify/assert"
 )
 
 func setupHandler() (*Handler, *httptest.Server) {
