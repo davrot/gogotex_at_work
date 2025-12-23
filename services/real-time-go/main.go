@@ -1,28 +1,54 @@
-package realtimego
 package main
 
+import (
+	"database/sql"
+	"encoding/json"
+	"log"
+	"net/http"
+	"os"
 
+	"github.com/overleaf/real-time-go/internal/messages"
+	"github.com/overleaf/real-time-go/internal/store"
+	_ "github.com/jackc/pgx/v5/stdlib"
+)
 
+func main() {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/health", healthHandler)
 
+	var sstore store.Store
+	if os.Getenv("STORE") == "postgres" {
+		dsn := os.Getenv("DATABASE_URL")
+		if dsn == "" {
+			log.Fatal("DATABASE_URL required when STORE=postgres")
+		}
+		db, err := sql.Open("pgx", dsn)
+		if err != nil {
+			log.Fatalf("open db: %v", err)
+		}
+		ps, err := store.NewPostgresStore(db)
+		if err != nil {
+			log.Fatalf("NewPostgresStore: %v", err)
+		}
+		sstore = ps
+	} else {
+		sstore = store.NewMemStore()
+	}
 
+	h := messages.NewHandler(sstore)
+	h.Register(mux)
 
+	log.Printf("listening on :%s", port)
+	if err := http.ListenAndServe(":"+port, mux); err != nil {
+		log.Fatal(err)
+	}
+}
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-}	}		log.Fatal(err)	if err := http.ListenAndServe(addr, nil); err != nil {	log.Printf("listening on %s", addr)	http.HandleFunc("/health", healthHandler)	addr := ":" + port	}		port = "8080"	if port == "" {	port := os.Getenv("PORT")func main() {}	_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})	w.Header().Set("Content-Type", "application/json")func healthHandler(w http.ResponseWriter, r *http.Request) {)	"os"	"net/http"	"log"	"encoding/json"import (
+func healthHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
