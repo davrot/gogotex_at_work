@@ -73,6 +73,10 @@ jobs:
           # Build a small image containing the parity script to avoid workspace bind issues
           docker build -t webprofile-node-parity:${{ github.sha }} -f scripts/contract/Dockerfile.node-parity .
 
+      - name: Start second webprofile instance (for cross-instance tests)
+        run: |
+          NETWORK=${NETWORK} MONGO_URI="mongodb://${MONGO_CONTAINER}:27017/sharelatex" ./scripts/contract/run_webprofile_in_network.sh ${IMAGE_TAG}-node2
+
       - name: Run Node parity smoke test (non-blocking, via image + retried)
         continue-on-error: true
         run: |
@@ -84,6 +88,18 @@ jobs:
             -v "${{ github.workspace }}/ci:/workspace/ci" \
             webprofile-node-parity:${{ github.sha }} \
             /usr/local/bin/rerun_with_retries.sh 3 /workspace/ci -- node /usr/local/bin/node_parity.js > ci/webprofile-parity/node.parity.out 2>&1 || true
+
+      - name: Run cross-instance revocation immediacy test (non-blocking)
+        continue-on-error: true
+        run: |
+          mkdir -p ci/webprofile-parity || true
+          timeout 120s docker run --rm \
+            --network ${NETWORK} \
+            -e INSTANCE1="http://${IMAGE_TAG}:3900" \
+            -e INSTANCE2="http://${IMAGE_TAG}-node2:3900" \
+            -v "${{ github.workspace }}/ci:/workspace/ci" \
+            webprofile-node-parity:${{ github.sha }} \
+            node /usr/local/bin/cross_instance_client.js > ci/webprofile-parity/cross-instance.out 2>&1 || true
 
       - name: Upload flakiness report
         if: always()
@@ -99,11 +115,19 @@ jobs:
           name: webprofile-node-parity
           path: ci/webprofile-parity/node.parity.out
 
+      - name: Upload cross-instance artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: webprofile-cross-instance
+          path: ci/webprofile-parity/cross-instance.out || true
+
       - name: Save webprofile + mongo logs
         if: always()
         run: |
           mkdir -p ci/webprofile-parity || true
           docker logs --tail 500 ${IMAGE_TAG} > ci/webprofile-parity/webprofile.log || true
+          docker logs --tail 500 ${IMAGE_TAG}-node2 > ci/webprofile-parity/webprofile-node2.log || true
           docker logs --tail 500 ${MONGO_CONTAINER} > ci/webprofile-parity/mongo.log || true
 
       - name: Upload container logs
@@ -111,7 +135,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: webprofile-logs
-          path: ci/webprofile-parity/webprofile.log,ci/webprofile-parity/mongo.log
+          path: ci/webprofile-parity/webprofile.log,ci/webprofile-parity/webprofile-node2.log,ci/webprofile-parity/mongo.log
 
       - name: Bundle parity artifacts
         if: always()

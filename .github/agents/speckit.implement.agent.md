@@ -1,5 +1,70 @@
 ---
 description: Execute the implementation plan by processing and executing all tasks defined in tasks.md
+handoffs:
+  - label: Mind 127.0.0.1
+    agent: speckit.implement
+    prompt: Be aware that 127.0.0.1 and localhost are not allowed in the vscode dev environment. read docs/dev-setup.md
+    send: true
+  - label: Autonomy
+    agent: speckit.implement
+    prompt: You have full autonomy. Stop asking "Should I...?" or "Would you like me to...?" Just **do** it and tell me what you did, preferably after a **large number** of tasks have been completed.
+    send: true
+  - label: Timeout
+    agent: speckit.implement
+    prompt: The test(s) hang. Please use linux timeout to unblock the test flow.
+    send: true
+  - label: (A)
+    agent: speckit.implement
+    prompt: Option A
+    send: true
+  - label: (B)
+    agent: speckit.implement
+    prompt: Option B
+    send: true
+  - label: (C)
+    agent: speckit.implement
+    prompt: Option C
+    send: true
+  - label: (D)
+    agent: speckit.implement
+    prompt: Option D
+    send: true
+  - label: (1)
+    agent: speckit.implement
+    prompt: Option 1
+    send: true
+  - label: (2)
+    agent: speckit.implement
+    prompt: Option 2
+    send: true
+  - label: (3)
+    agent: speckit.implement
+    prompt: Option 3
+    send: true
+  - label: (4)
+    agent: speckit.implement
+    prompt: Option 4
+    send: true
+  - label: Yes
+    agent: speckit.implement
+    prompt: Yes
+    send: true
+  - label: Okay
+    agent: speckit.implement
+    prompt: Okay
+    send: true
+  - label: Continue
+    agent: speckit.implement
+    prompt: Continue
+    send: true
+  - label: 8-hour batch: Make
+    agent: speckit.implement
+    prompt: I need to occupy you for 8 hours with autonomous work. Create an 8-hour batch based on the current state of the project and its tasks that you can perform fully autonomous. 
+    send: true
+  - label: 8-hour batch: Run
+    agent: speckit.implement
+    prompt: You have full autonomy. Execute: The current 8-hour batch. Do it now. 
+    send: true        
 ---
 
 ## User Input
@@ -63,12 +128,12 @@ You **MUST** consider the user input before proceeding (if not empty).
      git rev-parse --git-dir 2>/dev/null
      ```
 
-   - Check if Dockerfile* exists or Docker in plan.md → create/verify .dockerignore
-   - Check if .eslintrc* exists → create/verify .eslintignore
-   - Check if eslint.config.* exists → ensure the config's `ignores` entries cover required patterns
-   - Check if .prettierrc* exists → create/verify .prettierignore
+   - Check if Dockerfile\* exists or Docker in plan.md → create/verify .dockerignore
+   - Check if .eslintrc\* exists → create/verify .eslintignore
+   - Check if eslint.config.\* exists → ensure the config's `ignores` entries cover required patterns
+   - Check if .prettierrc\* exists → create/verify .prettierignore
    - Check if .npmrc or package.json exists → create/verify .npmignore (if publishing)
-   - Check if terraform files (*.tf) exist → create/verify .terraformignore
+   - Check if terraform files (\*.tf) exist → create/verify .terraformignore
    - Check if .helmignore needed (helm charts present) → create/verify .helmignore
 
    **If ignore file already exists**: Verify it contains essential patterns, append missing critical patterns only
@@ -105,7 +170,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 6. Execute implementation following the task plan:
    - **Phase-by-phase execution**: Complete each phase before moving to the next
-   - **Respect dependencies**: Run sequential tasks in order, parallel tasks [P] can run together  
+   - **Respect dependencies**: Run sequential tasks in order, parallel tasks [P] can run together
    - **Follow TDD approach**: Execute test tasks before their corresponding implementation tasks
    - **File-based coordination**: Tasks affecting the same files must run sequentially
    - **Validation checkpoints**: Verify each phase completion before proceeding

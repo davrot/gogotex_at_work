@@ -4,6 +4,7 @@ WORKDIR /workspace
 # Copy parity script and rerunner into the image so CI can run retries deterministically
 COPY scripts/contract/node_parity.js /usr/local/bin/node_parity.js
 COPY scripts/contract/rerun_with_retries.sh /usr/local/bin/rerun_with_retries.sh
-RUN chmod +x /usr/local/bin/node_parity.js /usr/local/bin/rerun_with_retries.sh
+COPY scripts/contract/cross_instance_client.js /usr/local/bin/cross_instance_client.js
+RUN chmod +x /usr/local/bin/node_parity.js /usr/local/bin/rerun_with_retries.sh /usr/local/bin/cross_instance_client.js
 
 ENTRYPOINT ["node", "/usr/local/bin/node_parity.js"]

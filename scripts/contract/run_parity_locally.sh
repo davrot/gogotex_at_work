@@ -72,6 +72,14 @@ else
   echo "Node parity smoke timed out or failed. See ci/webprofile-parity/node.parity.out"
 fi
 
+# Run cross-instance test (two instances)
+echo "Running cross-instance revocation immediacy test"
+if timeout 120s ./scripts/contract/run_cross_instance_locally.sh --no-cleanup; then
+  echo "Cross-instance test finished"
+else
+  echo "Cross-instance test failed; see ci/webprofile-parity/cross-instance.out"
+fi
+
 # Gather logs (local helper)
 echo "Collecting container logs to ci/webprofile-parity/"
 docker logs --tail 500 ${IMAGE_TAG} > ci/webprofile-parity/webprofile.log || true
