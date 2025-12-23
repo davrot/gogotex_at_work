@@ -22,6 +22,11 @@ Pull Requests
 See [our wiki](https://github.com/overleaf/overleaf/wiki)
 for how to manage the Overleaf development environment and for our developer guidelines.
 
+Go migration convention
+-----------------------
+
+When migrating an existing Node.js microservice to Go, create the Go version in a parallel directory with the `-go` suffix (e.g. `services/contacts-go`). Use `bin/create-go-service <name>` to scaffold a starter layout, add tests and integration scripts, and follow the `docs/go-migration-guidelines.md` and the `docs/go-migration-checklist.md` checklist to keep migrations consistent across the repo.
+
 We love pull requests, so be bold with them! Don't be afraid of going ahead
 and changing something, or adding a new feature. We're very happy to work with you
 to get your changes merged into Overleaf.
