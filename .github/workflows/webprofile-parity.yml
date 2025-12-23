@@ -206,6 +206,16 @@ jobs:
             } else if (fs.existsSync(testOutPath)) {
               try { summary = fs.readFileSync(testOutPath, 'utf8').slice(0, 2000) } catch (e) { summary = 'failed to read test parity output' }
             }
+            // Append cross-instance summary if available
+            const crossPath = 'ci/webprofile-parity/cross-instance-results.json'
+            if (fs.existsSync(crossPath)) {
+              try {
+                const cross = JSON.parse(fs.readFileSync(crossPath,'utf8'))
+                const total = cross.length
+                const failed = cross.filter(x => x.success === false).length
+                summary += `\n\nCross-instance: ${failed}/${total} iterations failed (see cross-instance artifacts)`
+              } catch (e) { summary += '\n\nCross-instance: failed to read cross-instance results' }
+            }
             const body = `Automated parity job detected failures.
 
 Summary (truncated):
@@ -234,6 +244,16 @@ Summary (truncated):
               const nodeJsonPath = 'ci/webprofile-parity/node.parity.json'
               if (fs.existsSync(nodeJsonPath)) {
                 try { summary = fs.readFileSync(nodeJsonPath, 'utf8').slice(0, 6000) } catch (e) { summary = 'failed to read node parity json' }
+              }
+              // append cross-instance summary if present
+              const crossPath = 'ci/webprofile-parity/cross-instance-results.json'
+              if (fs.existsSync(crossPath)) {
+                try {
+                  const cross = JSON.parse(fs.readFileSync(crossPath,'utf8'))
+                  const totalCI = cross.length
+                  const failedCI = cross.filter(x => x.success === false).length
+                  summary = `${summary}\n\nCross-instance: ${failedCI}/${totalCI} iterations failed (see cross-instance artifacts)`
+                } catch (e) { summary += '\n\nCross-instance: failed to read cross-instance results' }
               }
               await github.rest.checks.create({
                 owner: github.context.repo.owner,

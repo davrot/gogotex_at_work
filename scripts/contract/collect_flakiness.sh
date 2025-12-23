@@ -72,6 +72,26 @@ with open('ci/flakiness/cross/report.txt','w') as f:
     f.write('iter_total=%d\n' % iter_total)
     f.write('iter_failures=%d\n' % iter_failures)
 PY
+
+  # generate a minimal HTML dashboard for quick inspection
+  CROSS_SUMMARY=$(cat ci/flakiness/cross/report.txt || true)
+  cat > ci/flakiness/cross/dashboard.html <<HTML
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Parity Cross-Instance Dashboard</title></head>
+<body>
+<h1>Parity Cross-Instance Summary</h1>
+<pre>
+$CROSS_SUMMARY
+</pre>
+<p>Artifacts:</p>
+<ul>
+  <li><a href="aggregate_cross.json">aggregate_cross.json</a></li>
+  <li>Raw per-run outputs in <code>raw/</code> (from artifact bundle)</li>
+</ul>
+</body>
+</html>
+HTML
 else
   echo '[]' > ci/flakiness/cross/aggregate_cross.json
 fi
