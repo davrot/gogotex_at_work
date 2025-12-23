@@ -3,6 +3,7 @@ package contacts
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/overleaf/contacts-go/internal/store"
@@ -32,6 +33,11 @@ func (h *Handler) create(c *gin.Context) {
 	var in store.Contact
 	if err := c.BindJSON(&in); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
+		return
+	}
+	// Basic validation: require name and email
+	if strings.TrimSpace(in.Name) == "" || strings.TrimSpace(in.Email) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "name and email are required"})
 		return
 	}
 	ctx := c.Request.Context()

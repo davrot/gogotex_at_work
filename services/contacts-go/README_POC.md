@@ -12,5 +12,5 @@ Next steps to expand PoC:
 - Add a basic logging middleware to include request IDs and structured fields. (Implemented as `internal/middleware`.)
 - The middleware echoes the `X-Request-ID` header back in responses.
 - Add Prometheus histogram for request durations. (Implemented as `internal/metrics.RequestDuration`.)
-- Add integration test that runs the Docker image and hits `/health` and `/metrics`. (Implemented as `test/integration/run_integration.sh`.)
+- Add integration test that runs the Docker image and hits `/health`, `/metrics`, and `/contacts` endpoints (create/list and invalid JSON handling). (Implemented as `test/integration/run_integration.sh`.)
 - Add a simple `config` package to read host/port from env and match existing services' settings. (Implemented as `internal/config`.)

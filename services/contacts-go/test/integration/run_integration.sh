@@ -62,6 +62,15 @@ if [ "$bad_code" != "400" ]; then
   exit 5
 fi
 
+# missing required fields should return 400
+missing_code=$(docker run --network container:$CONTAINER --rm curlimages/curl:latest -sS -o /dev/null -w "%{http_code}" -H 'Content-Type: application/json' -d '{"name":""}' http://localhost:8080/contacts) || true
+if [ "$missing_code" != "400" ]; then
+  echo "contacts missing-fields create did not return 400 (code: $missing_code)"
+  docker logs "$CONTAINER" || true
+  docker rm -f "$CONTAINER" || true
+  exit 6
+fi
+
 echo "integration succeeded"
 
 docker rm -f "$CONTAINER" >/dev/null

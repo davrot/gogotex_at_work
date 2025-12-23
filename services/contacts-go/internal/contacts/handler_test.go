@@ -39,11 +39,19 @@ func TestContactsListCreate(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w3.Code)
 	assert.Contains(t, w3.Body.String(), "Alice")
 
-    // invalid create should return 400
+    // invalid create should return 400 for malformed JSON
     badReq := httptest.NewRequest(http.MethodPost, "/contacts", strings.NewReader(`{name:"oops"}`))
     badReq.Header.Set("Content-Type", "application/json")
     wb := httptest.NewRecorder()
     r.ServeHTTP(wb, badReq)
     assert.Equal(t, http.StatusBadRequest, wb.Code)
     assert.Contains(t, wb.Body.String(), "invalid JSON")
+
+    // missing fields should return 400
+    missingReq := httptest.NewRequest(http.MethodPost, "/contacts", strings.NewReader(`{"name":""}`))
+    missingReq.Header.Set("Content-Type", "application/json")
+    wm := httptest.NewRecorder()
+    r.ServeHTTP(wm, missingReq)
+    assert.Equal(t, http.StatusBadRequest, wm.Code)
+    assert.Contains(t, wm.Body.String(), "name and email are required")
 }
