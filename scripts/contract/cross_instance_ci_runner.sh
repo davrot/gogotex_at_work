@@ -29,10 +29,7 @@ for iter in $(seq 1 $ITERATIONS); do
   token=$(echo "$create_resp" | jq -r '.token // .plaintext // empty')
   if [ -z "$id" ] || [ -z "$token" ]; then
     echo "Iteration $iter: Failed to create token"
-    python3 - <<PY > "ci/webprofile-parity/cross-instance-iter-$iter.json"
-import json
-json.dump({"iteration": %d, "success": False, "reason": "create_failed"}, sys.stdout)
-PY
+    python3 -c "import json,sys; json.dump({'iteration': %s, 'success': False, 'reason': 'create_failed'}, sys.stdout)" > "ci/webprofile-parity/cross-instance-iter-$iter.json" || true
     continue
   fi
 
@@ -43,10 +40,7 @@ PY
   echo "$revoke_status" > "ci/webprofile-parity/cross-instance-revoke-iter-$iter.txt"
   if [ "$revoke_status" != "204" ]; then
     echo "Iteration $iter: Revoke failed with status $revoke_status"
-    python3 - <<PY > "ci/webprofile-parity/cross-instance-iter-$iter.json"
-import json
-json.dump({"iteration": %d, "success": False, "reason": "revoke_failed", "revoke_status": %d}, sys.stdout)
-PY
+    python3 -c "import json,sys; json.dump({'iteration': %s, 'success': False, 'reason': 'revoke_failed', 'revoke_status': %s}, sys.stdout)" > "ci/webprofile-parity/cross-instance-iter-$iter.json" || true
     continue
   fi
 
@@ -70,15 +64,11 @@ PY
   done
 
   if [ "$ok" = true ]; then
-    python3 - <<PY > "ci/webprofile-parity/cross-instance-iter-$iter.json"
-import json
-json.dump({"iteration": %d, "success": True}, sys.stdout)
-PY
+    python3 -c "import json,sys; json.dump({'iteration': %s, 'success': True}, sys.stdout)" > "ci/webprofile-parity/cross-instance-iter-$iter.json" || true
   else
-    python3 - <<PY > "ci/webprofile-parity/cross-instance-iter-$iter.json"
-import json
-json.dump({"iteration": %d, "success": False, "reason": "revocation_not_observed", "last": %s}, sys.stdout)
-PY
+    # encode last_resp as base64 to avoid JSON quoting issues
+    last_b64=$(printf '%s' "$last_resp" | python3 -c "import sys,base64;print(base64.b64encode(sys.stdin.buffer.read()).decode())")
+    python3 -c "import json,sys; json.dump({'iteration': %s, 'success': False, 'reason': 'revocation_not_observed', 'last_b64': '%s'}, sys.stdout)" > "ci/webprofile-parity/cross-instance-iter-$iter.json" || true
   fi
 
 # after loop, aggregate per-iteration json files into results_file
