@@ -50,12 +50,19 @@ if [ -n "${GITHUB_PAGES_REPO:-}" ] && [ -n "${GITHUB_TOKEN:-}" ]; then
   if [ -f "$TREND_JSON" ]; then
     cp "$TREND_JSON" "$tmpdir/parity-cross/trend.json"
   fi
+  # copy status badge if present
+  if [ -f "ci/flakiness/cross/status.svg" ]; then
+    cp "ci/flakiness/cross/status.svg" "$tmpdir/parity-cross/status.svg"
+  fi
   # also create a timestamped archive snapshot for retention
   TIMESTAMP=$(date -u +%Y%m%dT%H%M%SZ)
   mkdir -p "$tmpdir/parity-cross/archives/$TIMESTAMP"
   cp "$DASH_HTML" "$tmpdir/parity-cross/archives/$TIMESTAMP/dashboard.html"
   if [ -f "$TREND_JSON" ]; then
     cp "$TREND_JSON" "$tmpdir/parity-cross/archives/$TIMESTAMP/trend.json"
+  fi
+  if [ -f "ci/flakiness/cross/status.svg" ]; then
+    cp "ci/flakiness/cross/status.svg" "$tmpdir/parity-cross/archives/$TIMESTAMP/status.svg"
   fi
 
   pushd "$tmpdir" >/dev/null

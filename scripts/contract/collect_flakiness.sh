@@ -134,6 +134,11 @@ HTML
     fi
   fi
 
+  # generate a small status SVG for live badges
+  if command -v python3 >/dev/null 2>&1; then
+    python3 scripts/contract/generate_status_badge.py || echo "generate_status_badge.py failed"
+  fi
+
   # also attempt to generate a richer trend dashboard using Chart.js (requires Python 3)
   if command -v python3 >/dev/null 2>&1; then
     echo "Generating trend dashboard..."
