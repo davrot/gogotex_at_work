@@ -10,6 +10,9 @@ handoffs:
     prompt: Create a checklist for the following domain...
 ---
 
+> **NOTE (SOLO MODE):** Solo Developer Mode is active. Do **not** create GitHub PRs, issues, or workflows unless explicitly requested. Prefer providing local scripts and explicit commands for the user to run.
+
+
 ## User Input
 
 ```text

@@ -2,6 +2,9 @@
 description: Perform a non-destructive cross-artifact consistency and quality analysis across spec.md, plan.md, and tasks.md after task generation.
 ---
 
+> **NOTE (SOLO MODE):** This project is configured for Solo Developer Mode. Do **not** create GitHub PRs, issues, or GitHub Actions workflows unless explicitly requested. Prefer providing local scripts and commands for the user to run.
+
+
 ## User Input
 
 ```text
