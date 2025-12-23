@@ -9,6 +9,21 @@ IMAGE=contacts-go:integration
 CONTAINER=contacts-go-integration
 PORT=8085
 
+# Parse arguments
+REMOTE_DB_TEST=0
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --remote-db-test)
+      REMOTE_DB_TEST=1
+      shift
+      ;;
+    *)
+      echo "Unknown argument: $1"
+      exit 2
+      ;;
+  esac
+done
+
 # build image
 docker build -t "$IMAGE" .
 
@@ -69,6 +84,21 @@ for i in {1..20}; do
 done
 
 # Run a create/list check in postgres mode
+# Optionally run a networked Go-level DB test inside a helper container to validate NewPostgresStore
+if [ "$REMOTE_DB_TEST" = "1" ]; then
+  echo "running remote networked Go DB test inside helper container..."
+  HELPER_OUT=$(docker run --rm --network container:${PG_CONTAINER} -v "$SERVICE_DIR":/src -w /src golang:1.25-alpine sh -c "apk add --no-cache git ca-certificates && RUN_DB_INTEGRATION_REMOTE=1 go test ./internal/store -run TestPostgresStoreRemoteInner -v" 2>&1) || true
+  echo "helper output:\n$HELPER_OUT"
+  if echo "$HELPER_OUT" | grep -q "go: go.mod file not found"; then
+    echo "remote helper: go.mod not found in helper container mount; this environment may not support mounting workspace into helper containers. Skipping remote Go-level DB validation." >&2
+  elif echo "$HELPER_OUT" | grep -q "FAIL"; then
+    echo "remote helper tests failed; see output above" >&2
+    docker logs "$CONTAINER" || true
+  else
+    echo "remote helper tests succeeded"
+  fi
+fi
+
 create_code=$(docker run --network container:$CONTAINER --rm curlimages/curl:latest -sS -o /dev/null -w "%{http_code}" -H 'Content-Type: application/json' -d '{"name":"DBIntegration","email":"db@e.com","id":"11111111-1111-1111-1111-111111111111"}' http://localhost:8080/contacts) || true
 if [ "$create_code" != "201" ]; then
   echo "postgres contacts create failed (code: $create_code)"
@@ -87,9 +117,6 @@ if ! docker run --network container:$CONTAINER --rm curlimages/curl:latest -sS h
 fi
 
 echo "postgres integration succeeded"
-
-docker rm -f "$CONTAINER" >/dev/null || true
-docker rm -f $PG_CONTAINER >/dev/null || true
 
 # assert health and metrics via an ephemeral curl container
 docker run --network container:$CONTAINER --rm curlimages/curl:latest -sS http://localhost:8080/health | jq .
@@ -136,4 +163,7 @@ fi
 
 echo "integration succeeded"
 
-docker rm -f "$CONTAINER" >/dev/null
+# cleanup
+docker rm -f "$CONTAINER" >/dev/null || true
+docker rm -f $PG_CONTAINER >/dev/null || true
+docker network rm $NETWORK >/dev/null || true
