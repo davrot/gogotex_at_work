@@ -1,4 +1,4 @@
-name: CI - contacts-go-go (template)
+name: CI - foo-go-go (template)
 
 on: [push, pull_request]
 
@@ -18,7 +18,7 @@ jobs:
         with:
           version: v1.59.0
       - name: Build Docker image
-        run: docker build -t contacts-go-go:ci .
+        run: docker build -t foo-go-go:ci .
       - name: Run integration script (optional DB checks)
         run: bash test/integration/run_integration.sh --remote-db-test
         env:
