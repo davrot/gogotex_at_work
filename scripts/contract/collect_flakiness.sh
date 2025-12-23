@@ -52,7 +52,13 @@ fi
 
 # Aggregate
 mkdir -p ci/flakiness
-jq -s '.' $OUT_DIR/*.json > ci/flakiness/aggregate.json || echo '[]' > ci/flakiness/aggregate.json
+# Aggregate only the main run JSONs (exclude cross-instance *_cross.json which are arrays of iterations)
+run_files=$(ls -1 $OUT_DIR/*.json 2>/dev/null | grep -v '_cross.json' || true)
+if [ -n "$run_files" ]; then
+  jq -s '.' $run_files > ci/flakiness/aggregate.json || echo '[]' > ci/flakiness/aggregate.json
+else
+  echo '[]' > ci/flakiness/aggregate.json
+fi
 
 # Aggregate cross-instance results if present
 mkdir -p ci/flakiness/cross
