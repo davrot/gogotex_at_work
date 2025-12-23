@@ -47,6 +47,8 @@ func threadsHandlerWithStore(s *store.Store, w http.ResponseWriter, r *http.Requ
 // messagesHandlerWithStore handles POST /project/{projectId}/threads/{threadId}/messages
 // and performs minimal validation to match Node controller behavior for parity tests.
 func messagesHandlerWithStore(s *store.Store, w http.ResponseWriter, r *http.Request) {
+	// log for parity debugging
+	log.Printf("messagesHandler: %s %s", r.Method, r.URL.Path)
 	// Expect path: /project/{projectId}/threads/{threadId}/messages
 	parts := strings.Split(r.URL.Path, "/")
 	if len(parts) < 6 || parts[1] != "project" || parts[3] != "threads" || parts[5] != "messages" {
