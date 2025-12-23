@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       run-db:
-        description: 'Run DB-backed integration tests'
+        description: "Run DB-backed integration tests"
         required: true
-        default: 'true'
+        default: "true"
 
 jobs:
   integration-db:
