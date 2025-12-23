@@ -1,4 +1,7 @@
-.PHONY: integration-go integration-go-remote
+.PHONY: integration-go integration-go-remote integration-go-all
+
+integration-go-all:
+	scripts/run_all_go_integrations.sh
 
 # Run integration for all services/*-go directories (local only)
 integration-go:
