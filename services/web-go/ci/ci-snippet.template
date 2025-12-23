@@ -1,0 +1,22 @@
+# Example GitHub Actions snippet for web-go (add to your workflow)
+
+- name: Set up Go
+  uses: actions/setup-go@v4
+  with:
+    go-version: 1.25
+
+- name: Run go tests
+  run: go test ./...
+
+- name: Run golangci-lint
+  uses: golangci/golangci-lint-action@v3
+  with:
+    version: v1.59.0
+
+- name: Build Docker image
+  run: docker build -t web-go:ci .
+
+- name: Run integration script
+  run: bash test/integration/run_integration.sh
+  env:
+    RUN_DB_INTEGRATION: 1
