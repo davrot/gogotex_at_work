@@ -25,13 +25,12 @@ Links:
 Checklist Summary:
 
 - [x] Parity unit tests (go)
-- [x] Contract/parity tests vs Node (spike parity test present)
+- [x] Contract/parity tests vs Node (validation & roundtrip parity tests added)
 - [x] Benchmarks + SLO validated (basic harness added; CI job pending)
-- [ ] Dockerfile updated to run Go binary
+- [x] Dockerfile added for Go runtime (`Dockerfile.go`, static binary); default Node Dockerfile not overwritten
 - [ ] CI builds/tests/bench runs added (spike CI added for PRs touching services/chat)
 - [ ] Rollout plan + rollback plan
 
 Notes:
 
 - Spike validates approach by porting `/status` endpoint. Next step: port a read-only thread endpoint or similar.
-

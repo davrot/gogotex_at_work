@@ -1,13 +1,20 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
 	"os"
 	"strings"
+	"time"
+
 	"github.com/davrot/gogotex_at_work/services/chat/internal/store"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
+
+var messagesColl *mongo.Collection
 
 func statusHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -85,13 +92,31 @@ func messagesHandlerWithStore(s *store.Store, w http.ResponseWriter, r *http.Req
 			return
 		}
 
-		// Minimal message creation: store basic JSON with timestamp and return 201 with message body
+			// Minimal message creation: persist to Mongo if configured; otherwise use in-memory store
 		msg := map[string]interface{}{
-			"_id":   "m1",
-			"content": body.Content,
-			"user_id": body.UserID,
+			"_id":      "m1",
+			"content":  body.Content,
+			"user_id":  body.UserID,
 			"timestamp": 1234567890,
 		}
+		if messagesColl != nil {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			doc := map[string]interface{}{
+				"room_id": threadId,
+				"content": body.Content,
+				"user_id": body.UserID,
+				"timestamp": time.Now().Unix(),
+			}
+			if _, err := messagesColl.InsertOne(ctx, doc); err != nil {
+				log.Printf("mongo insert error: %v", err)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusCreated)
+			_ = json.NewEncoder(w).Encode(msg)
+			return
+		}
+
 		key := "messages:" + projectId + ":" + threadId
 		b, _ := json.Marshal([]interface{}{msg})
 		s.Put(key, string(b))
@@ -104,6 +129,23 @@ func messagesHandlerWithStore(s *store.Store, w http.ResponseWriter, r *http.Req
 
 	// For GET, return stored messages if present
 	if r.Method == http.MethodGet {
+		// query Mongo if configured
+		if messagesColl != nil {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			cur, err := messagesColl.Find(ctx, map[string]interface{}{ "room_id": threadId })
+			if err == nil {
+				var out []map[string]interface{}
+				if err := cur.All(ctx, &out); err == nil {
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusOK)
+					_ = json.NewEncoder(w).Encode(out)
+					return
+				}
+			}
+			// fallthrough to empty
+		}
+
 		key := "messages:" + projectId + ":" + threadId
 		if val, ok := s.Get(key); ok {
 			w.Header().Set("Content-Type", "application/json")
@@ -133,6 +175,24 @@ func main() {
 			for pid, threads := range decoded {
 				b, _ := json.Marshal(threads)
 				s.Put("threads:"+pid, string(b))
+			}
+		}
+	}
+
+	// Optional MongoDB initialization
+	if uri := os.Getenv("MONGO_URI"); uri != "" {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		clientOpts := options.Client().ApplyURI(uri)
+		client, err := mongo.Connect(ctx, clientOpts)
+		if err != nil {
+			log.Printf("mongo connect error: %v", err)
+		} else {
+			if err := client.Ping(ctx, nil); err != nil {
+				log.Printf("mongo ping failed: %v", err)
+			} else {
+				messagesColl = client.Database("chat").Collection("messages")
+				log.Printf("connected to Mongo at %s", uri)
 			}
 		}
 	}
