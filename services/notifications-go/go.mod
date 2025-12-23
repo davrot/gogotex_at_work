@@ -3,6 +3,7 @@ module github.com/overleaf/notifications-go
 go 1.23.0
 
 require (
+	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/google/uuid v1.4.0
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/pkg/errors v0.9.1

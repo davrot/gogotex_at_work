@@ -45,7 +45,7 @@ func TestPostgresStore_Create_ExecError(t *testing.T) {
 		t.Fatalf("NewPostgresStore: %v", err)
 	}
 
-	n := Notification{Recipient: "me@example.com", Message: "h"}
+	n := Notification{Recipient: "me@example.com", Message: "h", Status: "queued"}
 	mock.ExpectExec("INSERT INTO notifications").WithArgs(sqlmock.AnyArg(), n.Recipient, n.Message, n.Status, sqlmock.AnyArg()).WillReturnError(fmt.Errorf("exec-fail"))
 	_, err = ps.Create(context.Background(), n)
 	if err == nil || !strings.Contains(err.Error(), "exec-fail") {
