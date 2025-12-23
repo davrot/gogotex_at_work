@@ -47,13 +47,14 @@
 
 - [ ] T047 [P] Migrate `chat` backend to Go — `services/chat`: add `go.mod`, `cmd/chat`, core handlers, unit tests, and CI job to build/test `services/chat`.
   - Acceptance: `go test ./services/chat/...` passes locally and in CI; equivalent contract tests (chat message endpoints) pass; production runtime is the Go binary and Docker/CI integrated to use it.
-  - Current: **scaffolded** — `cmd/chat` provides a health endpoint but the business logic and production runtime still run in Node (`app.js`).
+  - Current: **scaffolded → in-progress** — `cmd/chat` provides a health endpoint; next phase ports a read-only thread endpoint and message handlers.
   - Subtasks:
-    - [ ] T047a Port business logic and endpoints from Node → Go (owner: TBD)
-    - [ ] T047b Add parity contract tests and benchmarks; ensure p95 SLOs are met (owner: TBD)
-    - [ ] T047c Update Dockerfile / docker-compose / runit / CI to run the Go binary (owner: TBD)
-    - [ ] T047d Rollout plan, rollback plan, and canary cutover (owner: TBD)
-    - [ ] T047e Validate migration in CI and close T047 (owner: TBD)
+    - [ ] T047a Port business logic and endpoints from Node → Go (owner: @migration-owner)
+    - [ ] T047b Add parity contract tests and benchmarks; ensure p95 SLOs are met (owner: @migration-owner)
+    - [ ] T047c Update Dockerfile / docker-compose / runit / CI to run the Go binary (owner: @migration-owner)
+    - [ ] T047d Rollout plan, rollback plan, and canary cutover (owner: @migration-owner)
+    - [ ] T047e Validate migration in CI and close T047 (owner: @migration-owner)
+    - [ ] T047f Add integration test harness and add to `ci/benchmarks` (owner: @migration-owner)
 
 - [x] T048 [P] Migrate `contacts` backend to Go — `services/contacts`: add `go.mod`, `cmd/contacts`, services for contact CRUD, unit tests, and CI job to build/test `services/contacts`.
   - Acceptance: `go test ./services/contacts/...` passes; contract tests for contact endpoints pass. **Status:** implemented (basic Go implementation + unit tests added; `go test` passes).
