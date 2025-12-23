@@ -10,7 +10,8 @@ If automated parity runs detect failures, follow these steps:
 
 Slack alerting:
 
-- Slack notifications are optional. If `secrets.SLACK_WEBHOOK` is set, a failure will send a short summary message to the configured webhook.
+- Slack notifications are optional. If `secrets.SLACK_WEBHOOK` is set, a parity job failure will send a short summary message to the configured webhook including cross-instance counts when available.
+- The weekly flakiness summary job will also send an optional Slack message with cross-instance metrics if `secrets.SLACK_WEBHOOK` is set.
 - Thresholds: we consider >3 consecutive scheduled failures a 'major' alert; see `ci/flakiness` artifacts for counts.
 
 Runbook for maintainers:

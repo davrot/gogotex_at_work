@@ -74,6 +74,13 @@ jobs:
             if (failures > 0) {
               const body = `Automated weekly parity flakiness report:\n\n${report}${crossSummary}\n\nAttached aggregate JSON and cross-instance dashboard (if present).`
               await github.rest.issues.create({ owner: github.context.repo.owner, repo: github.context.repo.repo, title: `Parity flakiness weekly summary (${new Date().toISOString().slice(0,10)})`, body })
+              // Slack notify (optional): post cross-instance summary if SLACK_WEBHOOK configured
+              const slackWebhook = process.env.SLACK_WEBHOOK
+              if (slackWebhook) {
+                let slackMsg = `Parity flakiness weekly summary: failures=${failures}`
+                if (crossSummary) slackMsg += `\n\n${crossSummary}`
+                try { await require('node-fetch')(slackWebhook, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: slackMsg }) }) } catch (e) { core.warning('Slack notify failed: ' + String(e)) }
+              } else { core.info('SLACK_WEBHOOK not set; skipping weekly Slack notify') }
             } else {
               core.info('No failures detected this week; no issue created')
             }

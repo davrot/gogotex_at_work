@@ -277,6 +277,12 @@ Summary (truncated):
           if [ -f ci/webprofile-parity/analysis.json ] && jq -r '.status' ci/webprofile-parity/analysis.json | grep -q failure; then
             title="Parity job failure for ${{ github.ref_name }}"
             summary=$(if [ -f ci/webprofile-parity/node.parity.json ]; then jq -r 'tojson' ci/webprofile-parity/node.parity.json | sed -n '1,200p' ; elif [ -f ci/webprofile-parity/test.parity.out ]; then sed -n '1,200p' ci/webprofile-parity/test.parity.out ; else echo 'no summary'; fi)
+            # Append cross-instance summary if present
+            if [ -f ci/webprofile-parity/cross-instance-results.json ]; then
+              ci_failed=$(jq '[.[] | select(.success==false)] | length' ci/webprofile-parity/cross-instance-results.json || echo 0)
+              ci_total=$(jq 'length' ci/webprofile-parity/cross-instance-results.json || echo 0)
+              summary="$summary\n\nCross-instance: ${ci_failed}/${ci_total} iterations failed (see artifacts)"
+            fi
             payload=$(jq -nc --arg t "$title" --arg s "$summary" '{text: ($t + "\n\n" + $s)}')
             curl -sS -X POST -H 'Content-type: application/json' -d "$payload" "$SLACK_WEBHOOK" || true
           else
