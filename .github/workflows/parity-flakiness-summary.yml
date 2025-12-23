@@ -44,6 +44,10 @@ jobs:
           SKIP_AUTO_ISSUE: 'true'
           ISSUE_RUN_THRESHOLD: ${{ secrets.ISSUE_RUN_THRESHOLD }}
           ISSUE_ITER_RATE_THRESHOLD: ${{ secrets.ISSUE_ITER_RATE_THRESHOLD }}
+          # optional issue creation customization
+          ISSUE_CREATE_AS_DRAFT: ${{ secrets.ISSUE_CREATE_AS_DRAFT }}
+          ISSUE_LABELS: ${{ secrets.ISSUE_LABELS }}
+          ISSUE_ASSIGNEES: ${{ secrets.ISSUE_ASSIGNEES }}
         run: |
           ./scripts/contract/collect_flakiness.sh --publish || ./scripts/contract/collect_flakiness.sh || true
 
@@ -123,7 +127,21 @@ jobs:
               if (crossAlert) body += `\n\nCross-instance threshold exceeded.\n${crossSummary}`
               else if (crossSummary) body += `\n\n${crossSummary}`
               body += `\n\nAttached aggregate JSON and cross-instance dashboard (if present).`
-              await github.rest.issues.create({ owner: github.context.repo.owner, repo: github.context.repo.repo, title: `Parity flakiness weekly summary (${new Date().toISOString().slice(0,10)})`, body })
+
+              // allow configuring draft-like behavior by prefixing title and adding a 'draft' label
+              const issueDraft = (process.env.ISSUE_CREATE_AS_DRAFT === 'true' || process.env.ISSUE_DRAFT === 'true')
+              const labelsEnv = process.env.ISSUE_LABELS || ''
+              const assigneesEnv = process.env.ISSUE_ASSIGNEES || ''
+              let labelsArr = labelsEnv.split(',').map(s=>s.trim()).filter(Boolean)
+              if (issueDraft) labelsArr.push('draft')
+              let assigneesArr = assigneesEnv.split(',').map(s=>s.trim()).filter(Boolean)
+
+              const title = (issueDraft ? `[DRAFT] Parity flakiness weekly summary (${new Date().toISOString().slice(0,10)})` : `Parity flakiness weekly summary (${new Date().toISOString().slice(0,10)})`)
+              const params = { owner: github.context.repo.owner, repo: github.context.repo.repo, title, body }
+              if (labelsArr.length) params.labels = labelsArr
+              if (assigneesArr.length) params.assignees = assigneesArr
+
+              await github.rest.issues.create(params)
 
               // Slack notify (optional): post cross-instance summary if SLACK_WEBHOOK configured
               const slackWebhook = process.env.SLACK_WEBHOOK

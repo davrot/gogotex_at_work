@@ -45,6 +45,13 @@ Thresholds & alerts:
   - `CROSS_RUN_FAIL_THRESHOLD` (default `1`) — number of runs with failures that triggers a cross-instance alert (used for crossAlert evaluation)
   - `CROSS_ITER_FAILURE_RATE_THRESHOLD` (default `0.05`) — fraction of iterations failed across aggregated runs (e.g., `0.05` for 5%) that triggers a cross-instance alert
 
+Issue creation options (customize created issue):
+
+  - `ISSUE_CREATE_AS_DRAFT` (default `true`) — when `true` the created issue will be prefixed with `[DRAFT]` and will also receive the `draft` label to indicate it is a draft-like issue
+  - `ISSUE_LABELS` (comma-separated string) — additional labels to add to the created issue (e.g., `bug,parity`)
+  - `ISSUE_ASSIGNEES` (comma-separated string) — usernames to assign the created issue to (e.g., `alice,bob`)
+
+
 Example (CI):
 
 ```yaml
