@@ -120,13 +120,12 @@ with open('ci/flakiness/report.txt','w') as f:
     f.write('success=%d\n' % success)
     f.write('failure=%d\n' % fail)
 
-# append cross-instance summary if present
-cross_report=''
-if Path('ci/flakiness/cross/report.txt').exists():
-    cross_report = open('ci/flakiness/cross/report.txt').read()
-    f.write('\n# cross-instance summary\n')
-    f.write(cross_report)
-    print('Cross-instance summary appended')
+    # append cross-instance summary if present
+    if Path('ci/flakiness/cross/report.txt').exists():
+        cross_report = open('ci/flakiness/cross/report.txt').read()
+        f.write('\n# cross-instance summary\n')
+        f.write(cross_report)
+        print('Cross-instance summary appended')
 PY
 
 echo "Wrote ci/flakiness/aggregate.json and ci/flakiness/report.txt"
