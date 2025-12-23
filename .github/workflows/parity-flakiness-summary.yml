@@ -2,7 +2,7 @@ name: Parity flakiness summary
 
 on:
   schedule:
-    - cron: '0 4 * * 1' # weekly on Monday 04:00 UTC
+    - cron: "0 4 * * 1" # weekly on Monday 04:00 UTC
   workflow_dispatch: {}
 
 permissions:
@@ -19,7 +19,18 @@ jobs:
 
       - name: Ensure tools
         run: |
-          sudo apt-get update && sudo apt-get install -y unzip jq
+          # Install required tools (unzip, jq, curl, python3)
+          apt-get update && apt-get install -y unzip jq curl python3 || true
+          # verify availability
+          jq --version || true
+          python3 --version || true
+          curl --version >/dev/null 2>&1 || true
+
+      - name: Validate inputs
+        run: |
+          if [ -z "${{ secrets.GITHUB_TOKEN }}" ]; then echo "GITHUB_TOKEN secret is not set; aborting" && exit 1; fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Collect flakiness artifacts
         env:
@@ -41,6 +52,7 @@ jobs:
         with:
           script: |
             const fs = require('fs')
+            const core = require('@actions/core')
             const report = fs.existsSync('ci/flakiness/report.txt') ? fs.readFileSync('ci/flakiness/report.txt','utf8') : 'no report'
             const aggPath = 'ci/flakiness/aggregate.json'
             let agg = []
