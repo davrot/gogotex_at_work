@@ -73,7 +73,8 @@ OUT_DIR.joinpath('trend.json').write_text(json.dumps({
 }, indent=2))
 
 # generate HTML with Chart.js
-html = f"""<!doctype html>
+data_json = json.dumps({'labels': labels, 'success_rates': success_rates, 'failures': failures})
+html = """<!doctype html>
 <html>
 <head>
   <meta charset="utf-8">
@@ -83,7 +84,7 @@ html = f"""<!doctype html>
 </head>
 <body>
   <h1>Parity Cross-Instance Trend</h1>
-  <p>Generated: {datetime.utcnow().isoformat()}Z</p>
+  <p>Generated: {generated_at}Z</p>
   <div style="width: 100%; max-width: 900px">
     <canvas id="successChart" height="120"></canvas>
   </div>
@@ -92,7 +93,7 @@ html = f"""<!doctype html>
     <canvas id="failChart" height="80"></canvas>
   </div>
   <script>
-    const data = {json.dumps({'labels': labels, 'success_rates': success_rates, 'failures': failures})};
+    const data = {data_json};
     const ctxS = document.getElementById('successChart').getContext('2d');
     const successChart = new Chart(ctxS, {
       type: 'line',
@@ -130,7 +131,7 @@ html = f"""<!doctype html>
   <p>Artifacts: <a href="aggregate_cross.json">aggregate_cross.json</a> | <a href="trend.json">trend.json</a></p>
 </body>
 </html>
-"""
+""".format(generated_at=datetime.utcnow().isoformat(), data_json=data_json)
 
 OUT_DIR.joinpath('dashboard.html').write_text(html)
 print('Wrote', OUT_DIR.joinpath('dashboard.html'))
