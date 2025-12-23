@@ -14,7 +14,9 @@ Checklist:
 - [x] Rollout plan + rollback plan
 
 Notes:
+
 - Project history migration implemented; validate retention & audit logs in staging.
 
 Links:
+
 - Tasks: T056

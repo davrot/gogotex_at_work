@@ -13,7 +13,9 @@ Checklist:
 - [ ] Rollout plan for incremental cutover (component-by-component)
 
 Notes:
+
 - Web migration is incremental; only shims exist for now. Each extracted component requires its own readiness doc and sign-off.
 
 Links:
+
 - Tasks: T057

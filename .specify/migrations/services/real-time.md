@@ -14,7 +14,9 @@ Checklist:
 - [x] Rollout plan + rollback plan (owner to confirm)
 
 Notes:
+
 - Real-time migration implemented with performance benchmarks. Confirm SLOs on canonical runner.
 
 Links:
+
 - Tasks: T051

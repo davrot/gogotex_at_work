@@ -123,6 +123,22 @@ Local Solo-mode safety (recommended):
 
 - The hook runs `scripts/contract/check_prevent_workflow_changes.sh` and will block commits that modify `.github/workflows/*` unless you explicitly set `ALLOW_WORKFLOW_CHANGES=true`.
 
+Solo Developer mode status & validation:
+
+- A lightweight scanner is provided to validate agent guidance files include the Solo-mode reminder. Run it locally:
+
+```sh
+python3 scripts/contract/check_agent_solo_mode.py
+```
+
+- To run the associated test:
+
+```sh
+python3 scripts/contract/tests/test_check_agent_solo_mode.py
+```
+
+- The README includes a small `SOLO DEVELOPER MODE` badge to indicate the repository is configured for solo development.
+
 Example (CI): set `PUBLISH_DASHBOARD=true` and `AWS_S3_BUCKET` or `GITHUB_PAGES_REPO` in the scheduled workflow step environment or secrets.
 
 - Attempt local repro with `./scripts/contract/run_parity_locally.sh --no-cleanup` and run `./scripts/contract/run_cross_instance_locally.sh --no-cleanup` to reproduce; attach `ci/webprofile-parity-<TIMESTAMP>.tar.gz` to the issue.

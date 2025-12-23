@@ -14,8 +14,10 @@ Checklist:
 - [x] Rollout plan + rollback plan
 
 Notes:
+
 - `git-bridge` was ported to Go due to lack of Java maintainers. Parity scripts, benchmarks, and CI jobs are present; readiness sign-off pending owner confirmation.
 
 Links:
+
 - Tasks: T042, T041a
 - Docs: services/git-bridge/README.md

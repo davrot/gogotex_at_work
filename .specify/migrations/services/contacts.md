@@ -14,7 +14,9 @@ Checklist:
 - [x] Rollout plan + rollback plan (owner to confirm)
 
 Notes:
+
 - Basic Go implementation and CI job exist. Final sign-off awaiting owner confirmation and bench artifacts link.
 
 Links:
+
 - Tasks: T048

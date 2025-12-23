@@ -14,7 +14,9 @@ Checklist:
 - [x] Rollout plan + rollback plan (owner to confirm)
 
 Notes:
+
 - Notifications service has a Go implementation with basic tests and CI job. Verify benchmark artifacts if needed.
 
 Links:
+
 - Tasks: T050

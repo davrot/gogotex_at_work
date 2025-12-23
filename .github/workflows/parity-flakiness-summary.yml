@@ -41,7 +41,7 @@ jobs:
           CROSS_RUN_FAIL_THRESHOLD: ${{ secrets.CROSS_RUN_FAIL_THRESHOLD }}
           CROSS_ITER_FAILURE_RATE_THRESHOLD: ${{ secrets.CROSS_ITER_FAILURE_RATE_THRESHOLD }}
           # Solo-developer settings: disable automatic issue creation by default
-          SKIP_AUTO_ISSUE: 'true'
+          SKIP_AUTO_ISSUE: "true"
           ISSUE_RUN_THRESHOLD: ${{ secrets.ISSUE_RUN_THRESHOLD }}
           ISSUE_ITER_RATE_THRESHOLD: ${{ secrets.ISSUE_ITER_RATE_THRESHOLD }}
           # optional issue creation customization

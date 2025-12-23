@@ -1,10 +1,9 @@
 ---
 description: Convert existing tasks into actionable, dependency-ordered GitHub issue *templates* for the feature based on available design artifacts.
-tools: ['github/github-mcp-server/issue_write']
+tools: ["github/github-mcp-server/issue_write"]
 ---
 
 > **NOTE (SOLO MODE):** Solo Developer Mode is active. **Do not** create GitHub issues automatically. Instead produce ready-to-paste issue templates or an artifacts file the user can use to create issues manually. If explicit permission is given (ALOW_ISSUE_CREATION=true), then creating issues may proceed.
-
 
 ## User Input
 

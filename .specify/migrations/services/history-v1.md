@@ -14,7 +14,9 @@ Checklist:
 - [x] Rollout plan + rollback plan
 
 Notes:
+
 - History check and retention behavior must be validated during staging runs.
 
 Links:
+
 - Tasks: T055

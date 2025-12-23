@@ -1,6 +1,6 @@
 # Migration Readiness Checklist ✅
 
-This document defines the canonical checklist that each service migration from Node → Go must satisfy *before* the production runtime is flipped. Use this as the authoritative, per-service gate for safe, incremental rollouts.
+This document defines the canonical checklist that each service migration from Node → Go must satisfy _before_ the production runtime is flipped. Use this as the authoritative, per-service gate for safe, incremental rollouts.
 
 > **Solo Developer Mode:** This checklist is a local governance artifact. Do **not** open PRs, create issues, or change GitHub Actions workflows unless you explicitly ask. I can prepare commits or PRs only upon your instruction.
 

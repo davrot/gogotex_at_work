@@ -14,7 +14,9 @@ Checklist:
 - [x] Rollout plan + rollback plan (owner to confirm)
 
 Notes:
+
 - Go implementation added and tests pass in CI; bench artifacts available in `ci/benchmarks`.
 
 Links:
+
 - Tasks: T049

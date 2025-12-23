@@ -125,6 +125,17 @@ ifneq (,$(wildcard test/acceptance))
 	$(DOCKER_COMPOSE_TEST_ACCEPTANCE) run --rm test_acceptance
 endif
 
+# Go migration targets
+go-build:
+	cd cmd/chat && go build -o ../../bin/chat ./...
+
+go-test:
+	cd cmd/chat && go test ./...
+
+docker-go-build:
+	docker build -f Dockerfile.go -t $(IMAGE_CI)-go .
+
+
 test_acceptance_run_debug:
 ifneq (,$(wildcard test/acceptance))
 	$(DOCKER_COMPOSE_TEST_ACCEPTANCE) run -p 127.0.0.9:19999:19999 --rm test_acceptance npm run test:acceptance -- --inspect=0.0.0.0:19999 --inspect-brk

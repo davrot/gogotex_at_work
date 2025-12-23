@@ -1,0 +1,9 @@
+Collected 0 reports
+success=0
+failure=0
+
+# cross-instance summary
+cross_runs=2
+run_failures=0
+iter_total=10
+iter_failures=0

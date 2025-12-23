@@ -14,7 +14,9 @@ Checklist:
 - [x] Rollout plan + rollback plan (owner to confirm)
 
 Notes:
+
 - Basic migration implemented and contract tests pass. Validate p95 on bench runner.
 
 Links:
+
 - Tasks: T053

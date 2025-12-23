@@ -21,12 +21,14 @@ This document summarizes the changes made in the parity and cross-instance flaki
 - Updated runbook: `docs/parity-runbook.md` with instructions (collection, thresholds, publishing, badge CLI).
 
 ## Notes
+
 - Defaults: `CROSS_RUN_FAIL_THRESHOLD=1`, `CROSS_ITER_FAILURE_RATE_THRESHOLD=0.05`.
 - Slack notifications are optional and use `secrets.SLACK_WEBHOOK`.
 
 ## Files added/modified (high level)
-- scripts/contract/*.sh, *.py, tests/
-- .github/workflows/* (parity-flakiness-summary.yml, parity-dashboard-status.yml, parity-dashboard-publish.yml)
+
+- scripts/contract/_.sh, _.py, tests/
+- .github/workflows/\* (parity-flakiness-summary.yml, parity-dashboard-status.yml, parity-dashboard-publish.yml)
 - docs/parity-runbook.md, docs/PARITY_CHANGELOG.md
 - README.md (badges)
 

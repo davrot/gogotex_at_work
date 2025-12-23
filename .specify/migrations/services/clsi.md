@@ -14,7 +14,9 @@ Checklist:
 - [x] Rollout plan + rollback plan
 
 Notes:
+
 - CLI/sandbox requires additional security tests; ensure sandboxing harness is part of readiness criteria.
 
 Links:
+
 - Tasks: T052
