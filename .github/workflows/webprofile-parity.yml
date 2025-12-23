@@ -1,0 +1,236 @@
+name: Webprofile parity (non-blocking)
+
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 3 * * *" # daily at 03:00 UTC
+
+permissions:
+  contents: read
+  actions: read
+  issues: write
+  checks: write
+
+jobs:
+  webprofile-parity:
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_TAG: webprofile-api-parity
+      NETWORK: webprofile-parity-net
+      MONGO_CONTAINER: webprofile-parity-mongo
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create docker network
+        run: |
+          docker network create ${NETWORK} || true
+
+      - name: Start Mongo (in-network)
+        run: |
+          docker rm -f ${MONGO_CONTAINER} >/dev/null 2>&1 || true
+          docker run -d --name ${MONGO_CONTAINER} --network ${NETWORK} mongo:6.0.5
+
+      - name: Build & start webprofile-api in network
+        run: |
+          NETWORK=${NETWORK} MONGO_URI="mongodb://${MONGO_CONTAINER}:27017/sharelatex" ./scripts/contract/run_webprofile_in_network.sh ${IMAGE_TAG}
+
+      - name: Wait for webprofile-api to be ready
+        run: |
+          for i in $(seq 1 20); do
+            code=$(docker run --rm --network ${NETWORK} curlimages/curl -sS -u overleaf:overleaf -o /dev/null -w "%{http_code}" http://${IMAGE_TAG}:3900/ || true)
+            if [ -n "$code" ]; then
+              echo "webprofile-api responded with HTTP status $code"
+              break
+            fi
+            sleep 1
+          done
+
+      - name: Run parity contract tests (non-blocking)
+        # Allow failures for now — this parity check is informational (MVP)
+        continue-on-error: true
+        run: |
+          # Limit runtime to avoid blocking the workflow on hangs (2 minutes)
+          timeout 120s docker run --rm \
+            -v "${{ github.workspace }}:/workspace" \
+            --network ${NETWORK} \
+            -e MONGO_URI="mongodb://${MONGO_CONTAINER}:27017" \
+            -e TARGET_BASE_URL="http://${IMAGE_TAG}:3900" \
+            -w /workspace \
+            golang:1.25 \
+            bash -lc "mkdir -p ci/webprofile-parity && echo '=== START PARITY TESTS ===' > /workspace/ci/webprofile-parity/test.parity.out && cd services/git-bridge && echo '=== TestIntrospectIntegration_Bcrypt ===' >> /workspace/ci/webprofile-parity/test.parity.out && go test ./test/contract -run TestIntrospectIntegration_Bcrypt -v 2>&1 | tee -a /workspace/ci/webprofile-parity/test.parity.out ; echo '=== TestTokenCreateIntrospectRevokeIntegration ===' >> /workspace/ci/webprofile-parity/test.parity.out && go test ./test/contract -run TestTokenCreateIntrospectRevokeIntegration -v 2>&1 | tee -a /workspace/ci/webprofile-parity/test.parity.out"
+
+      - name: Upload webprofile parity test artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: webprofile-parity-tests
+          path: ci/webprofile-parity/test.parity.out
+
+      - name: Run Node parity smoke test (non-blocking, retried)
+        continue-on-error: true
+        run: |
+          mkdir -p ci/flakiness || true
+          # Copy the rerunner script into the container and execute the node parity under retries
+          timeout 180s docker run --rm \
+            -v "${{ github.workspace }}:/workspace" \
+            --network ${NETWORK} \
+            -e TARGET_BASE_URL="http://${IMAGE_TAG}:3900" \
+            -w /workspace \
+            node:18 bash -lc "chmod +x scripts/contract/rerun_with_retries.sh && scripts/contract/rerun_with_retries.sh 3 ci/flakiness -- node scripts/contract/node_parity.js > ci/webprofile-parity/node.parity.out 2>&1 || true" || true
+
+      - name: Upload Node parity artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: webprofile-node-parity
+          path: ci/webprofile-parity/node.parity.out
+
+      - name: Save webprofile + mongo logs
+        if: always()
+        run: |
+          mkdir -p ci/webprofile-parity || true
+          docker logs --tail 500 ${IMAGE_TAG} > ci/webprofile-parity/webprofile.log || true
+          docker logs --tail 500 ${MONGO_CONTAINER} > ci/webprofile-parity/mongo.log || true
+
+      - name: Upload container logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: webprofile-logs
+          path: ci/webprofile-parity/webprofile.log,ci/webprofile-parity/mongo.log
+
+      - name: Bundle parity artifacts
+        if: always()
+        run: |
+          tar -czf ci/webprofile-parity.tar.gz -C ci webprofile-parity || true
+
+      - name: Upload parity artifact bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: webprofile-parity-artifacts
+          path: ci/webprofile-parity.tar.gz
+
+      - name: Print parity diagnostics summary
+        if: always()
+        run: |
+          echo "== Parity diagnostics summary: =="
+          if [ -f ci/webprofile-parity/node.parity.json ]; then
+            echo "node.parity.json (summary):"
+            jq -S '.' ci/webprofile-parity/node.parity.json || cat ci/webprofile-parity/node.parity.json || true
+          else
+            echo "node.parity.json not found"
+          fi
+          echo "--- webprofile.log (tail 200) ---"
+          if [ -f ci/webprofile-parity/webprofile.log ]; then tail -n 200 ci/webprofile-parity/webprofile.log || true; else echo "webprofile.log not found"; fi
+          echo "--- mongo.log (tail 200) ---"
+          if [ -f ci/webprofile-parity/mongo.log ]; then tail -n 200 ci/webprofile-parity/mongo.log || true; else echo "mongo.log not found"; fi
+          echo "== End diagnostics =="
+
+      - name: Analyze parity outputs
+        if: always()
+        run: |
+          mkdir -p ci/webprofile-parity || true
+          status="success"
+          if [ -f ci/webprofile-parity/node.parity.json ]; then
+            if ! jq -er '.success == true' ci/webprofile-parity/node.parity.json >/dev/null 2>&1; then
+              status="failure"
+            fi
+          fi
+          if [ -f ci/webprofile-parity/test.parity.out ]; then
+            if grep -E "FAIL|revocation not observed|ERROR" ci/webprofile-parity/test.parity.out >/dev/null 2>&1; then
+              status="failure"
+            fi
+          fi
+          echo "{\"status\":\"$status\"}" > ci/webprofile-parity/analysis.json
+          echo "analysis status: $status"
+
+      - name: Report parity failures to PR / Issues
+        if: always()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs')
+            const core = require('@actions/core')
+            const analysisPath = 'ci/webprofile-parity/analysis.json'
+            let analysis = { status: 'success' }
+            if (fs.existsSync(analysisPath)) analysis = JSON.parse(fs.readFileSync(analysisPath, 'utf8'))
+            if (analysis.status !== 'failure') { core.info('No parity failure detected.'); return }
+            let summary = 'Parity diagnostics attached.'
+            const nodeJsonPath = 'ci/webprofile-parity/node.parity.json'
+            const testOutPath = 'ci/webprofile-parity/test.parity.out'
+            if (fs.existsSync(nodeJsonPath)) {
+              try { summary = fs.readFileSync(nodeJsonPath, 'utf8').slice(0, 2000) } catch (e) { summary = 'failed to read node parity json' }
+            } else if (fs.existsSync(testOutPath)) {
+              try { summary = fs.readFileSync(testOutPath, 'utf8').slice(0, 2000) } catch (e) { summary = 'failed to read test parity output' }
+            }
+            const body = `Automated parity job detected failures.
+
+Summary (truncated):
+\n\n\`\`\`\n${summary}\n\`\`\`\n\nArtifacts: webprofile-parity-artifacts (available on this workflow run).`
+            if (github.context.eventName === 'pull_request') {
+              const pr = github.context.payload.pull_request.number
+              await github.rest.issues.createComment({ owner: github.context.repo.owner, repo: github.context.repo.repo, issue_number: pr, body })
+              try { await github.rest.issues.addLabels({ owner: github.context.repo.owner, repo: github.context.repo.repo, issue_number: pr, labels: ['parity-failure'] }) } catch (e) { core.warning('failed to add label: ' + e.message) }
+            } else if (github.context.eventName === 'schedule') {
+              await github.rest.issues.create({ owner: github.context.repo.owner, repo: github.context.repo.repo, title: 'Automated parity job failure', body })
+            }
+
+      - name: Annotate check run (parity)
+        if: always()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs')
+            const core = require('@actions/core')
+            const analysisPath = 'ci/webprofile-parity/analysis.json'
+            let analysis = { status: 'success' }
+            if (fs.existsSync(analysisPath)) analysis = JSON.parse(fs.readFileSync(analysisPath, 'utf8'))
+            const checkName = 'webprofile-parity'
+            if (analysis.status === 'failure') {
+              let summary = 'Parity failure detected.'
+              const nodeJsonPath = 'ci/webprofile-parity/node.parity.json'
+              if (fs.existsSync(nodeJsonPath)) {
+                try { summary = fs.readFileSync(nodeJsonPath, 'utf8').slice(0, 6000) } catch (e) { summary = 'failed to read node parity json' }
+              }
+              await github.rest.checks.create({
+                owner: github.context.repo.owner,
+                repo: github.context.repo.repo,
+                name: checkName,
+                head_sha: github.context.sha,
+                status: 'completed',
+                conclusion: 'failure',
+                output: { title: 'Parity failure', summary, text: 'See uploaded artifacts for full logs.' }
+              })
+            } else {
+              await github.rest.checks.create({ owner: github.context.repo.owner, repo: github.context.repo.repo, name: checkName, head_sha: github.context.sha, status: 'completed', conclusion: 'success', output: { title: 'Parity OK', summary: 'Parity checks passed' } })
+            }
+
+      - name: Slack notify (optional)
+        if: always()
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+        run: |
+          if [ -z "$SLACK_WEBHOOK" ]; then echo "SLACK_WEBHOOK not set; skipping"; exit 0; fi
+          if [ -f ci/webprofile-parity/analysis.json ] && jq -r '.status' ci/webprofile-parity/analysis.json | grep -q failure; then
+            title="Parity job failure for ${{ github.ref_name }}"
+            summary=$(if [ -f ci/webprofile-parity/node.parity.json ]; then jq -r 'tojson' ci/webprofile-parity/node.parity.json | sed -n '1,200p' ; elif [ -f ci/webprofile-parity/test.parity.out ]; then sed -n '1,200p' ci/webprofile-parity/test.parity.out ; else echo 'no summary'; fi)
+            payload=$(jq -nc --arg t "$title" --arg s "$summary" '{text: ($t + "\n\n" + $s)}')
+            curl -sS -X POST -H 'Content-type: application/json' -d "$payload" "$SLACK_WEBHOOK" || true
+          else
+            echo "No failure detected; skipping Slack notification"
+          fi
+
+      - name: Collect minimal logs
+        if: always()
+        run: |
+          docker logs --tail 200 ${IMAGE_TAG} || true
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker rm -f ${IMAGE_TAG} >/dev/null 2>&1 || true
+          docker rm -f ${MONGO_CONTAINER} >/dev/null 2>&1 || true
+          docker network rm ${NETWORK} >/dev/null 2>&1 || true

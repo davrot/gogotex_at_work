@@ -8,14 +8,21 @@ NETWORK=${NETWORK:-develop_default}
 MONGO_URI=${MONGO_URI:-mongodb://mongo:27017/sharelatex}
 
 # Build the image
-pushd services/git-bridge/cmd/webprofile-api >/dev/null
+REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+pushd "${REPO_ROOT}/services/git-bridge/cmd/webprofile-api" >/dev/null
 docker build -t ${IMAGE_TAG} .
 popd >/dev/null
 
 # Remove existing container if present
 docker rm -f ${IMAGE_TAG} >/dev/null 2>&1 || true
 
-# Run attached to the compose network
-docker run -d --name ${IMAGE_TAG} --network ${NETWORK} -e MONGO_URI="${MONGO_URI}" -p 3900:3900 ${IMAGE_TAG}
+# Optionally publish host port; by default we run attached to network without publishing
+PORT_ARG=""
+if [ "${PUBLISH_PORT:-false}" = "true" ]; then
+  PORT_ARG="-p 3900:3900"
+fi
 
-echo "Started ${IMAGE_TAG} on network ${NETWORK} (port 3900 published to host). Use http://webprofile-api-ci:3900 from other containers in the ${NETWORK} network."
+# Run attached to the compose network
+docker run -d --name ${IMAGE_TAG} --network ${NETWORK} -e MONGO_URI="${MONGO_URI}" ${PORT_ARG} ${IMAGE_TAG}
+
+echo "Started ${IMAGE_TAG} on network ${NETWORK}. Use http://${IMAGE_TAG}:3900 from other containers in the ${NETWORK} network."

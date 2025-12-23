@@ -8,6 +8,23 @@ This document provides a concise overview for getting the development environmen
 - Start a local MongoDB (via `docker compose` or your preferred method).
 - Build and run `webprofile-api` shim for contract/consistency checks: see **Spec Kit** later in this doc.
 
+### Webprofile parity checks (Go shim) 🔁
+
+We run a non-blocking parity check that builds and starts the Go `webprofile-api` shim and runs small integration tests against it to verify token create/introspect/revoke parity with the Node implementation.
+
+Quick local steps:
+
+- Start a Mongo instance attached to a Docker network: `docker run -d --name webprofile-parity-mongo --network webprofile-parity-net mongo:6.0.5`
+- Start the Go shim attached to the same network (helper script): `NETWORK=webprofile-parity-net MONGO_URI="mongodb://webprofile-parity-mongo:27017/sharelatex" ./scripts/contract/run_webprofile_in_network.sh webprofile-api-parity`
+- Run the Go integration test against the running shim:
+
+```bash
+cd services/git-bridge
+TARGET_BASE_URL=http://webprofile-api-parity:3900 MONGO_URI=mongodb://webprofile-parity-mongo:27017 go test ./test/contract -run TestTokenCreateIntrospectRevokeIntegration -v
+```
+
+CI note: a non-blocking GitHub Actions workflow (`.github/workflows/webprofile-parity.yml`) has been added to run these parity checks on PRs (the job is allowed to fail while parity stabilizes).
+
 ## Prerequisites
 
 - Install Node.js via `nvm` (recommended):

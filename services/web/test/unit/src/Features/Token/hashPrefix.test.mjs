@@ -26,51 +26,48 @@ describe('PersonalAccessToken hashPrefix behavior', function () {
     const tokenPlain = 'test-token-12345'
     const expectedPrefix = crypto.createHash('sha256').update(tokenPlain).digest('hex').slice(0, 8)
 
-    // stub the model find to capture the query (stub at mongoose.Model level for robustness)
-    // DEBUG: inspect the model export
-    // eslint-disable-next-line no-console
-    console.debug('[hashPrefix.test] model export keys:', Object.keys(PersonalAccessTokenModel), 'hasPersonalAccessToken?', !!PersonalAccessTokenModel.PersonalAccessToken)
-    // stub the model find to capture the query (try mongoose.models first for robustness)
+    // Stub model find on both module export and mongoose.models to capture the query
     const mongoose = require('mongoose')
-    let originalFind = null
+    let originalFindModule = null
+    let originalFindMongoose = null
     let capturedQuery = null
-    if (mongoose && mongoose.models && mongoose.models.PersonalAccessToken) {
-      originalFind = mongoose.models.PersonalAccessToken.find
-      mongoose.models.PersonalAccessToken.find = vi.fn((query) => {
-        capturedQuery = query
-        return { lean: () => Promise.resolve([]) }
-      })
-    } else if (PersonalAccessTokenModel.PersonalAccessToken) {
-      originalFind = PersonalAccessTokenModel.PersonalAccessToken.find
+
+    if (PersonalAccessTokenModel.PersonalAccessToken) {
+      originalFindModule = PersonalAccessTokenModel.PersonalAccessToken.find
       PersonalAccessTokenModel.PersonalAccessToken.find = vi.fn((query) => {
         capturedQuery = query
         return { lean: () => Promise.resolve([]) }
       })
-    } else {
-      // ensure test fails loudly if model isn't present
-      throw new Error('PersonalAccessToken model export not found; cannot stub')
+    }
+    if (mongoose && mongoose.models && mongoose.models.PersonalAccessToken) {
+      originalFindMongoose = mongoose.models.PersonalAccessToken.find
+      mongoose.models.PersonalAccessToken.find = vi.fn((query) => {
+        capturedQuery = query
+        return { lean: () => Promise.resolve([]) }
+      })
     }
 
     try {
-      // Import a fresh manager after stubbing so it picks up the stubbed model
-      const manager = await freshManager()
-      // DEBUG: ensure the stub is visible on the manager's model (safe checks)
-      // eslint-disable-next-line no-console
-      console.debug('[hashPrefix.test] manager.find === model.find?', !!(manager && manager.PersonalAccessToken && manager.PersonalAccessToken.find) && !!(PersonalAccessTokenModel && PersonalAccessTokenModel.PersonalAccessToken && PersonalAccessTokenModel.PersonalAccessToken.find) && manager.PersonalAccessToken.find === PersonalAccessTokenModel.PersonalAccessToken.find, 'managerFindName', manager && manager.PersonalAccessToken && manager.PersonalAccessToken.find && manager.PersonalAccessToken.find.name)
-      // Call introspect which should compute prefix and call find with it
-      const result = await manager.introspect(tokenPlain)
-      // It's sufficient to assert we got the expected miss result (no candidate found)
-      expect(result && typeof result.active === 'boolean').toBe(true)
-      expect(result.active).toBe(false)
+      // Ensure we force local DB behavior while importing the manager so it will query the DB
+      const prevUseWebprofile = process.env.AUTH_TOKEN_USE_WEBPROFILE_API
+      process.env.AUTH_TOKEN_USE_WEBPROFILE_API = 'false'
+      try {
+        // Import a fresh manager after stubbing so it picks up the stubbed model
+        const manager = await freshManager()
+        // Call introspect which should compute prefix and call find with it
+        await manager.introspect(tokenPlain)
+        // Assert that a query was captured with the expected hashPrefix
+        expect(capturedQuery).not.toBeNull()
+        expect(capturedQuery.hashPrefix).toBe(expectedPrefix)
+      } finally {
+        if (typeof prevUseWebprofile === 'undefined') delete process.env.AUTH_TOKEN_USE_WEBPROFILE_API
+        else process.env.AUTH_TOKEN_USE_WEBPROFILE_API = prevUseWebprofile
+      }
     } finally {
       // restore safely depending on where we patched
       try {
-        const mongoose = require('mongoose')
-        if (mongoose && mongoose.models && mongoose.models.PersonalAccessToken) {
-          mongoose.models.PersonalAccessToken.find = originalFind
-        } else if (PersonalAccessTokenModel.PersonalAccessToken) {
-          PersonalAccessTokenModel.PersonalAccessToken.find = originalFind
-        }
+        if (originalFindModule) PersonalAccessTokenModel.PersonalAccessToken.find = originalFindModule
+        if (originalFindMongoose) mongoose.models.PersonalAccessToken.find = originalFindMongoose
       } catch (e) {
         // ignore restore errors in cleanup
       }
