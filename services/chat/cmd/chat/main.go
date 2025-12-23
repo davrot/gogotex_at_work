@@ -56,7 +56,7 @@ func threadsHandlerWithStore(s *store.Store, w http.ResponseWriter, r *http.Requ
 func messagesHandlerWithStore(s *store.Store, w http.ResponseWriter, r *http.Request) {
 	// log for parity debugging
 	log.Printf("messagesHandler: %s %s", r.Method, r.URL.Path)
-	// Expect path: /project/{projectId}/threads/{threadId}/messages
+	// Expect path: /project/{projectId}/threads/{threadId}/messages or /messages/{messageId}
 	parts := strings.Split(r.URL.Path, "/")
 	if len(parts) < 6 || parts[1] != "project" || parts[3] != "threads" || parts[5] != "messages" {
 		w.WriteHeader(http.StatusNotFound)
@@ -65,7 +65,7 @@ func messagesHandlerWithStore(s *store.Store, w http.ResponseWriter, r *http.Req
 	projectId := parts[2]
 	threadId := parts[4]
 
-	// Only implement POST for now
+	// POST: create message
 	if r.Method == http.MethodPost {
 		var body struct {
 			UserID string `json:"user_id"`
@@ -92,7 +92,7 @@ func messagesHandlerWithStore(s *store.Store, w http.ResponseWriter, r *http.Req
 			return
 		}
 
-			// Minimal message creation: persist to Mongo if configured; otherwise use in-memory store
+		// Minimal message creation: persist to Mongo if configured; otherwise use in-memory store
 		msg := map[string]interface{}{
 			"_id":      "m1",
 			"content":  body.Content,
@@ -156,6 +156,103 @@ func messagesHandlerWithStore(s *store.Store, w http.ResponseWriter, r *http.Req
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_ = json.NewEncoder(w).Encode([]interface{}{})
+		return
+	}
+
+	// New: PUT /project/{pid}/threads/{tid}/messages/{mid} -> edit
+	if r.Method == http.MethodPut || r.Method == http.MethodPatch {
+		// Expect messageId at parts[6]
+		if len(parts) < 7 {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		messageId := parts[6]
+		var body struct{ Content string `json:"content"` }
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte("Invalid JSON"))
+			return
+		}
+		if body.Content == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte("No content provided"))
+			return
+		}
+		// Update in Mongo if present
+		if messagesColl != nil {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			res, err := messagesColl.UpdateOne(ctx, map[string]interface{}{ "_id": messageId, "room_id": threadId }, map[string]interface{}{ "$set": map[string]interface{}{ "content": body.Content, "edited_at": time.Now().Unix() } })
+			if err == nil && res.ModifiedCount == 1 {
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		// In-memory store: naive replacement
+		key := "messages:" + projectId + ":" + threadId
+		if val, ok := s.Get(key); ok {
+			var arr []map[string]interface{}
+			_ = json.Unmarshal([]byte(val), &arr)
+			updated := false
+			for i := range arr {
+				if arr[i]["_id"] == messageId {
+					arr[i]["content"] = body.Content
+					updated = true
+					break
+				}
+			}
+			if updated {
+				b, _ := json.Marshal(arr)
+				s.Put(key, string(b))
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+		}
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	// New: DELETE /project/{pid}/threads/{tid}/messages/{mid}
+	if r.Method == http.MethodDelete {
+		if len(parts) < 7 {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		messageId := parts[6]
+		if messagesColl != nil {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			res, err := messagesColl.DeleteOne(ctx, map[string]interface{}{ "_id": messageId, "room_id": threadId })
+			if err == nil && res.DeletedCount == 1 {
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		key := "messages:" + projectId + ":" + threadId
+		if val, ok := s.Get(key); ok {
+			var arr []map[string]interface{}
+			_ = json.Unmarshal([]byte(val), &arr)
+			newArr := []map[string]interface{}{}
+			deleted := false
+			for _, m := range arr {
+				if m["_id"] == messageId {
+					deleted = true
+					continue
+				}
+				newArr = append(newArr, m)
+			}
+			if deleted {
+				b, _ := json.Marshal(newArr)
+				s.Put(key, string(b))
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+		}
+		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
