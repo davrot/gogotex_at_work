@@ -47,10 +47,9 @@ Thresholds & alerts:
 
 Issue creation options (customize created issue):
 
-  - `ISSUE_CREATE_AS_DRAFT` (default `true`) — when `true` the created issue will be prefixed with `[DRAFT]` and will also receive the `draft` label to indicate it is a draft-like issue
-  - `ISSUE_LABELS` (comma-separated string) — additional labels to add to the created issue (e.g., `bug,parity`)
-  - `ISSUE_ASSIGNEES` (comma-separated string) — usernames to assign the created issue to (e.g., `alice,bob`)
-
+- `ISSUE_CREATE_AS_DRAFT` (default `true`) — when `true` the created issue will be prefixed with `[DRAFT]` and will also receive the `draft` label to indicate it is a draft-like issue
+- `ISSUE_LABELS` (comma-separated string) — additional labels to add to the created issue (e.g., `bug,parity`)
+- `ISSUE_ASSIGNEES` (comma-separated string) — usernames to assign the created issue to (e.g., `alice,bob`)
 
 Example (CI):
 
@@ -113,6 +112,16 @@ Example (local publish):
 ```sh
 PUBLISH_DASHBOARD=true AWS_S3_BUCKET=my-bucket ./scripts/contract/collect_local_cross_runs.sh --copy
 ```
+
+Local Solo-mode safety (recommended):
+
+- Install a pre-commit hook locally to avoid accidentally committing changes to GitHub Actions workflows which are disabled by default in Solo Developer Mode:
+
+```sh
+./scripts/contract/install_solo_hooks.sh
+```
+
+- The hook runs `scripts/contract/check_prevent_workflow_changes.sh` and will block commits that modify `.github/workflows/*` unless you explicitly set `ALLOW_WORKFLOW_CHANGES=true`.
 
 Example (CI): set `PUBLISH_DASHBOARD=true` and `AWS_S3_BUCKET` or `GITHUB_PAGES_REPO` in the scheduled workflow step environment or secrets.
 
