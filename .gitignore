@@ -33,6 +33,10 @@ services/git-bridge/cmd/webprofile-api/tmp/
 services/web/tmp/
 services/*/tmp/
 
+# Local flakiness collection and local CI run artifacts
+ci/flakiness/collected/
+ci/webprofile-parity/
+
 # Test artifacts
 services/web/test/integration/src/*.out
 services/web/test/unit/src/*.out
