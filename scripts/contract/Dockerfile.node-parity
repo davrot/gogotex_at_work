@@ -1,0 +1,8 @@
+FROM node:18-alpine
+WORKDIR /workspace
+
+# Copy parity script and ensure ci dir available
+COPY scripts/contract/node_parity.js /usr/local/bin/node_parity.js
+RUN chmod +x /usr/local/bin/node_parity.js
+
+ENTRYPOINT ["node", "/usr/local/bin/node_parity.js"]

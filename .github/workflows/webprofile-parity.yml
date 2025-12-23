@@ -68,17 +68,20 @@ jobs:
           name: webprofile-parity-tests
           path: ci/webprofile-parity/test.parity.out
 
-      - name: Run Node parity smoke test (non-blocking, retried)
+      - name: Build node parity image
+        run: |
+          # Build a small image containing the parity script to avoid workspace bind issues
+          docker build -t webprofile-node-parity:${{ github.sha }} -f scripts/contract/Dockerfile.node-parity .
+
+      - name: Run Node parity smoke test (non-blocking, via image)
         continue-on-error: true
         run: |
           mkdir -p ci/flakiness || true
-          # Copy the rerunner script into the container and execute the node parity under retries
           timeout 180s docker run --rm \
-            -v "${{ github.workspace }}:/workspace" \
             --network ${NETWORK} \
             -e TARGET_BASE_URL="http://${IMAGE_TAG}:3900" \
-            -w /workspace \
-            node:18 bash -lc "chmod +x scripts/contract/rerun_with_retries.sh && scripts/contract/rerun_with_retries.sh 3 ci/flakiness -- node scripts/contract/node_parity.js > ci/webprofile-parity/node.parity.out 2>&1 || true" || true
+            -v "${{ github.workspace }}/ci:/workspace/ci" \
+            webprofile-node-parity:${{ github.sha }} > ci/webprofile-parity/node.parity.out 2>&1 || true
 
       - name: Upload Node parity artifact
         if: always()

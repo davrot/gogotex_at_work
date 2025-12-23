@@ -52,15 +52,21 @@ else
   echo "Go parity tests timed out or failed. See ci/webprofile-parity/test.parity.out"
 fi
 
-# Run Node parity (timeout 180s)
-echo "Running Node parity smoke (timeout 180s)"
+# Run Node parity (timeout 180s) using containerized parity image to avoid workspace mount issues
+echo "Running Node parity smoke (timeout 180s) via parity image"
+PARITY_IMAGE=${PARITY_IMAGE:-webprofile-node-parity:local}
+# Build parity image if missing
+if ! docker image inspect ${PARITY_IMAGE} >/dev/null 2>&1; then
+  echo "Building parity image ${PARITY_IMAGE}"
+  docker build -t ${PARITY_IMAGE} -f scripts/contract/Dockerfile.node-parity "${REPO_ROOT}" || true
+fi
+
+# Ensure ci dir is mounted so parity script can write diagnostics
 if timeout 180s docker run --rm \
   --network ${NETWORK} \
   -e TARGET_BASE_URL="http://${IMAGE_TAG}:3900" \
-  -v "${REPO_ROOT}:/workspace" \
-  -w /workspace \
-  node:18 \
-  node scripts/contract/node_parity.js > ci/webprofile-parity/node.parity.out 2>&1; then
+  -v "${REPO_ROOT}/ci:/workspace/ci" \
+  ${PARITY_IMAGE} > ci/webprofile-parity/node.parity.out 2>&1; then
   echo "Node parity smoke finished (output: ci/webprofile-parity/node.parity.out)"
 else
   echo "Node parity smoke timed out or failed. See ci/webprofile-parity/node.parity.out"
