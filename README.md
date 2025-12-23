@@ -14,6 +14,10 @@
   <a href="#license">License</a>
 </p>
 
+<p align="center">
+  <a href="https://davrot.github.io/gogotex_at_work/parity-cross/dashboard.html"><img src="https://img.shields.io/badge/parity-cross-dashboard-blue.svg" alt="Parity Cross Dashboard"></a>
+</p>
+
 <img src="doc/screenshot.png" alt="A screenshot of a project being edited in Overleaf Community Edition">
 <p align="center">
   Figure 1: A screenshot of a project being edited in Overleaf Community Edition.

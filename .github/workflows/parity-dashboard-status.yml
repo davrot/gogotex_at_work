@@ -1,0 +1,63 @@
+name: Parity cross dashboard status
+
+on:
+  schedule:
+    - cron: "30 3 * * *" # daily at 03:30 UTC
+  workflow_dispatch: {}
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  status:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure tools
+        run: |
+          apt-get update && apt-get install -y jq curl python3 || true
+          python3 --version || true
+
+      - name: Collect flakiness (local aggregation)
+        run: |
+          ./scripts/contract/collect_flakiness.sh || true
+
+      - name: Create status JSON
+        env:
+          CROSS_RUN_FAIL_THRESHOLD: ${{ secrets.CROSS_RUN_FAIL_THRESHOLD }}
+          CROSS_ITER_FAILURE_RATE_THRESHOLD: ${{ secrets.CROSS_ITER_FAILURE_RATE_THRESHOLD }}
+          DASH_URL: "https://davrot.github.io/gogotex_at_work/parity-cross/dashboard.html"
+        run: |
+          python3 - <<PY
+import json, os
+from pathlib import Path
+summary_path = Path('ci/flakiness/cross/summary.json')
+out = {'timestamp': None, 'summary': {}, 'threshold_exceeded': False, 'dashboard_url': os.environ.get('DASH_URL')}
+if summary_path.exists():
+    s = json.loads(summary_path.read_text())
+    out['summary'] = s
+    out['timestamp'] = Path('ci/flakiness/cross/report.txt').stat().st_mtime if Path('ci/flakiness/cross/report.txt').exists() else None
+    run_failures = s.get('run_failures',0)
+    run_total = s.get('run_total',0)
+    iter_failures = s.get('iter_failures',0)
+    iter_total = s.get('iter_total',0)
+    iter_rate = 0.0 if iter_total==0 else (iter_failures/iter_total)
+    out['summary']['iter_rate'] = iter_rate
+    run_threshold = int(os.environ.get('CROSS_RUN_FAIL_THRESHOLD','1') or '1')
+    iter_rate_threshold = float(os.environ.get('CROSS_ITER_FAILURE_RATE_THRESHOLD','0.05') or '0.05')
+    out['threshold_exceeded'] = (run_failures>=run_threshold) or (iter_rate>=iter_rate_threshold)
+else:
+    out['error'] = 'no summary'
+Path('ci/flakiness/cross').mkdir(parents=True, exist_ok=True)
+Path('ci/flakiness/cross/status.json').write_text(json.dumps(out, indent=2))
+print('Wrote ci/flakiness/cross/status.json')
+PY
+
+      - name: Upload status artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: parity-cross-status
+          path: ci/flakiness/cross/status.json || true

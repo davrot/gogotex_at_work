@@ -56,6 +56,7 @@ Publishing & archival:
 - A scheduled job `parity-dashboard-publish.yml` runs weekly and will call the collector with `--publish` to publish the dashboard to the `gh-pages` branch (if `GITHUB_PAGES_REPO` and `GITHUB_TOKEN` are configured).
 - The publisher archives snapshots under `parity-cross/archives/<TIMESTAMP>/dashboard.html` and `trend.json` so you can inspect historical dashboards per-week.
 - Artifacts containing recent archived snapshots are uploaded as the `parity-cross-archives` artifact for the weekly run.
+- A daily `parity-dashboard-status` workflow generates `ci/flakiness/cross/status.json` and uploads it as artifact `parity-cross-status`. This file includes a timestamp, the aggregated summary, an `iter_rate` and a `threshold_exceeded` boolean so automation or dashboards can poll a small status artifact.
 
 Example: the published live dashboard URL will be:
 
