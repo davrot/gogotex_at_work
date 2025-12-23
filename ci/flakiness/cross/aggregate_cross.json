@@ -1,0 +1,46 @@
+[
+  [
+    {
+      "iteration": 1,
+      "success": true
+    },
+    {
+      "iteration": 2,
+      "success": true
+    },
+    {
+      "iteration": 3,
+      "success": true
+    },
+    {
+      "iteration": 4,
+      "success": true
+    },
+    {
+      "iteration": 5,
+      "success": true
+    }
+  ],
+  [
+    {
+      "iteration": 1,
+      "success": true
+    },
+    {
+      "iteration": 2,
+      "success": true
+    },
+    {
+      "iteration": 3,
+      "success": true
+    },
+    {
+      "iteration": 4,
+      "success": true
+    },
+    {
+      "iteration": 5,
+      "success": true
+    }
+  ]
+]
