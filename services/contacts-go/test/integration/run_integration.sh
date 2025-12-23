@@ -28,6 +28,65 @@ for i in {1..20}; do
   sleep 1
 done
 
+# Optional: run Postgres-backed integration (STORE=postgres)
+PG_CONTAINER=contacts-pg-integration
+PG_PORT=5433
+NETWORK=contacts-integ-net
+
+# create network
+docker network create $NETWORK 2>/dev/null || true
+
+# start a Postgres container on the network
+docker rm -f $PG_CONTAINER 2>/dev/null || true
+docker run -d --name $PG_CONTAINER --network $NETWORK -e POSTGRES_PASSWORD=pass -e POSTGRES_DB=contacts -p ${PG_PORT}:5432 postgres:15-alpine
+
+# wait for Postgres
+for i in {1..20}; do
+  if docker run --network $NETWORK --rm postgres:15-alpine psql postgresql://postgres:pass@${PG_CONTAINER}:5432/contacts -c '\l' >/dev/null 2>&1; then
+    echo "postgres ok"
+    break
+  fi
+  echo "waiting for postgres... (${i})"
+  sleep 1
+done
+
+# Run the service in postgres mode on the same network
+docker rm -f "$CONTAINER" 2>/dev/null || true
+docker run -d --name "$CONTAINER" --network $NETWORK -p ${PORT}:8080 -e STORE=postgres -e DATABASE_URL=postgres://postgres:pass@${PG_CONTAINER}:5432/contacts?sslmode=disable "$IMAGE"
+
+# wait for health again
+for i in {1..20}; do
+  if docker run --network $NETWORK --rm curlimages/curl:latest -sS -o /dev/null http://$CONTAINER:8080/health; then
+    echo "health ok (postgres mode)"
+    break
+  fi
+  echo "waiting for service (postgres mode)... (${i})"
+  sleep 1
+done
+
+# Run a create/list check in postgres mode
+create_code=$(docker run --network container:$CONTAINER --rm curlimages/curl:latest -sS -o /dev/null -w "%{http_code}" -H 'Content-Type: application/json' -d '{"name":"DBIntegration","email":"db@e.com","id":"11111111-1111-1111-1111-111111111111"}' http://localhost:8080/contacts) || true
+if [ "$create_code" != "201" ]; then
+  echo "postgres contacts create failed (code: $create_code)"
+  docker logs "$CONTAINER" || true
+  docker rm -f "$CONTAINER" || true
+  docker rm -f $PG_CONTAINER || true
+  exit 7
+fi
+
+if ! docker run --network container:$CONTAINER --rm curlimages/curl:latest -sS http://localhost:8080/contacts | grep -q DBIntegration; then
+  echo "postgres contacts list missing created contact"
+  docker logs "$CONTAINER" || true
+  docker rm -f "$CONTAINER" || true
+  docker rm -f $PG_CONTAINER || true
+  exit 8
+fi
+
+echo "postgres integration succeeded"
+
+docker rm -f "$CONTAINER" >/dev/null || true
+docker rm -f $PG_CONTAINER >/dev/null || true
+
 # assert health and metrics via an ephemeral curl container
 docker run --network container:$CONTAINER --rm curlimages/curl:latest -sS http://localhost:8080/health | jq .
 if ! docker run --network container:$CONTAINER --rm curlimages/curl:latest -sS http://localhost:8080/metrics | grep -q contacts_health_checks_total; then
