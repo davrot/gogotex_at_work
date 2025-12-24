@@ -108,7 +108,15 @@ if [ -f "$SERVICE_DIR/internal/store/postgres_integration_test.go" ] || [ -f "$S
 
   # cleanup PG resources
   docker rm -f $PG_CONTAINER >/dev/null || true
-  docker network rm $NETWORK >/dev/null || true
+
+  # Try to remove the network, retry if it has active endpoints (sometimes Docker delays cleanup)
+  for i in 1 2 3 4 5; do
+    if docker network rm $NETWORK >/dev/null 2>&1; then
+      break
+    fi
+    echo "network rm failed, retrying (${i}/5)..."
+    sleep 1
+  done
 fi
 
 # assert health and metrics via an ephemeral curl container
@@ -118,3 +126,20 @@ echo "integration succeeded"
 
 # cleanup
 docker rm -f "$CONTAINER" >/dev/null || true
+# attempt to remove network used by container (best-effort)
+for i in 1 2 3 4 5; do
+  if docker network rm $NETWORK >/dev/null 2>&1; then
+    break
+  fi
+  echo "network rm failed (post-cleanup), attempting to disconnect attached containers (attempt ${i}/5)"
+  # Try to disconnect any attached containers and retry
+  CONTAINERS_JSON=$(docker network inspect $NETWORK --format '{{json .Containers}}' 2>/dev/null || echo "{}")
+  if [ "$CONTAINERS_JSON" != "{}" ]; then
+    # extract container IDs and disconnect
+    echo "$CONTAINERS_JSON" | jq -r 'keys[]' 2>/dev/null | while read -r cid; do
+      echo "disconnecting $cid"
+      docker network disconnect --force $NETWORK "$cid" >/dev/null 2>&1 || true
+    done
+  fi
+  sleep 1
+done

@@ -57,12 +57,18 @@ Observability & CI
 - Expose Prometheus metrics `/metrics`
 - Add golangci-lint config and CI snippet from `docs/templates/service-go/ci-snippet.template`
 
-Checklist
+Checklist (updated 2025-12-24)
 
-- [ ] implement in-memory store and tests
-- [ ] implement handlers and tests
-- [ ] add integration script
-- [ ] add Postgres store (if required) and integration tests
-- [ ] add metrics and structured logging
+- [x] implement in-memory store and tests — implemented (`internal/store/mem_store.go`, `mem_store_test.go`)
+- [x] implement handlers and tests — implemented (`main.go`, `handlers_test.go`)
+- [x] add integration script — implemented (`test/integration/run_integration.sh`)
+- [x] add Postgres store and integration tests — implemented (`internal/store/postgres_store.go`, `postgres_store_sqlmock_test.go`, `postgres_integration_test.go`). Run local integration with `RUN_DB_INTEGRATION=1`.
+- [x] add metrics and structured logging — implemented: `/metrics` endpoint (Prometheus), zap-based structured logging in `main.go`, and `.golangci.yml` added. CI template already includes `golangci-lint` job under `ci/ci-workflow.template`. Integration script verifies `/metrics` endpoint as part of smoke checks.
+
+Notes & next steps
+
+- DB integration tests are present but gated behind `RUN_DB_INTEGRATION` / `RUN_DB_INTEGRATION_REMOTE` env vars to avoid accidental runs in CI/dev environments.
+- The integration script runs Postgres mode on a Docker network and supports a remote helper mode for Go-level tests.
+- Remaining recommended work: consider adding an `internal/logging` wrapper to centralize zap configuration across services and decide whether to enable the integration script's remote Go-level DB checks in CI (opt-in).
 
 Owner: @team-chat (assign as appropriate)
