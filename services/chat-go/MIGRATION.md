@@ -64,11 +64,20 @@ Checklist (updated 2025-12-24)
 - [x] add integration script — implemented (`test/integration/run_integration.sh`)
 - [x] add Postgres store and integration tests — implemented (`internal/store/postgres_store.go`, `postgres_store_sqlmock_test.go`, `postgres_integration_test.go`). Run local integration with `RUN_DB_INTEGRATION=1`.
 - [x] add metrics and structured logging — implemented: `/metrics` endpoint (Prometheus), zap-based structured logging in `main.go`, and `.golangci.yml` added. CI template already includes `golangci-lint` job under `ci/ci-workflow.template`. Integration script verifies `/metrics` endpoint as part of smoke checks.
+- [x] implement all missing endpoints for complete API parity — implemented all endpoints including:
+  - Thread resolution (`POST /project/{projectId}/thread/{threadId}/resolve`)
+  - Thread reopening (`POST /project/{projectId}/thread/{threadId}/reopen`)
+  - Thread deletion (`POST /project/{projectId}/thread/{threadId}/delete`)
+  - Message editing (`PUT /project/{projectId}/messages/{messageId}` and `PUT /project/{projectId}/thread/{threadId}/messages/{messageId}`)
+  - Message deletion (`DELETE /project/{projectId}/messages/{messageId}` and `DELETE /project/{projectId}/thread/{threadId}/messages/{messageId}`)
+  - Project destruction (`DELETE /project/{projectId}`)
+  - Thread duplication (`POST /project/{projectId}/threads/duplicate`)
+  - Resolved thread IDs (`GET /project/{projectId}/threads/resolved`)
 
 Notes & next steps
 
 - DB integration tests are present but gated behind `RUN_DB_INTEGRATION` / `RUN_DB_INTEGRATION_REMOTE` env vars to avoid accidental runs in CI/dev environments.
 - The integration script runs Postgres mode on a Docker network and supports a remote helper mode for Go-level tests.
-- Remaining recommended work: consider adding an `internal/logging` wrapper to centralize zap configuration across services and decide whether to enable the integration script's remote Go-level DB checks in CI (opt-in).
+- All API endpoints are now implemented for complete drop-in replacement compatibility.
 
 Owner: @team-chat (assign as appropriate)

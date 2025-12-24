@@ -1,28 +1,26 @@
-package webgo
 package main
 
+import (
+	"encoding/json"
+	"log"
+	"net/http"
+	"os"
+)
 
+func healthHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-}	}		log.Fatal(err)	if err := http.ListenAndServe(addr, nil); err != nil {	log.Printf("listening on %s", addr)	http.HandleFunc("/health", healthHandler)	addr := ":" + port	}		port = "8080"	if port == "" {	port := os.Getenv("PORT")func main() {}	_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})	w.Header().Set("Content-Type", "application/json")func healthHandler(w http.ResponseWriter, r *http.Request) {)	"os"	"net/http"	"log"	"encoding/json"import (
+func main() {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	addr := ":" + port
+	http.HandleFunc("/health", healthHandler)
+	log.Printf("listening on %s", addr)
+	if err := http.ListenAndServe(addr, nil); err != nil {
+		log.Fatal(err)
+	}
+}

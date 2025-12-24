@@ -6,12 +6,15 @@ import (
 	"net/http"
 )
 
+// healthHandler handles the /health endpoint
+func healthHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprint(w, `{"status":"ok"}`)
+}
+
 func main() {
-	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, `{"status":"ok"}`)
-	})
+	http.HandleFunc("/health", healthHandler)
 
 	addr := ":3000"
 	log.Printf("clsi service listening on %s", addr)

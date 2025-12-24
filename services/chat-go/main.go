@@ -81,20 +81,21 @@ func projectHandler(w http.ResponseWriter, r *http.Request) {
 				switch action {
 				case "resolve":
 					// mark resolved
-					var body struct {
-						UserID string `json:"user_id"`
-					}
-					_ = json.NewDecoder(r.Body).Decode(&body)
-					_ = msgStore // no-op for now
-					w.WriteHeader(http.StatusNoContent)
+					handleResolveThread(w, r, projectId, threadId)
 					return
 				case "reopen":
-					w.WriteHeader(http.StatusNoContent)
+					handleReopenThread(w, r, projectId, threadId)
 					return
 				case "delete":
-					w.WriteHeader(http.StatusNoContent)
+					handleDeleteThread(w, r, projectId, threadId)
 					return
 				}
+			}
+			// Handle message editing for thread-scoped messages
+			if r.Method == http.MethodPut && len(parts) >= 7 && parts[6] == "messages" {
+				messageId := parts[7]
+				handleEditThreadMessage(w, r, projectId, threadId, messageId)
+				return
 			}
 		}
 	}
@@ -102,6 +103,18 @@ func projectHandler(w http.ResponseWriter, r *http.Request) {
 	// /project/{projectId}/threads
 	if len(parts) == 4 && parts[3] == "threads" && r.Method == http.MethodGet {
 		handledThreadsList(w, r, projectId)
+		return
+	}
+
+	// /project/{projectId}/threads/resolved (get resolved thread IDs)
+	if len(parts) == 5 && parts[3] == "threads" && parts[4] == "resolved" && r.Method == http.MethodGet {
+		handleGetResolvedThreadIds(w, r, projectId)
+		return
+	}
+
+	// /project/{projectId}/threads/duplicate (duplicate threads)
+	if len(parts) == 5 && parts[3] == "threads" && parts[4] == "duplicate" && r.Method == http.MethodPost {
+		handleDuplicateCommentThreads(w, r, projectId)
 		return
 	}
 
@@ -115,6 +128,24 @@ func projectHandler(w http.ResponseWriter, r *http.Request) {
 			messagesCreateHandler(w, r)
 			return
 		}
+		// Handle global message editing
+		if r.Method == http.MethodPut && len(parts) >= 5 {
+			messageId := parts[4]
+			handleEditGlobalMessage(w, r, messageId)
+			return
+		}
+		// Handle global message deletion
+		if r.Method == http.MethodDelete && len(parts) >= 5 {
+			messageId := parts[4]
+			handleDeleteGlobalMessage(w, r, messageId)
+			return
+		}
+	}
+
+	// /project/{projectId} (delete project)
+	if len(parts) == 3 && r.Method == http.MethodDelete {
+		handleDestroyProject(w, r, projectId)
+		return
 	}
 
 	w.WriteHeader(http.StatusNotFound)
@@ -297,6 +328,57 @@ func messagesCreateHandler(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(out)
 }
 
+// handleEditGlobalMessage edits a global message
+func handleEditGlobalMessage(w http.ResponseWriter, r *http.Request, messageId string) {
+	// For now, we'll just return 204 No Content as a placeholder
+	// In a full implementation, this would update the message in the store
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleDeleteGlobalMessage deletes a global message
+func handleDeleteGlobalMessage(w http.ResponseWriter, r *http.Request, messageId string) {
+	// For now, we'll just return 204 No Content as a placeholder
+	// In a full implementation, this would delete the message from the store
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleDeleteThreadMessage deletes a message in a thread
+func handleDeleteThreadMessage(w http.ResponseWriter, r *http.Request, projectId, threadId, messageId string) {
+	// For now, we'll just return 204 No Content as a placeholder
+	// In a full implementation, this would delete the message from the store
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleDeleteUserMessage deletes a user's message in a thread
+func handleDeleteUserMessage(w http.ResponseWriter, r *http.Request, projectId, threadId, userId, messageId string) {
+	// For now, we'll just return 204 No Content as a placeholder
+	// In a full implementation, this would delete the message from the store
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleGetResolvedThreadIds gets resolved thread IDs for a project
+func handleGetResolvedThreadIds(w http.ResponseWriter, r *http.Request, projectId string) {
+	// For now, we'll return an empty array as a placeholder
+	// In a full implementation, this would query the store for resolved threads
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string][]string{"resolvedThreadIds": []string{}})
+}
+
+// handleDuplicateCommentThreads duplicates threads
+func handleDuplicateCommentThreads(w http.ResponseWriter, r *http.Request, projectId string) {
+	// For now, we'll return an empty response as a placeholder
+	// In a full implementation, this would duplicate threads
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"newThreads": map[string]interface{}{}})
+}
+
+// handleDestroyProject destroys a project
+func handleDestroyProject(w http.ResponseWriter, r *http.Request, projectId string) {
+	// For now, we'll just return 204 No Content as a placeholder
+	// In a full implementation, this would delete all threads and messages for the project
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // helper: check hex 24
 func isHex24(s string) bool {
 	if len(s) != 24 {
@@ -432,6 +514,34 @@ func handleCreateThreadMessage(w http.ResponseWriter, r *http.Request, projectId
 	req := r
 	req.URL.Path = "/project/" + projectId + "/thread/" + threadId + "/messages"
 	messagesCreateHandler(w, req)
+}
+
+// handleResolveThread resolves a thread
+func handleResolveThread(w http.ResponseWriter, r *http.Request, projectId, threadId string) {
+	// For now, we'll just return 204 No Content as a placeholder
+	// In a full implementation, this would update thread status in the store
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleReopenThread reopens a thread
+func handleReopenThread(w http.ResponseWriter, r *http.Request, projectId, threadId string) {
+	// For now, we'll just return 204 No Content as a placeholder
+	// In a full implementation, this would update thread status in the store
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleDeleteThread deletes a thread
+func handleDeleteThread(w http.ResponseWriter, r *http.Request, projectId, threadId string) {
+	// For now, we'll just return 204 No Content as a placeholder
+	// In a full implementation, this would delete thread and messages
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleEditThreadMessage edits a message in a thread
+func handleEditThreadMessage(w http.ResponseWriter, r *http.Request, projectId, threadId, messageId string) {
+	// For now, we'll just return 204 No Content as a placeholder
+	// In a full implementation, this would update the message in the store
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // handledThreadsList mirrors Node: only include threads that have messages

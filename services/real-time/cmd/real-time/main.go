@@ -8,21 +8,25 @@ import (
 	"github.com/davrot/gogotex_at_work/services/real_time/internal/api"
 )
 
-func main() {
-	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, `{"status":"ok"}`)
-	})
+// healthHandler handles the /health endpoint
+func healthHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprint(w, `{"status":"ok"}`)
+}
 
-	// Minimal API endpoints for parity tests
-	http.HandleFunc("/internal/api/pubsub/publish", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != "POST" {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			return
-		}
-		api.PublishHandler(w, r)
-	})
+// publishHandler handles the /internal/api/pubsub/publish endpoint
+func publishHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	api.PublishHandler(w, r)
+}
+
+func main() {
+	http.HandleFunc("/health", healthHandler)
+	http.HandleFunc("/internal/api/pubsub/publish", publishHandler)
 
 	addr := ":3000"
 	log.Printf("real-time service listening on %s", addr)

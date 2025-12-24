@@ -87,7 +87,7 @@ done
 # Optionally run a networked Go-level DB test inside a helper container to validate NewPostgresStore
 if [ "$REMOTE_DB_TEST" = "1" ]; then
   echo "running remote networked Go DB test inside helper container..."
-  HELPER_OUT=$(docker run --rm --network container:${PG_CONTAINER} -v "$SERVICE_DIR":/src -w /src golang:1.25-alpine sh -c "apk add --no-cache git ca-certificates && RUN_DB_INTEGRATION_REMOTE=1 go test ./internal/store -run TestPostgresStoreRemoteInner -v" 2>&1) || true
+  HELPER_OUT=$(timeout 30s docker run --rm --network container:${PG_CONTAINER} -v "$SERVICE_DIR":/src -w /src golang:1.25-alpine sh -c "apk add --no-cache git ca-certificates && RUN_DB_INTEGRATION_REMOTE=1 go test ./internal/store -run TestPostgresStoreRemoteInner -v" 2>&1) || true
   echo "helper output:\n$HELPER_OUT"
   if echo "$HELPER_OUT" | grep -q "go: go.mod file not found"; then
     echo "remote helper: go.mod not found in helper container mount; this environment may not support mounting workspace into helper containers. Skipping remote Go-level DB validation." >&2
@@ -99,7 +99,11 @@ if [ "$REMOTE_DB_TEST" = "1" ]; then
   fi
 fi
 
-create_code=$(docker run --network container:$CONTAINER --rm curlimages/curl:latest -sS -o /dev/null -w "%{http_code}" -H 'Content-Type: application/json' -d '{"name":"DBIntegration","email":"db@e.com","id":"11111111-1111-1111-1111-111111111111"}' http://localhost:8080/contacts) || true
+# Run tests with timeout to prevent hanging
+echo "Running tests with timeout..."
+timeout 30s docker run --network container:$CONTAINER --rm golang:1.25-alpine sh -c "cd /tmp && go test -v ./..." || true
+
+create_code=$(timeout 30s docker run --network container:$CONTAINER --rm curlimages/curl:latest -sS -o /dev/null -w "%{http_code}" -H 'Content-Type: application/json' -d '{"name":"DBIntegration","email":"db@e.com","id":"11111111-1111-1111-1111-111111111111"}' http://localhost:8080/contacts) || true
 if [ "$create_code" != "201" ]; then
   echo "postgres contacts create failed (code: $create_code)"
   docker logs "$CONTAINER" || true
@@ -128,7 +132,7 @@ if ! docker run --network container:$CONTAINER --rm curlimages/curl:latest -sS h
 fi
 
 # test contacts create & list
-create_code=$(docker run --network container:$CONTAINER --rm curlimages/curl:latest -sS -o /dev/null -w "%{http_code}" -H 'Content-Type: application/json' -d '{"name":"Integration","email":"int@e.com"}' http://localhost:8080/contacts) || true
+create_code=$(timeout 30s docker run --network container:$CONTAINER --rm curlimages/curl:latest -sS -o /dev/null -w "%{http_code}" -H 'Content-Type: application/json' -d '{"name":"Integration","email":"int@e.com"}' http://localhost:8080/contacts) || true
 if [ "$create_code" != "201" ]; then
   echo "contacts create failed (code: $create_code)"
   docker logs "$CONTAINER" || true
@@ -144,7 +148,7 @@ if ! docker run --network container:$CONTAINER --rm curlimages/curl:latest -sS h
 fi
 
 # invalid JSON should return 400
-bad_code=$(docker run --network container:$CONTAINER --rm curlimages/curl:latest -sS -o /dev/null -w "%{http_code}" -H 'Content-Type: application/json' -d '{name:bad}' http://localhost:8080/contacts) || true
+bad_code=$(timeout 30s docker run --network container:$CONTAINER --rm curlimages/curl:latest -sS -o /dev/null -w "%{http_code}" -H 'Content-Type: application/json' -d '{name:bad}' http://localhost:8080/contacts) || true
 if [ "$bad_code" != "400" ]; then
   echo "contacts invalid create did not return 400 (code: $bad_code)"
   docker logs "$CONTAINER" || true
@@ -153,7 +157,7 @@ if [ "$bad_code" != "400" ]; then
 fi
 
 # missing required fields should return 400
-missing_code=$(docker run --network container:$CONTAINER --rm curlimages/curl:latest -sS -o /dev/null -w "%{http_code}" -H 'Content-Type: application/json' -d '{"name":""}' http://localhost:8080/contacts) || true
+missing_code=$(timeout 30s docker run --network container:$CONTAINER --rm curlimages/curl:latest -sS -o /dev/null -w "%{http_code}" -H 'Content-Type: application/json' -d '{"name":""}' http://localhost:8080/contacts) || true
 if [ "$missing_code" != "400" ]; then
   echo "contacts missing-fields create did not return 400 (code: $missing_code)"
   docker logs "$CONTAINER" || true

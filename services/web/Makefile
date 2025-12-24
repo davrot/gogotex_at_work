@@ -82,6 +82,10 @@ clean_ci:
 
 test: test_unit test_acceptance test_frontend test_frontend_ct test_writefull
 
+# Run all tests with timeout protection
+test-with-timeout:
+	timeout 30s go test -v ./cmd/web
+
 test_module: test_unit_module test_acceptance_module
 
 #

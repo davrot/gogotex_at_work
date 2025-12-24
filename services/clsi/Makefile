@@ -103,6 +103,10 @@ typecheck_ci:
 
 test: format lint typecheck shellcheck test_unit test_acceptance
 
+# Run all tests with timeout protection
+test-with-timeout:
+	timeout 30s go test -v ./cmd/clsi
+
 test_unit:
 ifneq (,$(wildcard test/unit))
 	$(DOCKER_COMPOSE_TEST_UNIT) run --rm test_unit

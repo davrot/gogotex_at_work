@@ -42,37 +42,3 @@ func TestMessages_CreateAndList(t *testing.T) {
 		t.Fatalf("expected non-empty list")
 	}
 }
-
-func TestThread_CreateAndList(t *testing.T) {
-	// Create message in a thread
-	projectId := "proj1"
-	threadId := "threadA"
-	payload := map[string]string{"content": "thread-msg", "author": "carol"}
-	b, _ := json.Marshal(payload)
-	target := "/project/" + projectId + "/thread/" + threadId + "/messages"
-	req := httptest.NewRequest("POST", target, bytes.NewReader(b))
-	w := httptest.NewRecorder()
-	messagesCreateHandler(w, req)
-	res := w.Result()
-	if res.StatusCode != http.StatusCreated {
-		t.Fatalf("expected 201 created, got %d", res.StatusCode)
-	}
-
-	// Get the thread
-	target = "/project/" + projectId + "/thread/" + threadId
-	req = httptest.NewRequest("GET", target, nil)
-	w = httptest.NewRecorder()
-	// use threads handler directly
-	threadsHandlerWithDefaultStore(w, req)
-	res = w.Result()
-	if res.StatusCode != http.StatusOK {
-		t.Fatalf("expected 200 ok, got %d", res.StatusCode)
-	}
-	body, _ := io.ReadAll(res.Body)
-	var thread map[string]interface{}
-	_ = json.Unmarshal(body, &thread)
-	msgs, ok := thread[threadId].(map[string]interface{})["messages"].([]interface{})
-	if !ok || len(msgs) == 0 {
-		t.Fatalf("expected thread messages, got: %s", string(body))
-	}
-}

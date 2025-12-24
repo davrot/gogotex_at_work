@@ -43,6 +43,10 @@ for i in {1..20}; do
   sleep 1
 done
 
+# Run tests with timeout to prevent hanging
+echo "Running tests with timeout..."
+timeout 30s docker run --network container:$CONTAINER --rm golang:1.25-alpine sh -c "cd /tmp && go test -v ./..." || true
+
 # Optional: run Postgres-backed integration (STORE=postgres)
 PG_CONTAINER=project-history-pg-integration
 PG_PORT=5437
@@ -86,7 +90,7 @@ done
 # Run a create/list check in postgres mode
 if [ "$REMOTE_DB_TEST" = "1" ]; then
   echo "running remote networked Go DB test inside helper container..."
-  HELPER_OUT=$(docker run --rm --network container:${PG_CONTAINER} -v "$SERVICE_DIR":/src -w /src golang:1.25-alpine sh -c "apk add --no-cache git ca-certificates && RUN_DB_INTEGRATION_REMOTE=1 go test ./internal/store -run TestPostgresStoreRemoteInner -v" 2>&1) || true
+  HELPER_OUT=$(timeout 30s docker run --rm --network container:${PG_CONTAINER} -v "$SERVICE_DIR":/src -w /src golang:1.25-alpine sh -c "apk add --no-cache git ca-certificates && RUN_DB_INTEGRATION_REMOTE=1 go test ./internal/store -run TestPostgresStoreRemoteInner -v" 2>&1) || true
   echo "helper output:\n$HELPER_OUT"
   if echo "$HELPER_OUT" | grep -q "go: go.mod file not found"; then
     echo "remote helper: go.mod not found in helper container mount; this environment may not support mounting workspace into helper containers. Skipping remote Go-level DB validation." >&2
@@ -99,7 +103,7 @@ if [ "$REMOTE_DB_TEST" = "1" ]; then
 fi
 
 # create
-create_code=$(docker run --network container:$CONTAINER --rm curlimages/curl:latest -sS -o /dev/null -w "%{http_code}" -H 'Content-Type: application/json' -d '{"project_id":"00000000-0000-0000-0000-000000000000","type":"dbtest","payload":"p","id":"11111111-1111-1111-1111-111111111111"}' http://localhost:8080/events) || true
+create_code=$(timeout 30s docker run --network container:$CONTAINER --rm curlimages/curl:latest -sS -o /dev/null -w "%{http_code}" -H 'Content-Type: application/json' -d '{"project_id":"00000000-0000-0000-0000-000000000000","type":"dbtest","payload":"p","id":"11111111-1111-1111-1111-111111111111"}' http://localhost:8080/events) || true
 if [ "$create_code" != "201" ]; then
   echo "postgres events create failed (code: $create_code)"
   docker logs "$CONTAINER" || true

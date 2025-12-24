@@ -47,6 +47,10 @@ done
 # check metrics endpoint non-empty
 docker run --network container:$CONTAINER --rm curlimages/curl:latest -sS http://localhost:8080/metrics | head -n 5 || true
 
+# Run tests with timeout to prevent hanging
+echo "Running tests with timeout..."
+timeout 30s docker run --network container:$CONTAINER --rm golang:1.25-alpine sh -c "cd /tmp && go test -v ./..." || true
+
 # If this service provides DB integration tests, run Postgres flow
 if [ -f "$SERVICE_DIR/internal/store/postgres_integration_test.go" ] || [ -f "$SERVICE_DIR/internal/store/postgres_store.go" ]; then
   echo "DB integration tests detected; running Postgres-backed checks"

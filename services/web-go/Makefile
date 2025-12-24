@@ -5,7 +5,8 @@ build:
 	go build ./...
 
 test:
-	go test ./... -v
+	# Run tests with timeout to prevent hanging
+	timeout 30s go test ./... -v
 
 lint:
 	golangci-lint run || true

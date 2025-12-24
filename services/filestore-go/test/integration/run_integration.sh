@@ -44,6 +44,10 @@ for i in {1..20}; do
   sleep 1
 done
 
+# Run tests with timeout to prevent hanging
+echo "Running tests with timeout..."
+timeout 30s docker run --network container:$CONTAINER --rm golang:1.25-alpine sh -c "cd /tmp && go test -v ./..." || true
+
 # check metrics endpoint non-empty
 docker run --network container:$CONTAINER --rm curlimages/curl:latest -sS http://localhost:8080/metrics | head -n 5 || true
 
@@ -92,7 +96,7 @@ if [ -f "$SERVICE_DIR/internal/store/postgres_integration_test.go" ] || [ -f "$S
   # optionally run remote networked Go DB tests if requested
   if [ "$REMOTE_DB_TEST" = "1" ]; then
     echo "running remote networked Go DB test inside helper container..."
-    HELPER_OUT=$(docker run --rm --network container:${PG_CONTAINER} -v "$SERVICE_DIR":/src -w /src golang:1.25-alpine sh -c "apk add --no-cache git ca-certificates && RUN_DB_INTEGRATION_REMOTE=1 go test ./internal/store -run TestPostgresStoreRemoteInner -v" 2>&1) || true
+    HELPER_OUT=$(timeout 30s docker run --rm --network container:${PG_CONTAINER} -v "$SERVICE_DIR":/src -w /src golang:1.25-alpine sh -c "apk add --no-cache git ca-certificates && RUN_DB_INTEGRATION_REMOTE=1 go test ./internal/store -run TestPostgresStoreRemoteInner -v" 2>&1) || true
     echo "helper output:\n$HELPER_OUT"
     if echo "$HELPER_OUT" | grep -q "go: go.mod file not found"; then
       echo "remote helper: go.mod not found in helper container mount; skipping remote Go-level DB validation." >&2
