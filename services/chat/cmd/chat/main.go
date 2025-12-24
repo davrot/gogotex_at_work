@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/davrot/gogotex_at_work/services/chat/internal/store"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -39,7 +41,9 @@ func threadsHandlerWithStore(s *store.Store, w http.ResponseWriter, r *http.Requ
 			action := parts[4]
 			if action == "duplicate" {
 				// body: { threads: [id, ...] }
-				var body struct{ Threads []string `json:"threads"` }
+				var body struct {
+					Threads []string `json:"threads"`
+				}
 				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 					w.WriteHeader(http.StatusBadRequest)
 					w.Write([]byte("Invalid JSON"))
@@ -65,7 +69,9 @@ func threadsHandlerWithStore(s *store.Store, w http.ResponseWriter, r *http.Requ
 			}
 			// generate thread data: mirror Node behaviour by returning grouped messages for provided thread ids
 			if action == "generate" {
-				var body struct{ Threads []string `json:"threads"` }
+				var body struct {
+					Threads []string `json:"threads"`
+				}
 				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 					w.WriteHeader(http.StatusBadRequest)
 					w.Write([]byte("Invalid JSON"))
@@ -101,14 +107,45 @@ func threadsHandlerWithStore(s *store.Store, w http.ResponseWriter, r *http.Requ
 			return
 		}
 		if action == "reopen" {
-			s.Delete("resolved:"+projectId+":"+threadId)
+			s.Delete("resolved:" + projectId + ":" + threadId)
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
 		if action == "delete" {
-			s.Delete("messages:"+projectId+":"+threadId)
+			s.Delete("messages:" + projectId + ":" + threadId)
 			w.WriteHeader(http.StatusNoContent)
 			return
+		}
+	}
+
+	// support GET /project/:pid/threads/:tid to return messages for a thread when backed by Mongo
+	if r.Method == http.MethodGet && len(parts) >= 5 {
+		threadId := parts[4]
+		if messagesColl != nil {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			roomsColl := messagesColl.Database().Collection("rooms")
+			projVal := interface{}(projectId)
+			if pid, err := primitive.ObjectIDFromHex(projectId); err == nil {
+				projVal = pid
+			}
+			tidVal := interface{}(threadId)
+			if tid, err := primitive.ObjectIDFromHex(threadId); err == nil {
+				tidVal = tid
+			}
+			var room map[string]interface{}
+			if err := roomsColl.FindOne(ctx, map[string]interface{}{"project_id": projVal, "thread_id": tidVal}).Decode(&room); err == nil {
+				cur, err := messagesColl.Find(ctx, map[string]interface{}{"room_id": room["_id"]})
+				if err == nil {
+					var out []map[string]interface{}
+					if err := cur.All(ctx, &out); err == nil {
+						w.Header().Set("Content-Type", "application/json")
+						w.WriteHeader(http.StatusOK)
+						_ = json.NewEncoder(w).Encode(map[string]interface{}{threadId: map[string]interface{}{"messages": out}})
+						return
+					}
+				}
+			}
 		}
 	}
 
@@ -147,7 +184,7 @@ func messagesHandlerWithStore(s *store.Store, w http.ResponseWriter, r *http.Req
 	// POST: create message
 	if r.Method == http.MethodPost {
 		var body struct {
-			UserID string `json:"user_id"`
+			UserID  string `json:"user_id"`
 			Content string `json:"content"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -173,19 +210,44 @@ func messagesHandlerWithStore(s *store.Store, w http.ResponseWriter, r *http.Req
 
 		// Minimal message creation: persist to Mongo if configured; otherwise use in-memory store
 		msg := map[string]interface{}{
-			"_id":      "m1",
-			"content":  body.Content,
-			"user_id":  body.UserID,
+			"_id":       "m1",
+			"content":   body.Content,
+			"user_id":   body.UserID,
 			"timestamp": 1234567890,
 		}
 		if messagesColl != nil {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
+			// Resolve or create room by projectId + threadId
+			roomsColl := messagesColl.Database().Collection("rooms")
+			projVal := interface{}(projectId)
+			if pid, err := primitive.ObjectIDFromHex(projectId); err == nil {
+				projVal = pid
+			}
+			tidVal := interface{}(threadId)
+			if tid, err := primitive.ObjectIDFromHex(threadId); err == nil {
+				tidVal = tid
+			}
+			var room map[string]interface{}
+			if err := roomsColl.FindOne(ctx, map[string]interface{}{"project_id": projVal, "thread_id": tidVal}).Decode(&room); err != nil {
+				// create a new room
+				rdoc := map[string]interface{}{"project_id": projVal, "thread_id": tidVal}
+				if rres, rerr := roomsColl.InsertOne(ctx, rdoc); rerr == nil {
+					room = map[string]interface{}{"_id": rres.InsertedID}
+				} else {
+					log.Printf("rooms insert error: %v", rerr)
+				}
+			}
+			roomID := room["_id"]
+			userVal := interface{}(body.UserID)
+			if uid, err := primitive.ObjectIDFromHex(body.UserID); err == nil {
+				userVal = uid
+			}
 			doc := map[string]interface{}{
-				"room_id": threadId,
-				"content": body.Content,
-				"user_id": body.UserID,
-				"timestamp": time.Now().Unix(),
+				"room_id":   roomID,
+				"content":   body.Content,
+				"user_id":   userVal,
+				"timestamp": time.Now().UnixMilli(),
 			}
 			if _, err := messagesColl.InsertOne(ctx, doc); err != nil {
 				log.Printf("mongo insert error: %v", err)
@@ -212,7 +274,7 @@ func messagesHandlerWithStore(s *store.Store, w http.ResponseWriter, r *http.Req
 		if messagesColl != nil {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			cur, err := messagesColl.Find(ctx, map[string]interface{}{ "room_id": threadId })
+			cur, err := messagesColl.Find(ctx, map[string]interface{}{"room_id": threadId})
 			if err == nil {
 				var out []map[string]interface{}
 				if err := cur.All(ctx, &out); err == nil {
@@ -246,7 +308,9 @@ func messagesHandlerWithStore(s *store.Store, w http.ResponseWriter, r *http.Req
 			return
 		}
 		messageId := parts[6]
-		var body struct{ Content string `json:"content"` }
+		var body struct {
+			Content string `json:"content"`
+		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte("Invalid JSON"))
@@ -261,7 +325,7 @@ func messagesHandlerWithStore(s *store.Store, w http.ResponseWriter, r *http.Req
 		if messagesColl != nil {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			res, err := messagesColl.UpdateOne(ctx, map[string]interface{}{ "_id": messageId, "room_id": threadId }, map[string]interface{}{ "$set": map[string]interface{}{ "content": body.Content, "edited_at": time.Now().Unix() } })
+			res, err := messagesColl.UpdateOne(ctx, map[string]interface{}{"_id": messageId, "room_id": threadId}, map[string]interface{}{"$set": map[string]interface{}{"content": body.Content, "edited_at": time.Now().Unix()}})
 			if err == nil && res.ModifiedCount == 1 {
 				w.WriteHeader(http.StatusNoContent)
 				return
@@ -303,7 +367,7 @@ func messagesHandlerWithStore(s *store.Store, w http.ResponseWriter, r *http.Req
 		if messagesColl != nil {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			res, err := messagesColl.DeleteOne(ctx, map[string]interface{}{ "_id": messageId, "room_id": threadId })
+			res, err := messagesColl.DeleteOne(ctx, map[string]interface{}{"_id": messageId, "room_id": threadId})
 			if err == nil && res.DeletedCount == 1 {
 				w.WriteHeader(http.StatusNoContent)
 				return
@@ -338,7 +402,6 @@ func messagesHandlerWithStore(s *store.Store, w http.ResponseWriter, r *http.Req
 	w.WriteHeader(http.StatusMethodNotAllowed)
 }
 
-
 func main() {
 	// Optional seeding for tests: JSON map of projectId -> []threadIDs
 	seed := os.Getenv("SEED_THREADS")
@@ -367,8 +430,15 @@ func main() {
 			if err := client.Ping(ctx, nil); err != nil {
 				log.Printf("mongo ping failed: %v", err)
 			} else {
-				messagesColl = client.Database("chat").Collection("messages")
-				log.Printf("connected to Mongo at %s", uri)
+				// Use the database from the URI path if specified, e.g. mongodb://host:27017/chat_test
+				dbName := "chat"
+				if u, perr := url.Parse(uri); perr == nil {
+					if p := strings.Trim(u.Path, "/"); p != "" {
+						dbName = p
+					}
+				}
+				messagesColl = client.Database(dbName).Collection("messages")
+				log.Printf("connected to Mongo at %s (db=%s)", uri, dbName)
 			}
 		}
 	}

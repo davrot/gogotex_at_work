@@ -13,6 +13,8 @@
     "test:unit:_run": "mocha --recursive --exit $@ test/unit/js",
     "test:parity-status": "node test/parity_status_test.js",
     "test:parity-threads": "node test/parity_threads_test.js",
+    "test:parity-messages": "node test/parity_messages_test.js",
+    "test:parity-messages-get": "node test/parity_messages_get_test.js",
     "bench:threads": "node bench/threads_bench.js",
     "lint": "eslint --max-warnings 0 --format unix .",
     "format": "prettier --list-different $PWD/'**/{*.*js,*.ts}'",

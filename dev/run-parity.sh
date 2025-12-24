@@ -15,4 +15,11 @@ npm run test:parity-status
 echo "Running parity threads test..."
 npm run test:parity-threads || true
 
+# Messages parity checks (validation and persistence parity)
+echo "Running parity messages validation tests..."
+npm run test:parity-messages || true
+
+echo "Running parity messages GET tests..."
+npm run test:parity-messages-get || true
+
 echo "Parity tests complete"
