@@ -1,0 +1,175 @@
+name: Canary Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Image tag to deploy (e.g., sha or version)'
+        required: true
+        default: 'canary-{{ github.sha }}'
+      registry:
+        description: 'Container registry (e.g., ghcr.io/org or registry.example.com)'
+        required: true
+        default: 'ghcr.io/${{ github.repository_owner }}'
+      canary_percent:
+        description: 'Initial canary traffic percentage'
+        required: false
+        default: '5'
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    outputs:
+      image-tag: ${{ steps.set-tag.outputs.image-tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set image tag
+        id: set-tag
+        run: echo "::set-output name=image-tag::${{ github.event.inputs.image_tag }}"
+
+      - name: Log in to registry
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ github.event.inputs.registry }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Build & push web image
+        run: |
+          IMAGE=${{ github.event.inputs.registry }}/web:${{ steps.set-tag.outputs.image-tag }}
+          docker build -t "$IMAGE" -f services/web/Dockerfile .
+          docker push "$IMAGE"
+
+      - name: Build & push git-bridge image
+        run: |
+          IMAGE=${{ github.event.inputs.registry }}/git-bridge:${{ steps.set-tag.outputs.image-tag }}
+          docker build -t "$IMAGE" -f services/git-bridge/Dockerfile .
+          docker push "$IMAGE"
+
+  deploy-staging:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: '1.27.0'
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v1
+
+      - name: Configure kubeconfig
+        env:
+          KUBE_CONFIG_DATA: ${{ secrets.KUBE_CONFIG_STAGING }}
+        run: |
+          echo "$KUBE_CONFIG_DATA" | base64 --decode > /tmp/kubeconfig
+          export KUBECONFIG=/tmp/kubeconfig
+          kubectl get nodes || (kubectl config view && exit 1)
+
+      - name: Deploy web to staging (helm)
+        env:
+          IMAGE_TAG: ${{ needs.build-and-push.outputs.image-tag }}
+          REGISTRY: ${{ github.event.inputs.registry }}
+        run: |
+          helm upgrade --install web ./charts/web --namespace staging --create-namespace \
+            --set image.repository=${{ github.event.inputs.registry }}/web \
+            --set image.tag=${{ needs.build-and-push.outputs.image-tag }}
+
+      - name: Validate web health endpoint
+        env:
+          KUBECONFIG: /tmp/kubeconfig
+        run: |
+          POD=$(kubectl get pods -n staging -l app=web -o jsonpath='{.items[0].metadata.name}')
+          kubectl exec -n staging "$POD" -- curl -fsS --retry 3 --retry-delay 2 http://localhost:3000/internal/health/oauth-introspect
+
+      - name: Deploy git-bridge to staging (helm)
+        env:
+          IMAGE_TAG: ${{ needs.build-and-push.outputs.image-tag }}
+          REGISTRY: ${{ github.event.inputs.registry }}
+        run: |
+          helm upgrade --install git-bridge ./charts/git-bridge --namespace staging --create-namespace \
+            --set image.repository=${{ github.event.inputs.registry }}/git-bridge \
+            --set image.tag=${{ needs.build-and-push.outputs.image-tag }}
+
+      - name: Run integration tests against staging
+        env:
+          INTROSPECTION_URL: "http://web.staging.svc.cluster.local/internal/oauth/introspect"
+        run: |
+          mvn -Dtest=Oauth2FilterIntegrationTest test -f services/git-bridge/pom.xml
+
+  canary-production:
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: '1.27.0'
+
+      - name: Configure kubeconfig (production)
+        env:
+          KUBE_CONFIG_DATA: ${{ secrets.KUBE_CONFIG_PROD }}
+        run: |
+          echo "$KUBE_CONFIG_DATA" | base64 --decode > /tmp/kubeconfig
+          export KUBECONFIG=/tmp/kubeconfig
+
+      - name: Apply canary image to one replica
+        env:
+          IMAGE_TAG: ${{ needs.build-and-push.outputs.image-tag }}
+        run: |
+          # Create a canary deployment with the same spec but a single replica
+          kubectl -n production apply -f - <<EOF
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: web-canary
+            labels:
+              app: web
+              canary: "true"
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: web
+                canary: "true"
+            template:
+              metadata:
+                labels:
+                  app: web
+                  canary: "true"
+              spec:
+                containers:
+                  - name: web
+                    image: ${{ github.event.inputs.registry }}/web:${{ needs.build-and-push.outputs.image-tag }}
+                    ports:
+                      - containerPort: 3000
+          EOF
+
+      - name: Wait for canary to be ready
+        run: |
+          kubectl -n production rollout status deployment/web-canary --timeout=120s
+
+      - name: Smoke test canary
+        run: |
+          CANARY_POD=$(kubectl -n production get pods -l app=web,canary=true -o jsonpath='{.items[0].metadata.name}')
+          kubectl -n production exec "$CANARY_POD" -- curl -fsS --retry 3 --retry-delay 2 http://localhost:3000/internal/health/oauth-introspect
+
+      - name: Monitor metrics (placeholder)
+        run: |
+          echo "Monitoring: check Prometheus for error rate / introspection metrics for the canary window (manual or automated)."
+
+      - name: Promote canary to 50% (manual step)
+        run: |
+          echo "Manual step: increase traffic to canary via service mesh or LB (platform specific)."
+
+      - name: Final instructions
+        run: |
+          echo "If canary stable, increase to full rollout. If not, run: kubectl -n production delete deployment web-canary && helm upgrade --install web ./charts/web --set image.tag=<previous> --namespace production"
