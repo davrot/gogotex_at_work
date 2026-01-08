@@ -103,6 +103,10 @@ typecheck_ci:
 
 test: format lint typecheck shellcheck test_unit test_acceptance
 
+# Run all tests with timeout protection
+test-with-timeout:
+	timeout 30s npm run test:unit && timeout 30s npm run test:acceptance && timeout 30s go test -v ./cmd/chat
+
 test_unit:
 ifneq (,$(wildcard test/unit))
 	$(DOCKER_COMPOSE_TEST_UNIT) run --rm test_unit
@@ -124,6 +128,10 @@ test_acceptance_run:
 ifneq (,$(wildcard test/acceptance))
 	$(DOCKER_COMPOSE_TEST_ACCEPTANCE) run --rm test_acceptance
 endif
+
+# Go migration targets with timeout protection
+go-test:
+	cd cmd/chat && timeout 30s go test -v ./...
 
 # Go migration targets
 go-build:

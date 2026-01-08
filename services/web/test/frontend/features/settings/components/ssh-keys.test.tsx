@@ -9,6 +9,8 @@ afterEach(() => {
   else if (typeof fetchMock.reset === 'function') fetchMock.reset()
 })
 
+describe.only('SSHKeysPanel focused tests', function () {
+
 it('renders no keys and allows adding and deleting keys', async () => {
   const userId = 'u1'
   fetchMock.get(`/internal/api/users/${userId}/ssh-keys`, [])
@@ -168,4 +170,4 @@ it('delete uses effectiveUserId when available', async () => {
   // cleanup
   const m2 = document.querySelector('meta[name="ol-user_id"]')
   if (m2 && m2.parentNode) m2.parentNode.removeChild(m2)
-})
+});

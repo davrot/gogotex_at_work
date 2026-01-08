@@ -1,0 +1,2 @@
+Running local multi-instance runner (docker-backed); output -> ci/chat-multi-instance/multi-instance-run-20251223T123413Z.out
+Local multi-instance runner not found: services/chat/scripts/run_multi_instance_local.sh

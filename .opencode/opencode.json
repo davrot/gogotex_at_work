@@ -1,0 +1,21 @@
+
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "openai/gpt-oss-20b",
+  "provider": {
+    "bremen-neuro": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Bremen Neuro (GPT-OSS-20B)",
+      "options": {
+        "baseURL": "http://gate1.neuro.uni-bremen.de:8000/v1"
+      },
+      "models": {
+        "openai/gpt-oss-20b": {
+          "name": "openai/gpt-oss-20b",
+          "maxTokens": 8192
+        }
+      }
+    }
+  }
+}
+

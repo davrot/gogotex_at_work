@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+set -euo pipefail
+if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
+  echo "Usage: create-go-service <service-name> [--with-ci]"
+  exit 2
+fi
+NAME=$1
+WITH_CI=0
+if [ "${2-}" = "--with-ci" ]; then
+  WITH_CI=1
+fi
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+TEMPLATEDIR="$ROOT/docs/templates/service-go"
+DEST="$ROOT/services/${NAME}-go"
+if [ -d "$DEST" ]; then
+  echo "Destination $DEST already exists"
+  exit 1
+fi
+mkdir -p "$DEST"
+# Substitute service name into README template
+sed -e "s/{{SERVICE_NAME}}/$NAME/g" "$TEMPLATEDIR/README_TEMPLATE.md" > "$DEST/README_POC.md"
+sed -e "s/{{SERVICE_NAME}}/$NAME/g" "$TEMPLATEDIR/Dockerfile.template" > "$DEST/Dockerfile"
+mkdir -p "$DEST/test/integration"
+# copy CI snippet as a local template (do not create repo-level workflow automatically unless --with-ci is passed)
+mkdir -p "$DEST/ci"
+sed -e "s/{{SERVICE_NAME}}/$NAME/g" "$TEMPLATEDIR/ci-snippet.template" > "$DEST/ci/ci-snippet.template"
+# create a minimal Makefile for local workflows
+cat > "$DEST/Makefile" <<'MAKE'
+.PHONY: all build test lint docker integration integration-remote
+all: build
+
+build:
+	go build ./...
+
+test:
+	go test ./... -v
+
+lint:
+	golangci-lint run || true
+
+docker:
+	docker build -t ${NAME}-go:local .
+
+# Integration helpers
+integration:
+	bash test/integration/run_integration.sh
+
+integration-remote:
+	bash test/integration/run_integration.sh --remote-db-test
+MAKE
+
+# Optionally create a service-level GitHub Actions workflow when requested
+if [ "$WITH_CI" -eq 1 ]; then
+  mkdir -p "$ROOT/.github/workflows"
+  sed -e "s/{{SERVICE_NAME}}/$NAME/g" "$TEMPLATEDIR/ci-workflow.template" > "$ROOT/.github/workflows/ci-$NAME-go.yml"
+  echo "Created .github/workflows/ci-$NAME-go.yml"
+fi
+chmod +x "$DEST"
+cat <<EOF
+Created $DEST
+
+Next steps:
+ - Implement the Go service in $DEST/internal
+ - Add tests and CI snippet from docs/templates/service-go/ci-snippet.template
+EOF
